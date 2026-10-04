@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My results and schedule</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1d2330;--mut:#6b7385;--ac:#2b5cd9;--ok:#1f9d55;--warn:#d9822b;--bd:#e3e6ec}
+@media(prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b2030;--tx:#e8ebf2;--mut:#98a0b3;--bd:#2a3145}}
+*{box-sizing:border-box}body{margin:0;font:16px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--tx)}
+main{max-width:720px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:1.4rem;margin:0 0 4px}h2{font-size:1.1rem;margin:28px 0 10px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px 16px;margin-bottom:12px}
+.mut{color:var(--mut);font-size:.9rem}.row{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.big{font-size:1.6rem;font-weight:700}.bar{height:8px;border-radius:4px;background:var(--bd);overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;background:var(--ac)}.crit{margin:10px 0}
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:.8rem;background:var(--bd)}
+.fb{border-left:3px solid var(--ac);padding-left:10px;margin-top:10px;white-space:pre-wrap}
+.day{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd)}.day:last-child{border:0}
+.work{color:var(--ok);font-weight:600}.off{color:var(--mut)}.leave{color:var(--warn);font-weight:600}
+button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx);cursor:pointer}
+#login{text-align:center;margin-top:60px}#err{color:#c0392b;margin:12px 0}
+</style></head><body><main>
+<div id="login"><h1>My results and schedule</h1><p class="mut">Sign in with the Google account your trainer has on file.</p>
+<div id="gbtn" style="display:inline-block"></div><div id="err"></div></div>
+<div id="app" hidden></div>
+</main>
+<script>
+/* ===== SETTINGS ===== */
+var CLIENT_ID = '121975980339-fu9nd124kov2g6j94qiofOrkjkhbkee6.apps.googleusercontent.com';
+var SERVER_URL = 'https://script.google.com/macros/s/AKfycbwEvHPAhAm62KOSxUjxb08KqQC6r0DVEgvpHULQFIx3n5gpkyl6lH_w8ZETzROxO6kG/exec';   /* ends in /exec */
+/* ==================== */
+var tok = null;
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function err(m){document.getElementById('err').textContent=m}
+function init(){
+  if(!window.google||!google.accounts){return setTimeout(init,200)}
+  google.accounts.id.initialize({client_id:CLIENT_ID,callback:function(r){tok=r.credential;load()},auto_select:false});
+  google.accounts.id.renderButton(document.getElementById('gbtn'),{theme:'outline',size:'large'});
+}
+function load(){
+  err('Loading...');
+  fetch(SERVER_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'me',idToken:tok})})
+  .then(function(r){return r.json()}).then(function(j){
+    if(j.error){err({'no employee found for this email':'This Google account is not on the employee list. Ask your trainer to check your email.','sign-in invalid':'Sign-in failed or expired. Please try again.','not configured':'The service is not set up yet.'}[j.error]||j.error);return}
+    show(j)}).catch(function(){err('Could not reach the server. Please try again.')});
+}
+var SH={morning:'Morning',afternoon:'Afternoon',night:'Night'},OFF={rest:'Day off',vacation:'Vacation',sick:'Sick leave',unpaid:'Unpaid leave'};
+function hh(n){n=n%24;return String(Math.floor(n)).padStart(2,'0')+':'+(n%1?'30':'00')}
+function show(d){
+  document.getElementById('login').hidden=true;var a=document.getElementById('app');a.hidden=false;
+  var h='<div class="row"><div><h1>Hello, '+esc(d.name||d.email)+'</h1><div class="mut">'+esc(d.email)+'</div></div><button onclick="location.reload()">Sign out</button></div>';
+  h+='<h2>My results</h2>';
+  if(!d.evaluations.length)h+='<div class="card mut">No results have been shared with you yet.</div>';
+  d.evaluations.forEach(function(e){
+    var mx=Math.max.apply(null,[5].concat(e.criteria.map(function(c){return c.score||0})));
+    h+='<div class="card"><div class="row"><div><b>'+esc(e.game||'Evaluation')+'</b><div class="mut">'+esc(e.date)+'</div></div><div class="big">'+(e.total==null?'-':esc(e.total))+'</div></div>';
+    e.criteria.forEach(function(c){if(c.score==null)return;h+='<div class="crit"><div class="row"><span>'+esc(c.name)+'</span><span class="mut">'+c.score+'</span></div><div class="bar"><i style="width:'+Math.min(100,c.score/mx*100)+'%"></i></div></div>'});
+    if(e.improve&&e.improve.length)h+='<div style="margin-top:8px"><span class="mut">Focus on: </span>'+e.improve.map(function(x){return '<span class="tag">'+esc(x)+'</span>'}).join(' ')+'</div>';
+    if(e.feedback)h+='<div class="fb">'+esc(e.feedback)+'</div>';
+    h+='</div>'});
+  h+='<h2>My next 28 days</h2>';
+  if(!d.schedule||!d.schedule.days.length)h+='<div class="card mut">No schedule has been published for you yet.</div>';
+  else{h+='<div class="card">';d.schedule.days.forEach(function(x){
+    var dt=new Date(x.d+'T12:00:00'),lbl=dt.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'});
+    var work=SH[x.s],txt=work?SH[x.s]+(x.f!=null?' &middot; '+hh(x.f)+'-'+hh(x.t):''):esc(OFF[x.s]||x.s);
+    h+='<div class="day"><span>'+lbl+'</span><span class="'+(work?'work':x.s==='rest'?'off':'leave')+'">'+txt+'</span></div>'});h+='</div>'}
+  a.innerHTML=h;
+}
+init();
+</script></body></html>
