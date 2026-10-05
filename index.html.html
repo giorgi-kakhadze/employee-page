@@ -27,7 +27,7 @@ button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--bd
 <script>
 /* ===== SETTINGS ===== */
 var CLIENT_ID = '121975980339-fu9nd124kov2g6j94qiofOrkjkhbkee6.apps.googleusercontent.com';
-var SERVER_URL = 'https://script.google.com/macros/s/AKfycbwEvHPAhAm62KOSxUjxb08KqQC6r0DVEgvpHULQFIx3n5gpkyl6lH_w8ZETzROxO6kG/exec';   /* ends in /exec */
+var SERVER_URL = 'PASTE-YOUR-APPS-SCRIPT-WEB-APP-URL-HERE';   /* ends in /exec */
 /* ==================== */
 var tok = null;
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
@@ -37,34 +37,56 @@ function init(){
   google.accounts.id.initialize({client_id:CLIENT_ID,callback:function(r){tok=r.credential;load()},auto_select:false});
   google.accounts.id.renderButton(document.getElementById('gbtn'),{theme:'outline',size:'large'});
 }
-function load(){
-  err('Loading...');
+var refreshT=null;
+function load(silent){
+  if(!silent)err('Loading...');
   fetch(SERVER_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'me',idToken:tok})})
-  .then(function(r){return r.json()}).then(function(j){
-    if(j.error){err({'no employee found for this email':'This Google account is not on the employee list. Ask your trainer to check your email.','sign-in invalid':'Sign-in failed or expired. Please try again.','not configured':'The service is not set up yet.'}[j.error]||j.error);return}
-    show(j)}).catch(function(){err('Could not reach the server. Please try again.')});
+  .then(function(r){return r.json()})  .then(function(j){
+    if(j.error){if(silent)return;err({'no employee found for this email':'This Google account is not on the employee list. Ask your trainer to check your email.','sign-in invalid':'Sign-in failed or expired. Please try again.','not configured':'The service is not set up yet.'}[j.error]||j.error);return}
+    show(j)}).catch(function(){if(!silent)err('Could not reach the server. Please try again.')});
 }
 var SH={morning:'Morning',afternoon:'Afternoon',night:'Night'},OFF={rest:'Day off',vacation:'Vacation',sick:'Sick leave',unpaid:'Unpaid leave'};
 function hh(n){n=n%24;return String(Math.floor(n)).padStart(2,'0')+':'+(n%1?'30':'00')}
+function cellTxt(v){v=String(v||'').trim();if(!v)return '-';if(/^\d+$/.test(v))return 'Table '+v;if(/^(b|brk|break)$/i.test(v))return 'Break';if(/^(off|x|-)$/i.test(v))return 'Off';return v}
+function when(ms){var t=new Date(ms),n=new Date(),hm=t.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});return t.toDateString()===n.toDateString()?hm:t.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'})+' '+hm}
 function show(d){
   document.getElementById('login').hidden=true;var a=document.getElementById('app');a.hidden=false;
-  var h='<div class="row"><div><h1>Hello, '+esc(d.name||d.email)+'</h1><div class="mut">'+esc(d.email)+'</div></div><button onclick="location.reload()">Sign out</button></div>';
+  var h='<div class="row"><div><h1>Hello, '+esc(d.name||d.email)+'</h1><div class="mut">'+esc(d.email)+'</div></div><span><button onclick="load()">&#8635; Refresh</button> <button onclick="location.reload()">Sign out</button></span></div>';
   h+='<h2>My results</h2>';
   if(!d.evaluations.length)h+='<div class="card mut">No results have been shared with you yet.</div>';
   d.evaluations.forEach(function(e){
     var mx=Math.max.apply(null,[5].concat(e.criteria.map(function(c){return c.score||0})));
-    h+='<div class="card"><div class="row"><div><b>'+esc(e.game||'Evaluation')+'</b><div class="mut">'+esc(e.date)+'</div></div><div class="big">'+(e.total==null?'-':esc(e.total))+'</div></div>';
-    e.criteria.forEach(function(c){if(c.score==null)return;h+='<div class="crit"><div class="row"><span>'+esc(c.name)+'</span><span class="mut">'+c.score+'</span></div><div class="bar"><i style="width:'+Math.min(100,c.score/mx*100)+'%"></i></div></div>'});
+    var mx=Math.max.apply(null,[1].concat(e.criteria.map(function(c){return c.score||0}))),cr=e.criteria.filter(function(c){return c.score!=null}).sort(function(x,y){return x.score-y.score}),lost=cr.filter(function(c){return c.score<mx}).length;
+    h+='<div class="card"><div class="row"><div><b>'+esc(e.game||'Evaluation')+'</b><div class="mut">'+esc(e.date)+'</div></div><div class="big">'+(e.total==null?'-':esc(e.total))+'%</div></div>';
+    h+='<div class="mut" style="margin-top:6px">'+(lost?lost+' criteria with points deducted':'Full score on every criterion')+'</div>';
+    cr.forEach(function(c){var full=c.score>=mx;h+='<div class="day"><span>'+esc(c.name)+'</span><span class="'+(full?'work':'leave')+'">'+(full?'&#10003; Full score':'&minus;'+(mx-c.score)+' ('+c.score+'/'+mx+')')+'</span></div>'});
     if(e.improve&&e.improve.length)h+='<div style="margin-top:8px"><span class="mut">Focus on: </span>'+e.improve.map(function(x){return '<span class="tag">'+esc(x)+'</span>'}).join(' ')+'</div>';
     if(e.feedback)h+='<div class="fb">'+esc(e.feedback)+'</div>';
     h+='</div>'});
-  h+='<h2>My next 28 days</h2>';
-  if(!d.schedule||!d.schedule.days.length)h+='<div class="card mut">No schedule has been published for you yet.</div>';
-  else{h+='<div class="card">';d.schedule.days.forEach(function(x){
-    var dt=new Date(x.d+'T12:00:00'),lbl=dt.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'});
-    var work=SH[x.s],txt=work?SH[x.s]+(x.f!=null?' &middot; '+hh(x.f)+'-'+hh(x.t):''):esc(OFF[x.s]||x.s);
-    h+='<div class="day"><span>'+lbl+'</span><span class="'+(work?'work':x.s==='rest'?'off':'leave')+'">'+txt+'</span></div>'});h+='</div>'}
+  function days(t,x){h+='<h2>'+t+'</h2>';
+    if(!x||!x.days.length){h+='<div class="card mut">Nothing has been sent to you yet.</div>';return}
+    h+='<div class="card">';x.days.forEach(function(y){
+      var dt=new Date(y.d+'T12:00:00'),lbl=dt.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'});
+      var work=SH[y.s],txt=work?SH[y.s]+(y.f!=null?' &middot; '+hh(y.f)+'-'+hh(y.t):''):esc(OFF[y.s]||y.s);
+      h+='<div class="day"><span>'+lbl+'</span><span class="'+(work?'work':y.s==='rest'?'off':'leave')+'">'+txt+'</span></div>'});h+='</div>'}
+  function rot(x){
+    if(!x){h+='<h2>My rotation</h2><div class="card mut">No rotation has been shared with you yet.</div>';return}
+    if(x.days){days('My rotation',x);return}
+    h+='<h2>My rotation</h2>';
+    (x.entries||[]).forEach(function(e){
+      var dt=new Date(e.d+'T12:00:00'),lbl=dt.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'short'}),grp=[],i,v;
+      for(i=0;i<e.n;i++){v=cellTxt(e.c[i]);if(grp.length&&grp[grp.length-1].v===v)grp[grp.length-1].to=i+1;else grp.push({v:v,from:i,to:i+1})}
+      h+='<div class="card"><div class="row"><div><b>'+lbl+'</b><div class="mut">'+esc(SH[e.s]||e.s)+' &middot; starts '+hh(e.f)+'</div></div></div>';
+      grp.forEach(function(g){var tb=/^Table/.test(g.v);h+='<div class="day"><span>'+hh(e.f+g.from/2)+' - '+hh(e.f+g.to/2)+'</span><span class="'+(tb?'work':'off')+'">'+esc(g.v)+'</span></div>'});
+      h+='</div>'});
+    (x.pending||[]).forEach(function(p){
+      var dt=new Date(p.d+'T12:00:00'),lbl=dt.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'});
+      h+='<div class="card mut">Your rotation for <b>'+lbl+'</b> ('+esc(SH[p.s]||p.s)+', starts '+hh(p.f)+') will appear here at <b>'+when(p.at)+'</b>.</div>'});
+    if(!(x.entries||[]).length&&!(x.pending||[]).length)h+='<div class="card mut">No rotation has been shared with you yet.</div>';
+  }
+  days('My schedule',d.schedule);rot(d.rotation);
   a.innerHTML=h;
+  if(!refreshT)refreshT=setInterval(function(){load(true)},60000);
 }
 init();
 </script></body></html>
