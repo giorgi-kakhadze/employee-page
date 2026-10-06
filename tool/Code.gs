@@ -14,6 +14,9 @@
  * v2.3: action 'me' lets an employee who signs in with Google see only their own shared evaluation results and their own next 28 days of schedule (set GOOGLE_CLIENT_ID).
  * v3.16 employee board: action 'me' now also returns the employee's own profile, schedule and rotation (reads the format the tool writes now: sx/rx with a release time), and their requests. New actions 'reqNew' and 'reqCancel' let a signed-in employee file or cancel ONE of four request types (swap, giveaway, annual, sick). The employee is always identified from the verified Google token, never from what the browser says.
  * v3.22: action 'me' also returns the employee's own game counts (last 12 months, matched by work ID) and the manager name when the employee record has one.
+ * v3.23: tickets, cases, comments and announcements are sent per person (own department, own tickets, tickets they sent or are assigned; managers,
+ *   seniors and Management see all; HR sees every case). Saves are merged ticket by ticket, so a device that only sees part of the list never removes
+ *   the rest, and deleted tickets stay deleted. The audit log is sent to non-admins with only their own entries; their new entries are added, never replaced.
  * Data lives in your Google Drive folder "Tool Data": tool-data.json (shared data) and access.json (who may use the tool).
  */
 const ADMIN_SECRET = 'CHANGE-ME-ADMIN-KEY';
@@ -208,6 +211,73 @@ function redactPolicy_(e, em) { try { var p = JSON.parse(e.v), me = (p.users || 
 function stripPay_(e) { try { var o = JSON.parse(e.v); if (o && typeof o === 'object' && !Array.isArray(o) && 'pay' in o) { delete o.pay; return { v: JSON.stringify(o), t: e.t }; } } catch (x) {} return e; }
 function keepPay_(newV, oldV) { try { var n = JSON.parse(newV); if (!n || typeof n !== 'object' || Array.isArray(n)) return newV; var o = oldV ? JSON.parse(oldV) : null; if (o && o.pay !== undefined) n.pay = o.pay; else delete n.pay; return JSON.stringify(n); } catch (x) { return newV; } }
 
+/* ===== v3.23 record-level privacy: tickets (totTasks), cases (totCases), comments (totComments), announcements (totAnnouncements), audit log ===== */
+/* Same department list and default position -> department mapping as the tool (Admin can change the mapping; it is stored in policy.depts). */
+const DEPT_IDS = ['academy', 'performance', 'fmd', 'appearance', 'hr', 'access', 'it', 'management'];
+const DEPT_DEF = { training_coordinator: 'academy', performance_coach: 'performance', shift_lead: 'performance', scheduling_coordinator: 'fmd', senior: 'management', manager: 'management', hr_recruiter: 'hr' };
+const SCOPED = ['totTasks', 'totCases', 'totAnnouncements', 'totComments'];   /* comments last: their visibility depends on the tickets and announcements */
+const DEL_KEEP_DAYS = 180, AUDIT_MAX = 20000;
+function low_(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
+/* who is asking: the admin key sees everything; everybody else is described by their position and department */
+function ctx_(cur, em, admin) {
+  var cache = {}, c = { all: !!admin, em: em, name: '', dept: '', cache: cache };
+  c.idx = function (pre, name) { var k = pre + name; if (!cache[k]) { var o = {}, a = jp_(cur.keys[k] && cur.keys[k].v, []); (Array.isArray(a) ? a : []).forEach(function (x) { if (x && x.id != null) o[String(x.id)] = x; }); cache[k] = o; } return cache[k]; };
+  if (admin) return c;
+  var p = policy_(cur), u = (p.users || {})[em] || {}, depts = p.depts || {}, role = String(u.role || '');
+  c.dOf = function (x) { x = String(x || ''); return DEPT_IDS.indexOf(x) >= 0 ? x : (depts[x] || DEPT_DEF[x] || x); };
+  c.name = low_(u.name); c.dept = c.dOf(role);
+  c.all = role === 'manager' || role === 'senior' || c.dept === 'management';   /* same people the tool lets open "All tasks" and every department */
+  return c;
+}
+/* a ticket is visible to: its sender, its assignee, the department it is addressed to, the department that sent it, and (for case tickets) HR */
+function taskVis_(t, c) {
+  if (c.all) return true; if (!t) return false;
+  var fe = low_(t.fromEmail), te = low_(t.toEmail);
+  if (fe ? fe === c.em : (c.name && low_(t.fromName) === c.name)) return true;
+  if (te ? te === c.em : (c.name && !!t.toName && low_(t.toName) === c.name)) return true;
+  if (c.dept && (c.dOf(t.toRole) === c.dept || c.dOf(t.fromRole) === c.dept)) return true;
+  return !!t.caseId && c.dept === 'hr';
+}
+function caseVis_(x, c) { return c.all || c.dept === 'hr' || (!!x && low_(x.byEmail) === c.em); }
+function annVis_(a, c) { if (c.all) return true; if (!a) return false; if (low_(a.fromEmail) === c.em) return true; var to = Array.isArray(a.toRoles) ? a.toRoles : []; return !to.length || to.some(function (x) { return c.dOf(x) === c.dept; }); }
+function cmVis_(x, c, pre) {
+  if (c.all) return true; if (!x) return false; if (low_(x.email) === c.em) return true;
+  if (x.kind === 'task') return taskVis_(c.idx(pre, 'totTasks')[String(x.ref)], c);
+  if (x.kind === 'ann' || x.kind === 'ack') return annVis_(c.idx(pre, 'totAnnouncements')[String(x.ref)], c);
+  return false;   /* unknown kinds stay private to their author */
+}
+function recVis_(name, x, c, pre) { return name === 'totTasks' ? taskVis_(x, c) : name === 'totCases' ? caseVis_(x, c) : name === 'totAnnouncements' ? annVis_(x, c) : cmVis_(x, c, pre); }
+/* who may delete a record: the person who created it, or someone who sees everything (same rule as the tool's delete buttons) */
+function recOwner_(name, x, c) { if (c.all) return true; var e = name === 'totComments' ? x.email : name === 'totCases' ? x.byEmail : x.fromEmail, n = name === 'totComments' ? x.who : name === 'totCases' ? x.by : x.fromName;
+  return e ? low_(e) === c.em : (!!c.name && low_(n) === c.name); }   /* records saved before e-mails were stored: the name from the access list */
+function scopedPull_(name, v, c, pre) { var a = jp_(v, null); if (!Array.isArray(a)) return c.all ? v : '[]'; return c.all ? v : JSON.stringify(a.filter(function (x) { return x && recVis_(name, x, c, pre); })); }
+/* merge a save record by record: records this person cannot see are kept untouched; a visible record missing from the save counts as deleted only if
+   this person may delete it; new records are accepted only if this person can see them; deleted ids are remembered so they never come back */
+function scopedPush_(name, newV, oldV, c, pre, del) {
+  var n = jp_(newV, null), o = jp_(oldV, []), now = Date.now(); if (!Array.isArray(n)) return null; if (!Array.isArray(o)) o = [];
+  var inN = {}, seen = {}, out = [];
+  n.forEach(function (x) { if (x && x.id != null) inN[String(x.id)] = x; });
+  o.forEach(function (x) { var id = x && x.id != null ? String(x.id) : null; if (id == null) { out.push(x); return; } seen[id] = 1;
+    if (!recVis_(name, x, c, pre)) { out.push(x); return; }
+    if (inN[id] !== undefined) { out.push(inN[id]); return; }
+    if (recOwner_(name, x, c)) { del[id] = now; return; }
+    out.push(x); });
+  n.forEach(function (x) { var id = x && x.id != null ? String(x.id) : null; if (id == null || seen[id] || del[id]) return; seen[id] = 1; if (recVis_(name, x, c, pre)) out.push(x); });
+  return JSON.stringify(out);
+}
+function delMap_(cur, k) { cur.del = cur.del || {}; var m = cur.del[k] = cur.del[k] || {}, cut = Date.now() - DEL_KEEP_DAYS * 86400000; Object.keys(m).forEach(function (i) { if (m[i] < cut) delete m[i]; }); return m; }
+/* audit log for non-admins: they receive their own entries; what they send is added (never replaces), and only entries in their own name are accepted */
+function auditMine_(x, c) { var e = low_(x && x.email); return e ? e === c.em : (!!c.name && low_(x && x.who) === c.name); }
+function auditId_(x) { return x && x.id != null ? String(x.id) : x && typeof x === 'object' ? String(x.ts) + '|' + x.who + '|' + x.act : JSON.stringify(x); }
+function auditPull_(v, c) { var a = jp_(v, null); return Array.isArray(a) ? JSON.stringify(a.filter(function (x) { return auditMine_(x, c); })) : '[]'; }
+function auditPush_(newV, oldV, c) {
+  var n = jp_(newV, null), o = jp_(oldV, []); if (!Array.isArray(n)) return null; if (!Array.isArray(o)) o = [];
+  var seen = {}; o.forEach(function (x) { seen[auditId_(x)] = 1; });
+  n.forEach(function (x) { if (!x || typeof x !== 'object' || seen[auditId_(x)]) return; var e = low_(x.email); if (e && e !== c.em) return; if (!e) x.email = c.em; seen[auditId_(x)] = 1; o.push(x); });
+  if (o.length > AUDIT_MAX) { o.sort(function (a, b) { return (+(a && a.ts) || 0) - (+(b && b.ts) || 0); }); o = o.slice(-AUDIT_MAX); }
+  return JSON.stringify(o);
+}
+
 function backup_(df) {
   try {
     var P = PropertiesService.getScriptProperties(), day = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
@@ -291,8 +361,9 @@ function doPost(e) {
       if (rr.getResponseCode() >= 300) return out_({ error: 'drive error ' + rr.getResponseCode() });
       return out_({ ok: true, n: Math.ceil(vsize / VCH), mime: vf.getMimeType(), data: Utilities.base64Encode(rr.getContent()) });
     }
+    var cx = ctx_(cur, em, admin);   /* v3.23 who is asking, for record-level filtering */
     if (act === 'pull') {
-      if (admin) return out_(cur);
+      if (admin) return out_({ keys: cur.keys, updatedAt: cur.updatedAt || 0 });
       var res = { keys: {}, updatedAt: cur.updatedAt || 0 };
       Object.keys(cur.keys).forEach(function (k) {
         var p = parseKey_(k), en = cur.keys[k]; if (!p || !en) return;
@@ -301,22 +372,28 @@ function doPost(e) {
         if (p.name === 'totAccessGrants') { res.keys[k] = redactGrants_(en, em); return; }
         if (p.name === 'totAccessAsks') { res.keys[k] = mineAsks_(en, em); return; }
         if (me.sites.indexOf(p.site) < 0 || !roleOk_(p.name, me.role) || !capOk_(p.name, me, 'read') || !gateOk_(cur, em, p.name)) return;
+        var pre = k.slice(0, k.length - p.name.length);
+        if (SCOPED.indexOf(p.name) >= 0) { res.keys[k] = { v: scopedPull_(p.name, en.v, cx, pre), t: en.t }; return; }   /* v3.23 */
+        if (p.name === 'auditLog') { res.keys[k] = { v: auditPull_(en.v, cx), t: en.t }; return; }
         res.keys[k] = (p.name === 'totSchedule' && PAY_ROLES.indexOf(me.role) < 0) ? stripPay_(en) : en;
       });
       return out_(res);
     }
     if (act === 'push') {
       var conflicts = [], denied = [], now = Date.now(), changed = false;
-      Object.keys(b.keys || {}).forEach(function (k) {
+      var order = function (k) { var q = parseKey_(k), i = q ? SCOPED.indexOf(q.name) : -1; return i < 0 ? 0 : i + 1; };   /* tickets and announcements before comments */
+      Object.keys(b.keys || {}).sort(function (x, y) { return order(x) - order(y); }).forEach(function (k) {
         var n = b.keys[k], p = parseKey_(k);
         if (!p || !n || typeof n.v !== 'string' || n.v.length > 4500000) { denied.push(k); return; }
         if (!admin && (ADMIN_ONLY_WRITE.indexOf(k) >= 0 || ADMIN_ONLY_WRITE.indexOf(p.name) >= 0 || me.sites.indexOf(p.site) < 0 || !roleOk_(p.name, me.role) || !capOk_(p.name, me, 'write') || !gateOk_(cur, em, p.name))) { denied.push(k); return; }
-        var o = cur.keys[k], t = Math.min(+n.t || now, now + 60000);
+        var o = cur.keys[k], t = Math.min(+n.t || now, now + 60000), pre = k.slice(0, k.length - p.name.length);
+        if (!admin && p.name === 'auditLog') { var av = auditPush_(n.v, o && o.v, cx); if (av == null) { denied.push(k); return; } cur.keys[k] = { v: av, t: Math.max(now, (+(o && o.t) || 0) + 1) }; changed = true; return; }   /* v3.23 add-only, never a conflict */
         if (o && n.bt != null && (+o.t || 0) > (+n.bt || 0)) { conflicts.push(k); return; }   /* somebody saved after this device last read it */
         if (o && n.bt == null && t < (+o.t || 0)) return;                                    /* old clients: newest time wins */
         var val = n.v;
         if (!admin && p.name === 'totSchedule' && PAY_ROLES.indexOf(me.role) < 0) val = keepPay_(val, o && o.v);
         if (!admin && p.name === 'totAccessAsks') val = mergeAsks_(val, o && o.v, em);   /* a person may only write their own requests; other people's are kept */
+        if (SCOPED.indexOf(p.name) >= 0) { val = scopedPush_(p.name, val, o && o.v, cx, pre, delMap_(cur, k)); if (val == null) { denied.push(k); return; } delete cx.cache[k]; }   /* v3.23 */
         if (o) t = Math.max(t, (+o.t || 0) + 1);                                              /* versions only go up, so a missed save is always noticed */
         cur.keys[k] = { v: val, t: t }; changed = true;
       });
