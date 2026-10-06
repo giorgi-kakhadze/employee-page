@@ -19,6 +19,9 @@
  *   the rest, and deleted tickets stay deleted. The audit log is sent to non-admins with only their own entries; their new entries are added, never replaced.
  * v3.24: the access list sent to a non-admin also holds a colleague directory for "Assign to…" (name and position only): their own department,
  *   or everyone for managers, seniors and Management. Their own entry is unchanged.
+ * v3.25: Management is a position, not a department: 'management' left the department list and managers/seniors are no longer mapped to a department
+ *   (they still see everything; a position the admin mapped to the old Management department keeps that too). Uniforms, Building access and IT
+ *   see the case record (title) of every case they have a ticket in. FMD (scheduling coordinators) receives game counts and their import history.
  * Data lives in your Google Drive folder "Tool Data": tool-data.json (shared data) and access.json (who may use the tool).
  */
 const ADMIN_SECRET = 'CHANGE-ME-ADMIN-KEY';
@@ -27,7 +30,7 @@ const FOLDER = 'Tool Data', DATA = 'tool-data.json', ACCESS = 'access.json';
 /* Who may see the pay settings stored inside the schedule (admin always may). */
 const PAY_ROLES = ['manager'];   /* v2.1: matches the tool, where only the Manager sees the Pay tab (was also senior and scheduling_coordinator) */
 /* Data only these roles may read or write (admin always may). Key name without the site prefix. */
-const RESTRICT = { totRecruitment: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totWorkbooks: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totEmpRequests: ['manager', 'senior', 'scheduling_coordinator', 'hr_recruiter'], totGameCounts: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter'], totImportHistory: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter'], totLifecycle: ['manager', 'senior', 'hr_recruiter'], totMySchedules: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'] };   /* v2.3: per-person 28-day schedules, written only by schedule editors */
+const RESTRICT = { totRecruitment: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totWorkbooks: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totEmpRequests: ['manager', 'senior', 'scheduling_coordinator', 'hr_recruiter'], totGameCounts: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'], totImportHistory: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'], totLifecycle: ['manager', 'senior', 'hr_recruiter'], totMySchedules: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'] };   /* v2.3: per-person 28-day schedules, written only by schedule editors */
 /* v2.2 employee self-service: paste your Web client ID from Google Cloud (APIs & Services > Credentials > OAuth client ID > Web application). Leave as is to keep the feature off. */
 const GOOGLE_CLIENT_ID = '121975980339-fu9nd124kov2g6j94qiofOrkjkhbkee6.apps.googleusercontent.com';
 const ADMIN_ONLY_WRITE = ['totAccessPolicy', 'totSites', 'wsCustomConfig', 'totEvalKinds', 'totEvalCfgBackups', 'totProcessTpl', 'totIntegrations', 'totDeptCfg', 'totAccessGrants'];   /* v3.19: evaluation setup, kinds, backups, process templates and integration settings can only be written with the admin key */
@@ -220,8 +223,9 @@ function keepPay_(newV, oldV) { try { var n = JSON.parse(newV); if (!n || typeof
 
 /* ===== v3.23 record-level privacy: tickets (totTasks), cases (totCases), comments (totComments), announcements (totAnnouncements), audit log ===== */
 /* Same department list and default position -> department mapping as the tool (Admin can change the mapping; it is stored in policy.depts). */
-const DEPT_IDS = ['academy', 'performance', 'fmd', 'appearance', 'hr', 'access', 'it', 'management'];
-const DEPT_DEF = { training_coordinator: 'academy', performance_coach: 'performance', shift_lead: 'performance', scheduling_coordinator: 'fmd', senior: 'management', manager: 'management', hr_recruiter: 'hr' };
+/* v3.25: 'management' is no longer a department (manager and senior are positions that see everything, see c.all) */
+const DEPT_IDS = ['academy', 'performance', 'fmd', 'appearance', 'hr', 'access', 'it'];
+const DEPT_DEF = { training_coordinator: 'academy', performance_coach: 'performance', shift_lead: 'performance', scheduling_coordinator: 'fmd', hr_recruiter: 'hr' };
 const SCOPED = ['totTasks', 'totCases', 'totAnnouncements', 'totComments'];   /* comments last: their visibility depends on the tickets and announcements */
 const DEL_KEEP_DAYS = 180, AUDIT_MAX = 20000;
 function low_(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
@@ -233,7 +237,9 @@ function ctx_(cur, em, admin) {
   var p = policy_(cur), u = (p.users || {})[em] || {}, depts = p.depts || {}, role = String(u.role || '');
   c.dOf = function (x) { x = String(x || ''); return DEPT_IDS.indexOf(x) >= 0 ? x : (depts[x] || DEPT_DEF[x] || x); };
   c.name = low_(u.name); c.dept = c.dOf(role);
-  c.all = role === 'manager' || role === 'senior' || c.dept === 'management';   /* same people the tool lets open "All tasks" and every department */
+  /* same people the tool lets open "All tasks" and every department (__dept.wide()). The last clause is legacy compatibility only: before v3.25 the admin
+     could map a position to the Management department in policy.depts, and such a position keeps seeing everything. */
+  c.all = role === 'manager' || role === 'senior' || c.dept === 'management';
   return c;
 }
 /* a ticket is visible to: its sender, its assignee, the department it is addressed to, the department that sent it, and (for case tickets) HR */
@@ -245,7 +251,15 @@ function taskVis_(t, c) {
   if (c.dept && (c.dOf(t.toRole) === c.dept || c.dOf(t.fromRole) === c.dept)) return true;
   return !!t.caseId && c.dept === 'hr';
 }
-function caseVis_(x, c) { return c.all || c.dept === 'hr' || (!!x && low_(x.byEmail) === c.em); }
+/* a case record is visible to HR, to people who see everything, to its creator, and (v3.25) to anyone who can see at least one ticket of that case,
+   so Uniforms / Building access / IT see the case title of their linked ticket. The case-id index is cached per request with the tickets (see push). */
+function caseVis_(x, c, pre) {
+  if (c.all || c.dept === 'hr') return true; if (!x) return false; if (low_(x.byEmail) === c.em) return true;
+  if (pre == null || x.id == null || !c.idx) return false;
+  var k = pre + 'totTasks#case';
+  if (!c.cache[k]) { var o = {}, t = c.idx(pre, 'totTasks'); Object.keys(t).forEach(function (i) { var y = t[i]; if (y && y.caseId != null && !o[String(y.caseId)] && taskVis_(y, c)) o[String(y.caseId)] = 1; }); c.cache[k] = o; }
+  return !!c.cache[k][String(x.id)];
+}
 function annVis_(a, c) { if (c.all) return true; if (!a) return false; if (low_(a.fromEmail) === c.em) return true; var to = Array.isArray(a.toRoles) ? a.toRoles : []; return !to.length || to.some(function (x) { return c.dOf(x) === c.dept; }); }
 function cmVis_(x, c, pre) {
   if (c.all) return true; if (!x) return false; if (low_(x.email) === c.em) return true;
@@ -253,7 +267,7 @@ function cmVis_(x, c, pre) {
   if (x.kind === 'ann' || x.kind === 'ack') return annVis_(c.idx(pre, 'totAnnouncements')[String(x.ref)], c);
   return false;   /* unknown kinds stay private to their author */
 }
-function recVis_(name, x, c, pre) { return name === 'totTasks' ? taskVis_(x, c) : name === 'totCases' ? caseVis_(x, c) : name === 'totAnnouncements' ? annVis_(x, c) : cmVis_(x, c, pre); }
+function recVis_(name, x, c, pre) { return name === 'totTasks' ? taskVis_(x, c) : name === 'totCases' ? caseVis_(x, c, pre) : name === 'totAnnouncements' ? annVis_(x, c) : cmVis_(x, c, pre); }
 /* who may delete a record: the person who created it, or someone who sees everything (same rule as the tool's delete buttons) */
 function recOwner_(name, x, c) { if (c.all) return true; var e = name === 'totComments' ? x.email : name === 'totCases' ? x.byEmail : x.fromEmail, n = name === 'totComments' ? x.who : name === 'totCases' ? x.by : x.fromName;
   return e ? low_(e) === c.em : (!!c.name && low_(n) === c.name); }   /* records saved before e-mails were stored: the name from the access list */
@@ -400,7 +414,7 @@ function doPost(e) {
         var val = n.v;
         if (!admin && p.name === 'totSchedule' && PAY_ROLES.indexOf(me.role) < 0) val = keepPay_(val, o && o.v);
         if (!admin && p.name === 'totAccessAsks') val = mergeAsks_(val, o && o.v, em);   /* a person may only write their own requests; other people's are kept */
-        if (SCOPED.indexOf(p.name) >= 0) { val = scopedPush_(p.name, val, o && o.v, cx, pre, delMap_(cur, k)); if (val == null) { denied.push(k); return; } delete cx.cache[k]; }   /* v3.23 */
+        if (SCOPED.indexOf(p.name) >= 0) { val = scopedPush_(p.name, val, o && o.v, cx, pre, delMap_(cur, k)); if (val == null) { denied.push(k); return; } delete cx.cache[k]; delete cx.cache[k + '#case']; }   /* v3.23 */
         if (o) t = Math.max(t, (+o.t || 0) + 1);                                              /* versions only go up, so a missed save is always noticed */
         cur.keys[k] = { v: val, t: t }; changed = true;
       });

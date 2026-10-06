@@ -416,6 +416,7 @@
   }
   .giorgi-bubble {
     position: absolute; bottom: 78px; right: -6px; max-width: 190px;
+    width: max-content; max-width: min(260px, calc(100vw - 40px)); /* v3.25: was one word per line */
     background: var(--navy2); border: 1px solid var(--border2); color: var(--text);
     font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12px; font-weight: 500; line-height: 1.4;
     padding: 8px 11px; border-radius: 10px 10px 3px 10px;
@@ -469,7 +470,7 @@
 
   @media (max-width: 640px) {
     .giorgi-wrap { width: 52px; height: 58px; right: 12px; bottom: 12px; }
-    .giorgi-bubble { max-width: 150px; font-size: 11.5px; bottom: 64px; }
+    .giorgi-bubble { max-width: min(210px, calc(100vw - 30px)); font-size: 11.5px; bottom: 64px; }
   }
   .quick-link-btn:hover { border-color: var(--accent); color: var(--accent2); background: rgba(59,130,246,0.08); }
 
@@ -774,6 +775,7 @@
     --green:#22c55e; --green2:#4ade80; --red:#ef4444;
     --warm:#f2b25c; --warm2:#ffd08a;
     --surface-hi:#20243a;
+    --surface:var(--navy2); --surface2:var(--navy3); /* v3.25: --surface was never defined (white inputs on dark) */
     --lift-line:rgba(255,255,255,.05);
     --glow-warm:rgba(242,178,92,.075); --glow-cool:rgba(59,112,232,.11); --glow-base:rgba(120,100,220,.06);
     --bar-top:#1b1f31; --bar-bottom:#141724;
@@ -789,6 +791,7 @@
     --green:#16a34a; --green2:#22a35c; --red:#dc2626;
     --warm:#e39a3b; --warm2:#f2b25c;
     --surface-hi:#ffffff;
+    --surface:var(--navy2); --surface2:var(--navy3); /* v3.25 */
     --lift-line:rgba(255,255,255,.9);
     --glow-warm:rgba(242,178,92,.17); --glow-cool:rgba(59,112,232,.10); --glow-base:rgba(120,100,220,.06);
     --bar-top:#ffffff; --bar-bottom:#f3f4f9;
@@ -1021,6 +1024,20 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .tkOv{position:fixed;inset:0;z-index:10040;background:rgba(5,10,18,.78);display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto}.tkBox{background:var(--navy2);border:1px solid var(--border2,var(--border));border-radius:14px;padding:16px;width:100%;max-width:460px;color:var(--text)}.tkBox label{display:block;font-size:12px;color:var(--muted);margin:8px 0 2px}.tkBox input,.tkBox select,.tkBox textarea{width:100%;box-sizing:border-box;padding:9px;border-radius:8px;border:1px solid var(--border);background:transparent;color:inherit;font:inherit}
 .tkEmpty{text-align:center;color:var(--muted);padding:28px 8px}
 </style>
+<style id="apCss">/* v3.25: Uniforms (Appearance) screen uses the shared page scale */
+#appearanceView{padding:12px 16px;font-size:14px;color:var(--text)}
+#appearanceView .apW{max-width:1100px}#appearanceView .apTabs{margin:0 0 12px}
+#appearanceView h2{font-size:20px;margin:0 0 8px}
+#appearanceView h3{font-size:15px;margin:14px 0 6px}
+#appearanceView .hint{font-size:12px;color:var(--muted)}
+#appearanceView .apW button:not([data-am]),#appearanceView .apW select,#appearanceView .apW input:not([type=checkbox]):not([type=radio]),#appearanceView .apW textarea{font:inherit;font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid var(--border2,var(--border));background:var(--surface);color:var(--text)}
+#appearanceView .apW button:not([data-am]){cursor:pointer}
+#appearanceView .apW button:not([data-am]):hover{border-color:var(--accent)}
+/* v3.25: Integrations controls follow the theme (were native light buttons) */
+#integrationsView{color:var(--text);font-size:14px}#integrationsView summary{font-size:14px}
+#integrationsView button:not(.tkB),#integrationsView select,#integrationsView input,#integrationsView textarea{font:inherit;font-size:13px;padding:5px 10px;border-radius:8px;border:1px solid var(--border2,var(--border));background:var(--surface);color:var(--text)}
+#integrationsView button:not(.tkB){cursor:pointer}#integrationsView button:not(.tkB):hover{border-color:var(--accent)}
+</style>
 <style id="sdCss">
 .dbTabs{display:flex;gap:6px;align-items:center;margin-bottom:8px}.dbTabs h3{margin:0;flex:1;font-size:16px}.dbTabs button{background:var(--navy2);border:1px solid var(--border);color:var(--muted);border-radius:16px;padding:4px 12px;font:inherit;font-size:12.5px;cursor:pointer}.dbTabs button.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .dbG{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:8px;margin:6px 0}.dbT{background:var(--navy2);border:1px solid var(--border);border-radius:10px;padding:10px;cursor:pointer}.dbT b{display:block;font-size:22px;color:var(--text)}.dbT span{font-size:12px;color:var(--muted)}.dbT.r{border-color:var(--red)}.dbT.r b{color:var(--red)}
@@ -1061,10 +1078,10 @@ html:not(.is-admin) #edsClearBtn,html:not(.is-admin) button[onclick*="restorePre
     <button class="nav-tab active" id="navHome" role="tab" aria-selected="true" onclick="switchView('home')">
       <span class="tab-icon">&#127968;</span> Home
     </button>
-    <button class="nav-tab" id="navAcademy" role="tab" aria-selected="false" onclick="switchView('academy')">
+    <button class="nav-tab" id="navAcademy" role="tab" aria-selected="false" onclick="openSpace('academy')">
       <span class="tab-icon">&#127891;</span> Academy
     </button>
-    <button class="nav-tab" id="navPerformance" role="tab" aria-selected="false" onclick="openWs('exam','performance')">
+    <button class="nav-tab" id="navPerformance" role="tab" aria-selected="false" onclick="openSpace('performance')">
       <span class="tab-icon">&#128202;</span> Performance
     </button>
     <button class="nav-tab" id="navOnboarding" style="display:none" role="tab" aria-selected="false" onclick="switchView('onboarding')">
@@ -1079,22 +1096,25 @@ html:not(.is-admin) #edsClearBtn,html:not(.is-admin) button[onclick*="restorePre
     <button class="nav-tab" id="navLogbooks" style="display:none" role="tab" aria-selected="false" onclick="switchView('logbooks')">
       <span class="tab-icon">&#128221;</span> Logbooks
     </button>
-    <button class="nav-tab" id="navSchedule" role="tab" aria-selected="false" onclick="switchView('schedule')">
+    <button class="nav-tab" id="navSchedule" role="tab" aria-selected="false" onclick="openSpace('fmd')">
       <span class="tab-icon">&#128197;</span> FMD
     </button>
-    <button class="nav-tab" id="navAppearance" role="tab" aria-selected="false" onclick="switchView('appearance')">
-      <span class="tab-icon">&#128085;</span> Appearance
+    <button class="nav-tab" id="navAppearance" role="tab" aria-selected="false" onclick="openSpace('uniforms')">
+      <span class="tab-icon">&#128085;</span> Uniforms
     </button>
-    <button class="nav-tab" id="navTasks" role="tab" aria-selected="false" onclick="switchView('tasks')">
-      <span class="tab-icon">&#9989;</span> Tasks <span id="tkBadge" style="display:none;background:var(--red);color:#fff;border-radius:10px;padding:0 6px;font-size:11px;font-weight:700;margin-left:2px"></span>
+    <!-- v3.25: HR and Office (Building access + IT) spaces; onclick deliberately not switchView(' so applyRoleAccess leaves their visibility to spaceNavApply -->
+    <button class="nav-tab" id="navHr" role="tab" aria-selected="false" onclick="openSpace('hr')" style="display:none">
+      <span class="tab-icon">&#129522;</span> HR
+    </button>
+    <button class="nav-tab" id="navOffice" role="tab" aria-selected="false" onclick="openSpace('office')" style="display:none">
+      <span class="tab-icon">&#127970;</span> Office
     </button>
     <button class="nav-tab" id="navRecruiting" style="display:none" role="tab" aria-selected="false" onclick="switchView('recruiting')"><span class="tab-icon">&#129522;</span> Recruiting</button>
-    <button class="nav-tab" id="navIntegrations" style="display:none" role="tab" aria-selected="false" onclick="switchView('integrations')"><span class="tab-icon">&#128268;</span> Integrations</button>
     <button class="nav-tab" id="navRequests" style="display:none" role="tab" aria-selected="false" onclick="switchView('requests')"><span class="tab-icon">&#128232;</span> Requests</button>
     <button class="nav-tab" id="navDept" style="display:none" role="tab" aria-selected="false" onclick="switchView('dept')"><span class="tab-icon">&#127970;</span> Departments</button>
-    <button class="nav-tab" id="navPerm" style="display:none" role="tab" aria-selected="false" onclick="switchView('perm')"><span class="tab-icon">&#128272;</span> Permissions</button>
     <button class="nav-tab" id="navCoach" style="display:none" role="tab" aria-selected="false" onclick="switchView('coach')"><span class="tab-icon">&#127919;</span> Coach board</button>
     <button class="nav-tab" id="navEmpdata" style="display:none" role="tab" aria-selected="false" onclick="switchView('empdata')"><span class="tab-icon">&#128101;</span> Employees</button>
+    <button class="nav-tab nav-util" id="navTasks" role="tab" aria-selected="false" title="My tickets" aria-label="My tickets" data-vl="My tickets" onclick="switchView('tasks')"><span class="tab-icon">&#9989;</span><span id="tkBadge" style="display:none;background:var(--red);color:#fff;border-radius:10px;padding:0 6px;font-size:11px;font-weight:700;margin-left:2px"></span></button>
     <button class="nav-tab" id="bellBtn" type="button" title="Notifications" aria-label="Notifications" style="position:relative"><span class="tab-icon">&#128276;</span><span id="bellBadge" style="display:none;background:var(--red);color:#fff;border-radius:10px;padding:0 6px;font-size:11px;font-weight:700"></span></button>
     <button class="nav-tab" id="searchBtn" type="button" title="Search everything (press /)" aria-label="Search"><span class="tab-icon">&#128269;</span></button>
   </div>
@@ -1119,6 +1139,10 @@ html:not(.is-admin) #edsClearBtn,html:not(.is-admin) button[onclick*="restorePre
         <button type="button" class="more-menu-item" role="menuitem" onclick="closeMoreMenu(); document.getElementById('searchBtn').click();">🔍 Search everything</button>
         <button type="button" class="more-menu-item" role="menuitem" id="chatGiorgiBtn" onclick="closeMoreMenu(); openGiorgiChat();" title="Ask Giorgi about Pass-to-Floor (Gunda)">💬 Chat with Giorgi</button>
         <button type="button" class="more-menu-item" role="menuitem" onclick="toggleAppTheme(); closeMoreMenu();" id="themeToggleBtn">🌙 Theme</button>
+        <!-- v3.25: admin pages live in the More menu (ids kept; roleAccess + their nav() timers keep them admin-only, .pmN travels with navPerm) -->
+        <button type="button" class="more-menu-item" role="menuitem" id="navIntegrations" style="display:none" onclick="closeMoreMenu(); switchView('integrations')"><span class="tab-icon">&#128268;</span> Integrations</button>
+        <button type="button" class="more-menu-item" role="menuitem" id="navPerm" style="display:none" onclick="closeMoreMenu(); switchView('perm')"><span class="tab-icon">&#128272;</span> Permissions</button>
+        <button type="button" class="more-menu-item" role="menuitem" id="moreSpaces" style="display:none" onclick="closeMoreMenu(); if (window.totSpacesManage) totSpacesManage();">📁 Manage spaces</button>
         <button type="button" class="more-menu-item" role="menuitem" onclick="document.getElementById('importFileInput').click(); closeMoreMenu();">⬆️ Restore from backup</button>
         <div class="more-menu-sep"></div>
         <div class="more-menu-meta" id="moreStorageMeta">Storage: —</div>
@@ -2294,6 +2318,15 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
 <style id="spaceSubCss">
  body.no-vid-upload #pvList label.icon-btn{display:none!important}
 #navOnboarding,#navExam,#navId,#navLogbooks{display:none!important}
+/* v3.25: the top bar shows departments only; these screens live inside their space's second bar (#spaceSub) */
+#navRecruiting,#navRequests,#navDept,#navCoach,#navEmpdata{display:none!important}
+/* v3.25: sound and music stay in More -> Sound / Background music */
+#soundQuickBtn,#musicQuickBtn{display:none!important}
+.nav-tab.nav-util{padding-left:10px;padding-right:10px;gap:2px}
+#spaceSub .ss-sep{width:1px;align-self:stretch;background:var(--border2);margin:2px 4px}
+#spaceSub button .ss-n{background:var(--red);color:#fff;border-radius:10px;padding:0 6px;font-size:11px;font-weight:700;margin-left:4px}
+#deptView,#permView{padding:12px 16px}
+@media(min-width:601px){#deptView .kbCol{flex:1 1 160px;min-width:150px}}
 #spaceSub{display:none;gap:6px;flex-wrap:wrap;align-items:center;padding:8px 16px;background:var(--navy2);border-bottom:1px solid var(--border)}
 #spaceSub.show{display:flex}
 #spaceSub .ss-label{color:var(--muted);font:700 12px 'Inter',system-ui,sans-serif;padding-right:6px}
@@ -2307,6 +2340,9 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
 .pv-row{border-top:1px solid var(--border);padding:8px 0;font-size:13px}
 #perfSendBanner{position:fixed;left:14px;right:14px;bottom:70px;z-index:9991;display:none;gap:10px;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:12px;background:var(--accent);color:#fff;font:600 14px system-ui,sans-serif}
 #perfSendBanner.show{display:flex}#perfSendBanner button{padding:6px 12px;border-radius:8px;border:0;font:inherit;cursor:pointer}
+/* v3.25: phones and small tablets: the department tabs and the second bar scroll sideways instead of squeezing or wrapping */
+@media(max-width:760px){.nav-tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}.nav-tabs::-webkit-scrollbar{display:none}.nav-tabs>.nav-tab{flex:0 0 auto}
+#spaceSub{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:6px 12px}#spaceSub::-webkit-scrollbar{display:none}#spaceSub>*{flex:0 0 auto;white-space:nowrap}#spaceSub>span[style*="flex-basis"]{display:none}}
 @media print{#spaceSub,#perfSendModal,.ps-modal2,#perfSendBanner{display:none!important}}
 </style>
 <div id="spaceSub" role="tablist" aria-label="Space navigation"></div>
@@ -2408,9 +2444,9 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
         </div>
         <div class="tool-card" onclick="switchView('appearance')">
           <div class="tool-card-icon">&#128085;</div>
-          <h2>Appearance</h2>
+          <h2>Uniforms</h2>
           <p>Uniforms, inventory, spare checkout, trainees and forms.</p>
-          <div class="tool-card-cta">Open Appearance &rarr;</div>
+          <div class="tool-card-cta">Open Uniforms &rarr;</div>
         </div>
       </div>
 
@@ -2714,25 +2750,83 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
   function wsOk(m) { const T = window.totCan; if (!T) return true; return m === 'menu' ? (T('ws_register') || T('ws_checklist')) : m === 'files' ? T('ws_register') : m === 'checklist' ? T('ws_checklist') : m === 'exam' ? T('exam_check') : m === 'results' ? T('results_view') : m === 'retrain' ? (T('retrain') || T('exam_check')) : true; }
   function openWs(m, from) { if (!wsOk(m)) { try { showShellToast('Your position does not include this part.', 'error'); } catch (e) {} return; } wsMode = m; window.__wsFrom = from || ''; switchView('exam'); }
   window.openWs = openWs;
-  function spaceTabs(name) { const A = document.getElementById('navAcademy'), P = document.getElementById('navPerformance'), perf = (name === 'exam' && (wsMode === 'exam' || window.__wsFrom === 'performance')), acad = ['academy', 'onboarding', 'id', 'logbooks'].indexOf(name) >= 0 || (name === 'exam' && !perf);
-    [[A, acad], [P, perf]].forEach(function (x) { if (!x[0]) return; x[0].classList.toggle('active', x[1]); x[0].setAttribute('aria-selected', x[1] ? 'true' : 'false'); });  try { spaceSubRender(); } catch (eSs) {} }
+  /* v3.25: departments-only top bar. spaceOf(view) is the one resolver from the open screen to its space (top-bar highlight, #spaceSub, Back button);
+     spaceItems(space) lists that space's screens, each gated by its own rule, followed by the department-workspace tabs from the deptWsCore registry */
+  const SPACES = { academy: ['navAcademy', 'Academy'], performance: ['navPerformance', 'Performance'], fmd: ['navSchedule', 'FMD'], uniforms: ['navAppearance', 'Uniforms'], hr: ['navHr', 'HR'], office: ['navOffice', 'Office'] };
+  function deptSpace(d) { return d === 'appearance' ? 'uniforms' : (d === 'access' || d === 'it') ? 'office' : (SPACES[d] ? d : ''); }
+  function wsPerf() { if (wsMode === 'menu' || wsMode === 'files') return false; return wsMode === 'exam' || wsMode === 'results' || wsMode === 'retrain' || window.__wsFrom === 'performance'; }
+  function spaceOf(v) { v = v || ((typeof currentView !== 'undefined') ? currentView : 'home');
+    if (v === 'exam') return wsPerf() ? 'performance' : 'academy';
+    if (v === 'coach') return 'performance';
+    if (['academy', 'onboarding', 'id', 'logbooks'].indexOf(v) >= 0) return 'academy';
+    if (['schedule', 'empdata', 'requests'].indexOf(v) >= 0) return 'fmd';
+    if (v === 'appearance') return 'uniforms';
+    if (v === 'recruiting') return 'hr';
+    if (v === 'dept') { const W = window.__dw; return W && W.cur && W.tab() !== 'overview' ? deptSpace(W.cur()) : ''; }
+    return ''; }
+  function ssRole(v) { try { return !window.__roleAllowed || window.__roleAllowed(v); } catch (e) { return true; } }
+  function ssCap(l) { return !window.totCan || [].concat(l).some(function (c) { return window.totCan(c); }); }
+  function ssFn(n) { try { return !!(window[n] && window[n]()); } catch (e) { return false; } }
+  function ssDeptTabs(d) { try { const W = window.__dw; if (!W || !W.tabsFor || !ssFn('__dwAllowed') || !(window.__dept && __dept.sees(d))) return []; return W.tabsFor(d); } catch (e) { return []; } }
+  /* items: { l: label html, on, go } · { g: group label } · { br: 1 } (line break) */
+  function spaceItems(sp) {
+    const cv = (typeof currentView !== 'undefined') ? currentView : 'home', I = [], perf = cv === 'exam' && wsPerf(), W = window.__dw;
+    const dcur = cv === 'dept' && W && W.cur ? W.cur() : '', dtab = dcur ? W.tab() : '';
+    const add = function (ok, l, go, on) { if (ok) I.push({ l: l, go: go, on: !!on }); };
+    const ws = function (m, from) { return function () { openWs(m, from); }; }, sv = function (v) { return function () { switchView(v); }; };
+    const dept = function (d) { ssDeptTabs(d).forEach(function (t) { add(true, t.label, function () { window.DeptOpen(d, t.id); }, dcur === d && dtab === t.id); }); };
+    if (sp === 'academy') {
+      add(ssCap('onboarding') && ssRole('onboarding'), '&#128203; Onboarding', sv('onboarding'), cv === 'onboarding');
+      add(ssCap(['ws_register', 'ws_checklist']) && ssRole('exam'), '&#127891; Workshop', ws('menu', 'academy'), cv === 'exam' && !perf);
+      add(ssCap('id') && ssRole('id'), '&#128273; ID Creation', sv('id'), cv === 'id');
+      add(ssCap('logbooks') && ssRole('logbooks'), '&#128210; Logbooks', sv('logbooks'), cv === 'logbooks');
+      if (cv === 'exam' && !perf && ssRole('exam') && ssCap(['ws_register', 'ws_checklist'])) { I.push({ br: 1 }, { g: 'Workshop' }); add(ssCap('ws_register'), '&#128221; Registration', ws('files', 'academy'), wsMode === 'files'); add(ssCap('ws_checklist'), '&#128202; Checklist', ws('checklist', 'academy'), wsMode === 'checklist'); }
+      dept('academy'); }
+    else if (sp === 'performance') { const ex = ssRole('exam');
+      add(ex && ssCap('exam_check'), '&#11088; Exam Evaluation', ws('exam', 'performance'), perf && wsMode === 'exam');
+      add(ex && ssCap('ws_checklist'), '&#128202; Workshop Evaluation', ws('checklist', 'performance'), perf && wsMode === 'checklist');
+      add(ex && ssCap('results_view'), '&#128200; Results', ws('results', 'performance'), perf && wsMode === 'results');
+      add(ex && ssCap(['retrain', 'exam_check']), '&#128218; Retraining', ws('retrain', 'performance'), perf && wsMode === 'retrain');
+      add(ex && ssCap(['videos_view', 'videos_upload']), '&#127909; Videos', function () { perfVidOpen(); }, false);
+      add(ex && ssCap('results_send'), '&#128228; Send results', function () { perfSendOpen(); }, false);
+      add(ssFn('__coachAllowed') && ssRole('coach'), '&#127919; Coach board', sv('coach'), cv === 'coach');
+      dept('performance'); }
+    else if (sp === 'fmd') { let n = 0; try { n = window.__rqPending ? +window.__rqPending() || 0 : 0; } catch (e) {}
+      add(ssRole('schedule'), '&#128197; Schedule', sv('schedule'), cv === 'schedule');
+      add(!!(window.__emp && __emp.can()), '&#128101; Employees', sv('empdata'), cv === 'empdata');
+      add(ssFn('__rqAllowed'), '&#128232; Employee requests' + (n ? '<span class="ss-n">' + n + '</span>' : ''), sv('requests'), cv === 'requests');
+      dept('fmd'); }
+    else if (sp === 'uniforms') { add(ssRole('appearance'), '&#128085; Uniforms', sv('appearance'), cv === 'appearance'); dept('appearance'); }
+    else if (sp === 'hr') { add(ssFn('__rcAllowed'), '&#129522; Recruiting', sv('recruiting'), cv === 'recruiting'); dept('hr'); }
+    else if (sp === 'office') { [['access', '&#128273; Building access'], ['it', '&#128187; IT']].forEach(function (x) { if (!ssDeptTabs(x[0]).length) return; if (I.length) I.push({ sep: 1 }); I.push({ g: x[1] }); dept(x[0]); }); }
+    return I; }
+  function spaceAny(sp) { return spaceItems(sp).some(function (x) { return x.go; }); }
+  /* clicking a top department button opens that space's first available screen (Academy keeps its landing page) */
+  window.openSpace = function (sp) { window.__space = sp;
+    if (sp === 'academy' && ssRole('academy')) { switchView('academy'); return; }
+    const f = spaceItems(sp).filter(function (x) { return x.go; })[0];
+    if (!f) { try { showShellToast('Your position does not include this part.', 'error'); } catch (e) {} return; }
+    f.go(); };
+  window.spaceGo = function (i) { const x = (window.__ssItems || [])[i]; if (x && x.go) x.go(); };
+  /* one visibility rule for the department buttons: visible when the person has at least one screen or tab in that space (re-run after applyRoleAccess and on a timer) */
+  window.spaceNavApply = function () { Object.keys(SPACES).forEach(function (sp) { const b = document.getElementById(SPACES[sp][0]); if (!b) return; let ok = false; try { ok = spaceAny(sp); } catch (e) {} const v = ok ? '' : 'none'; if (b.style.display !== v) b.style.display = v; }); };
+  window.spaceOf = spaceOf; window.spaceItems = spaceItems; window.deptSpace = deptSpace;
+  function spaceTabs(name) { const cur = spaceOf(name);
+    Object.keys(SPACES).forEach(function (sp) { const b = document.getElementById(SPACES[sp][0]); if (!b) return; b.classList.toggle('active', sp === cur); b.setAttribute('aria-selected', sp === cur ? 'true' : 'false'); });
+    try { spaceSubRender(); } catch (eSs) {} }
   let wsMode = 'menu';
-  /* v2.84-2.91: second navigation bar in Academy and Performance; results + video panels in Performance */
+  /* v2.84-2.91, v3.25: second navigation bar for every department space */
   function spaceSubRender() { const bar = document.getElementById('spaceSub'); if (!bar) return;
-    const cv = (typeof currentView !== 'undefined') ? currentView : 'home', perf = cv === 'exam' && (wsMode === 'exam' || window.__wsFrom === 'performance'), acad = ['academy', 'onboarding', 'id', 'logbooks'].indexOf(cv) >= 0 || (cv === 'exam' && !perf);
-    if (!perf && !acad && (cv === 'schedule' || cv === 'empdata')) { if (!(window.__emp && __emp.can())) { bar.className = ''; bar.innerHTML = ''; return; }
-      bar.innerHTML = '<span class="ss-label">FMD</span><button type="button" class="' + (cv === 'schedule' ? 'on' : '') + '" onclick="switchView(\'schedule\')">&#128197; Schedule</button><button type="button" class="' + (cv === 'empdata' ? 'on' : '') + '" onclick="switchView(\'empdata\')">&#128101; Employee data</button>'; bar.className = 'show'; return; }
-    if (!perf && !acad) { bar.className = ''; bar.innerHTML = ''; return; }
-    const B = function (on, label, js) { return '<button type="button" class="' + (on ? 'on' : '') + '" onclick="' + js + '">' + label + '</button>'; };
-    let h = '<span class="ss-label">' + (perf ? 'Performance' : 'Academy') + '</span>';
-    const C = function (cap, html) { return (!window.totCan || window.totCan(cap)) ? html : ''; }, CA = function (caps, html) { return (!window.totCan || caps.some(function (c) { return window.totCan(c); })) ? html : '';
-    };
-    if (perf) { h += C('exam_check', B(wsMode === 'exam', '&#11088; Exam Evaluation', "openWs('exam','performance')")) + C('ws_checklist', B(wsMode === 'checklist', '&#128202; Workshop Evaluation', "openWs('checklist','performance')")) + C('results_view', B(wsMode === 'results', '&#128200; Results', "openWs('results','performance')")) + CA(['retrain', 'exam_check'], B(wsMode === 'retrain', '&#128218; Retraining', "openWs('retrain','performance')")) + CA(['videos_view', 'videos_upload'], B(false, '&#127909; Videos', 'perfVidOpen()')) + C('results_send', B(false, '&#128228; Send results', 'perfSendOpen()')); }
-    else { const ws = cv === 'exam';
-      h += C('onboarding', B(cv === 'onboarding', '&#128203; Onboarding', "switchView('onboarding')")) + CA(['ws_register', 'ws_checklist'], B(ws, '&#127891; Workshop', "openWs('menu','academy')")) + C('id', B(cv === 'id', '&#128273; ID Creation', "switchView('id')")) + C('logbooks', B(cv === 'logbooks', '&#128210; Logbooks', "switchView('logbooks')"));
-      if (ws) h += '<span style="flex-basis:100%;height:0"></span><span class="ss-label">Workshop</span>' + C('ws_register', B(wsMode === 'files', '&#128221; Registration', "openWs('files','academy')")) + C('ws_checklist', B(wsMode === 'checklist', '&#128202; Checklist', "openWs('checklist','academy')")); }
-    bar.innerHTML = h; bar.className = 'show'; }
+    const sp = spaceOf(), it = sp ? spaceItems(sp) : [];
+    if (!it.some(function (x) { return x.go; })) { window.__ssItems = []; bar.__h = ''; bar.className = ''; bar.innerHTML = ''; return; }
+    window.__ssItems = it;
+    let h = '<span class="ss-label">' + SPACES[sp][1] + '</span>';
+    it.forEach(function (x, i) { h += x.br ? '<span style="flex-basis:100%;height:0"></span>' : x.sep ? '<span class="ss-sep"></span>' : x.g ? '<span class="ss-label">' + x.g + '</span>' : '<button type="button" role="tab" aria-selected="' + (x.on ? 'true' : 'false') + '" class="' + (x.on ? 'on' : '') + '" onclick="spaceGo(' + i + ')">' + x.l + '</button>'; });
+    if (bar.__h !== h) { bar.__h = h; bar.innerHTML = h; bar.className = 'show'; ssIn(bar.querySelector('button.on')); ssIn(document.querySelector('.nav-tabs > .nav-tab.active')); } bar.className = 'show'; }
+  /* v3.25: on phones both bars scroll sideways; keep the active item in view (horizontal scroll only) */
+  function ssIn(b) { const p = b && b.parentNode; if (!p || p.scrollWidth <= p.clientWidth + 1) return; const r = b.getBoundingClientRect(), q = p.getBoundingClientRect(); if (r.left < q.left || r.right > q.right) p.scrollLeft += r.left - q.left - (q.width - r.width) / 2; }
   window.spaceSubRender = spaceSubRender;
+  setInterval(function () { try { window.spaceNavApply(); spaceSubRender(); if (window.__blLift) window.__blLift(); } catch (e) {} }, 1500);
   window.perfSendOpen = function () { const m = document.getElementById('perfSendModal'), c = document.getElementById('shCard'); document.getElementById('perfSendBanner').classList.remove('show'); if (!m || !c) return; m.classList.add('show'); c.open = true; c.dispatchEvent(new Event('toggle')); };
   window.perfSendClose = function () { const m = document.getElementById('perfSendModal'); if (m) m.classList.remove('show'); };
   (function () { let last = -1; setInterval(function () { try {
@@ -3135,7 +3229,7 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
 
   function switchView(name, mode) {
     try { if (typeof currentView !== 'undefined' && currentView && currentView !== name) playUiSound('nav'); } catch (eNav) {}
-    try { if (typeof currentView !== 'undefined' && currentView && currentView !== name) window.__lastView = currentView; } catch (eLv) {}
+    try { if (typeof currentView !== 'undefined' && currentView && currentView !== name) { window.__lastView = currentView; window.__lastLoc = blLoc(currentView); } } catch (eLv) {}
     currentView = name;
     Object.keys(views).forEach(k => views[k].hidden = (k !== name));
     try { updateBackLast(); } catch (eBl) {}
@@ -3188,25 +3282,40 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
   };
 
   /* ---- Floating "back to the last section" button (ID creator, Logbooks, Workshop, Onboarding) ---- */
-  const BL_NAMES = { home: 'Home', academy: 'Academy', exam: 'Workshop', id: 'ID Creator', logbooks: 'Logbooks', onboarding: 'Onboarding', schedule: 'Schedule', appearance: 'Appearance' };
+  /* v3.25: the button remembers the place, not only the view id (Workshop mode, department + tab), and is labelled by space and screen ("Back to FMD · Employees") */
+  const BL_NAMES = { home: 'Home', academy: 'Academy', exam: 'Academy · Workshop', id: 'Academy · ID Creation', logbooks: 'Academy · Logbooks', onboarding: 'Academy · Onboarding', schedule: 'FMD · Schedule', empdata: 'FMD · Employees', requests: 'FMD · Employee requests', appearance: 'Uniforms', coach: 'Performance · Coach board', recruiting: 'HR · Recruiting', tasks: 'My tickets', perm: 'Permissions', integrations: 'Integrations', dept: 'Departments' };
+  const BL_WS = { exam: 'Exam Evaluation', checklist: 'Workshop Evaluation', results: 'Results', retrain: 'Retraining' };
+  function blLoc(v) { const o = { v: v, ws: wsMode, from: window.__wsFrom || '', label: BL_NAMES[v] || 'the previous screen' };
+    try {
+      if (v === 'exam' && spaceOf('exam') === 'performance') o.label = 'Performance' + (BL_WS[wsMode] ? ' · ' + BL_WS[wsMode] : '');
+      if (v === 'dept' && window.__dw && __dw.cur) { const W = window.__dw, d = W.cur(), tb = W.tab(), sp = deptSpace(d), tl = (W.tabsFor(d).filter(function (t) { return t.id === tb; })[0] || {}).label || '';
+        o.d = d; o.tab = tb; o.label = tb === 'overview' ? 'All departments' : (sp === 'office' ? 'Office · ' + __dept.label(d) : (__dept.label(d) || 'Departments')) + (tl ? ' · ' + tl.replace(/^[^A-Za-z0-9]+/, '') : ''); }
+    } catch (e) {}
+    return o; }
   (function () {
     const st = document.createElement('style');
     st.textContent = '#backLastBtn{position:fixed;left:14px;bottom:14px;z-index:9998;padding:9px 16px;border-radius:999px;border:1px solid var(--border2,#555);background:var(--accent,#d63a67);color:#fff;font:600 13px system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}#backLastBtn:hover{filter:brightness(1.1)}#backLastBtn[hidden]{display:none}@media print{#backLastBtn{display:none!important}}';
     document.head.appendChild(st);
     const b = document.createElement('button'); b.id = 'backLastBtn'; b.hidden = true; b.type = 'button';
     b.addEventListener('click', function () {
-      const t = window.__lastView; if (!t || !views[t]) return;
+      const L = window.__lastLoc || { v: window.__lastView }, t = L.v; if (!t || !views[t]) return;
       if (t === 'onboarding') window.__obResume = true;
+      if (t === 'exam' && L.ws) { wsMode = L.ws; window.__wsFrom = L.from || ''; }
+      if (t === 'dept' && window.DeptOpen) { window.DeptOpen(L.d || '', L.tab || ''); return; }
       switchView(t);
     });
     document.body.appendChild(b);
   })();
+  /* keep the Back button above the bottom-left pills (View-as preview, time tracker) */
+  function blLift() { const b = document.getElementById('backLastBtn'); if (!b) return; let y = 14; ['viewAsPill', 'tt16pill'].forEach(function (id) { const p = document.getElementById(id); if (!p) return; const r = p.getBoundingClientRect(); if (r.width && r.height && r.left < 200 && r.bottom > window.innerHeight - 80) y = Math.max(y, window.innerHeight - r.top + 8); }); const v = y + 'px'; if (b.style.bottom !== v) b.style.bottom = v; }
+  window.__blLift = blLift;
   function updateBackLast() {
     const b = document.getElementById('backLastBtn'); if (!b) return;
-    const t = window.__lastView;
-    const show = !!t && views[t] && t !== currentView && t !== 'home' && currentView !== 'home';
+    const L = window.__lastLoc || { v: window.__lastView, label: BL_NAMES[window.__lastView] }, t = L.v;
+    const same = t === currentView && !(t === 'dept' && window.__dw && __dw.cur && (L.d !== __dw.cur() || L.tab !== __dw.tab()));
+    const show = !!t && views[t] && !same && t !== 'home' && currentView !== 'home';
     b.hidden = !show;
-    if (show) b.textContent = '\u2190 Back to ' + (BL_NAMES[t] || t);
+    if (show) { b.textContent = '\u2190 Back to ' + (L.label || BL_NAMES[t] || 'the previous screen'); try { blLift(); } catch (e) {} }
   }
 
   // Exam iframe → open Bulk ID Creation (grid "Create IDs" handoff)
@@ -6386,7 +6495,7 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
 /* Positions: which tabs a person sees, and how Giorgi talks. (A convenience filter inside this browser, not a security lock.) */
 (function () {
   function R() { return ROLES[getTrainerRole()] || null; }
-  function allowed(v) { if (v === 'perm') { try { return sessionStorage.getItem('totAdmin') === '1'; } catch (e) { return false; } } if (v === 'dept') return !!(window.__dwAllowed && window.__dwAllowed()); if (v === 'coach') return !!(window.__coachAllowed && window.__coachAllowed()); if (v === 'requests') return !!(window.__rqAllowed && window.__rqAllowed()); if (v === 'integrations') { try { return sessionStorage.getItem('totAdmin') === '1'; } catch (e) { return false; } } if (v === 'recruiting') return !!(window.__rcAllowed && window.__rcAllowed()); if (v === 'academy') return ['onboarding', 'exam', 'id', 'logbooks'].some(function (x) { return allowed(x); }); var r = R(), ok = !r || r.views.indexOf(v) >= 0; if (ok && v !== 'home' && window.totSpaceAllows) { try { ok = window.totSpaceAllows(v) !== false; } catch (e) {} } return ok; }
+  function allowed(v) { /* v3.25 */ if (v === 'empdata') return !!(window.__emp && window.__emp.can()); if (v === 'perm') { try { return sessionStorage.getItem('totAdmin') === '1'; } catch (e) { return false; } } if (v === 'dept') return !!(window.__dwAllowed && window.__dwAllowed()); if (v === 'coach') return !!(window.__coachAllowed && window.__coachAllowed()); if (v === 'requests') return !!(window.__rqAllowed && window.__rqAllowed()); if (v === 'integrations') { try { return sessionStorage.getItem('totAdmin') === '1' && !sessionStorage.getItem('totViewAs'); } catch (e) { return false; } } if (v === 'recruiting') return !!(window.__rcAllowed && window.__rcAllowed()); if (v === 'academy') return ['onboarding', 'exam', 'id', 'logbooks'].some(function (x) { return allowed(x); }); var r = R(), ok = !r || r.views.indexOf(v) >= 0; if (ok && v !== 'home' && window.totSpaceAllows) { try { ok = window.totSpaceAllows(v) !== false; } catch (e) {} } return ok; }
   function isPro() { var r = R(); return !!(r && r.pro); }
   window.giorgiIsPro = isPro;
   var EMO = /[\u{1F000}-\u{1FAFF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu;
@@ -6415,7 +6524,9 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
     var p = document.querySelector('.brand-text p'); if (p) p.textContent = r ? r.label : 'Exams · IDs · Logbooks';
     try { if (typeof currentView !== 'undefined' && !allowed(currentView)) switchView('home'); } catch (e) {}
     syncPersona();
+    try { if (window.spaceNavApply) { window.spaceNavApply(); window.spaceSubRender(); } } catch (e) {}   /* v3.25: department buttons follow the same rules as their second-bar screens */
   };
+  window.__roleAllowed = allowed;
   var _sv = window.switchView;
   window.switchView = function (name, mode) {
     if (!allowed(name)) { try { var rr = R(), bySpace = !rr || rr.views.indexOf(name) >= 0; showShellToast(bySpace ? 'This screen is not part of your current space. Switch space (top bar) to open it.' : 'Your position (' + (rr || {}).label + ') does not include this section.', 'error'); } catch (e) {} name = 'home'; mode = undefined; }
@@ -17912,7 +18023,7 @@ window.TOOL_CREATOR = 'Giorgi Kakhadze';
 'use strict';
 var LS = window.localStorage, sSet = Storage.prototype.setItem, sRem = Storage.prototype.removeItem, sClr = Storage.prototype.clear;
 var AUD = 'tt16Audit', MAXB = 15, MAXA = 400, MAXF = 30, seq = 0;
-var NAMES = { totAccessGrants: 'Access permissions', totAccessAsks: 'Access requests', totDeptCfg: 'Department setup', totDeptDocs: 'Department documents', totLifecycle: 'Employee lifecycle log', totGameCounts: 'Game counts', totImportHistory: 'Game-count import history', totEvalKinds: 'Evaluation kinds', totEvalCfgBackups: 'Evaluation setup backups', totProcessTpl: 'Process templates', totEmpRequests: 'Employee requests', totIntegrations: 'Integration settings', totWorkbooks: 'Recruiting workbooks', employeeDataSource: 'Employee list', evalResults: 'Exam results', totOnboardingV2: 'Onboarding data', totOnboardingHier: 'Onboarding trainers', totWorkshopFiles: 'Workshop files', totOnboardingFiles: 'Onboarding files', totRecruitment: 'Recruitment pipeline', totRetrain: 'Retraining register', gridData: 'Workshop grid', idPrintHistory: 'ID print history', logbookCustomGames: 'Logbook games', wsCustomConfig: 'Workshop config', idBarcodeTestResults: 'Barcode tests' };
+var NAMES = { totAccessGrants: 'Access permissions', totAccessAsks: 'Access requests', totDeptCfg: 'Department setup', totDeptDocs: 'Department documents', totLifecycle: 'Employee lifecycle log', totGameCounts: 'Game counts', totImportHistory: 'Game-count import history', totEvalKinds: 'Evaluation kinds', totEvalCfgBackups: 'Evaluation setup backups', totProcessTpl: 'Work types', totEmpRequests: 'Employee requests', totIntegrations: 'Integration settings', totWorkbooks: 'Recruiting workbooks', employeeDataSource: 'Employee list', evalResults: 'Exam results', totOnboardingV2: 'Onboarding data', totOnboardingHier: 'Onboarding trainers', totWorkshopFiles: 'Workshop files', totOnboardingFiles: 'Onboarding files', totRecruitment: 'Recruitment pipeline', totRetrain: 'Retraining register', gridData: 'Workshop grid', idPrintHistory: 'ID print history', logbookCustomGames: 'Logbook games', wsCustomConfig: 'Workshop config', idBarcodeTestResults: 'Barcode tests' };
 var st = { last: 0, valid: null, bad: [], folder: null, perm: false, hash: '', dirty: false, busy: false }, cache = [];
 var $ = function (i) { return document.getElementById(i); };
 var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
@@ -19177,7 +19288,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       EDITORS = ['scheduling_coordinator', 'manager', 'senior', 'shift_lead'], SH = { morning: '☀ Morning', afternoon: '🌆 Afternoon', night: '🌙 Night' }, DEF = { morning: 8, afternoon: 16, night: 0 }, root = document.getElementById('scheduleView');
     if (!root) return;
     var st = document.createElement('style');
-    st.textContent = '.sc{padding:14px;font:13px Inter,sans-serif;color:var(--text)}.sc button,.sc input,.sc select{background:var(--surface,#1b2738);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font:inherit}.sc button{cursor:pointer}.sc button.on{background:#3b82f6;color:#fff}.sc .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}.sc .wrap{overflow:auto;max-height:calc(100vh - 260px)}.sc table{border-collapse:collapse;user-select:none}.sc th,.sc td{border:1px solid var(--border);padding:0;min-width:46px}.sc th{background:var(--surface,#1b2738);padding:5px 3px;position:sticky;top:0;z-index:2;font-size:11px}.sc td.n{min-width:210px;position:sticky;left:0;background:var(--surface,#1b2738);z-index:1;white-space:nowrap;padding:2px 4px}.sc td input{width:100%;box-sizing:border-box;border:0;border-radius:0;background:transparent;text-align:center;padding:7px 1px;font-size:12px;user-select:text}.sc td.n input.nm{text-align:left;width:130px;padding:6px}.sc td.n small{opacity:.65;font-size:10px;margin-left:4px}.sc td.sel{box-shadow:inset 0 0 0 2px #3b82f6;background:rgba(59,130,246,.2)}.sc td.b{background:rgba(245,158,11,.28)}.sc td.t{background:rgba(34,197,94,.16)}.sc td.dis{background:rgba(128,128,128,.28)}.sc td.o{box-shadow:inset 0 0 0 2px #ef4444}.sc td.sM{background:rgba(250,204,21,.30)}.sc td.sA{background:rgba(249,115,22,.32)}.sc td.sN{background:rgba(139,92,246,.34)}.sc td.sO{background:rgba(128,128,128,.28)}.sc td.sX{background:rgba(34,197,94,.22)}.sc td.cm{position:relative}.sc td.cm:after{content:"";position:absolute;top:0;right:0;border-top:8px solid #ef4444;border-left:8px solid transparent;pointer-events:none}.sc th.we{color:#f87171}.sc td.sV,.sc .cd.sV{background:rgba(59,130,246,.45)}.sc td.sU,.sc .cd.sU{background:rgba(148,163,184,.34)}.sc td.sS,.sc .cd.sS{background:rgba(239,68,68,.30)}.sc .rq{border:1px solid var(--border);border-radius:10px;padding:8px 12px;margin:0 0 8px;max-width:760px}.sc .rq .st{font-size:11px;padding:1px 8px;border-radius:99px;background:rgba(128,128,128,.3);margin-left:6px}.sc .rq .st.pending,.sc .rq .st.awaiting{background:rgba(250,204,21,.4)}.sc .rq .st.approved{background:rgba(34,197,94,.4)}.sc .rq .st.rejected,.sc .rq .st.declined{background:rgba(239,68,68,.4)}.sc .rq button{margin:6px 6px 0 0}.sc .rqf{display:flex;flex-wrap:wrap;gap:8px;align-items:center;max-width:760px}.sc .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;max-width:900px}.sc .cal .wd{text-align:center;font-size:11px;opacity:.7;padding:2px}.sc .cd{border:1px solid var(--border);border-radius:8px;min-height:68px;padding:3px 5px;font-size:11px;overflow:hidden;word-wrap:break-word}.sc .cd .dn{font-weight:700;opacity:.8}.sc .cd .sl{font-weight:700;font-size:12px}.sc .cd .tm{opacity:.75}.sc .cd .cmt{opacity:.85;font-style:italic;margin-top:2px}.sc .cd.sM{background:rgba(250,204,21,.30)}.sc .cd.sA{background:rgba(249,115,22,.32)}.sc .cd.sN{background:rgba(139,92,246,.34)}.sc .cd.sO{background:rgba(128,128,128,.22)}.sc .cd.sX{background:rgba(34,197,94,.22)}.sc .cd.today{box-shadow:0 0 0 2px #3b82f6}.sc .cards{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}.sc .cards div{border:1px solid var(--border);border-radius:10px;padding:8px 12px}.sc .cards b{display:block;font-size:16px}.sc .subbar{display:flex;gap:6px;margin:0 0 12px;border-bottom:1px solid var(--border);padding-bottom:8px}.sc .subbar button{font-weight:600}.sc td.m{text-align:center;min-width:58px}.sc .x{border:0;background:none;color:#ef4444;padding:2px 6px}.sc .hint{font-size:12px;opacity:.7;margin-top:8px}';
+    st.textContent = '.sc{padding:14px;font:13px Inter,sans-serif;color:var(--text)}.sc button,.sc input,.sc select{background:var(--surface,#1b2738);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font:inherit}.sc button{cursor:pointer}.sc button.on{background:#3b82f6;color:#fff}.sc .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}.sc .wrap{overflow:auto;max-height:calc(100vh - 260px)}.sc table{border-collapse:collapse;user-select:none}.sc th,.sc td{border:1px solid var(--border);padding:0;min-width:46px}.sc th{background:var(--surface,#1b2738);padding:5px 3px;position:sticky;top:0;z-index:2;font-size:11px}.sc td.n{min-width:210px;position:sticky;left:0;background:var(--surface,#1b2738);z-index:1;white-space:nowrap;padding:2px 4px}.sc td input{width:100%;box-sizing:border-box;border:0;border-radius:0;background:transparent;text-align:center;padding:7px 1px;font-size:12px;user-select:text}.sc td.n input.nm{text-align:left;width:130px;padding:6px}.sc td.n small{opacity:.65;font-size:10px;margin-left:4px}.sc td.sel{box-shadow:inset 0 0 0 2px #3b82f6;background:rgba(59,130,246,.2)}.sc td.b{background:rgba(245,158,11,.28)}.sc td.t{background:rgba(34,197,94,.16)}.sc td.dis{background:rgba(128,128,128,.28)}.sc td.o{box-shadow:inset 0 0 0 2px #ef4444}.sc td.sM{background:rgba(250,204,21,.30)}.sc td.sA{background:rgba(249,115,22,.32)}.sc td.sN{background:rgba(139,92,246,.34)}.sc td.sO{background:rgba(128,128,128,.28)}.sc td.sX{background:rgba(34,197,94,.22)}.sc td.cm{position:relative}.sc td.cm:after{content:"";position:absolute;top:0;right:0;border-top:8px solid #ef4444;border-left:8px solid transparent;pointer-events:none}.sc th.we{color:#f87171}.sc td.sV,.sc .cd.sV{background:rgba(59,130,246,.45)}.sc td.sU,.sc .cd.sU{background:rgba(148,163,184,.34)}.sc td.sS,.sc .cd.sS{background:rgba(239,68,68,.30)}.sc .rq{border:1px solid var(--border);border-radius:10px;padding:8px 12px;margin:0 0 8px;max-width:760px}.sc .rq .st{font-size:11px;padding:1px 8px;border-radius:99px;background:rgba(128,128,128,.3);margin-left:6px}.sc .rq .st.pending,.sc .rq .st.awaiting{background:rgba(250,204,21,.4)}.sc .rq .st.approved{background:rgba(34,197,94,.4)}.sc .rq .st.rejected,.sc .rq .st.declined{background:rgba(239,68,68,.4)}.sc .rq button{margin:6px 6px 0 0}.sc .rqf{display:flex;flex-wrap:wrap;gap:8px;align-items:center;max-width:760px}.sc .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;max-width:900px}.sc .cal .wd{text-align:center;font-size:11px;opacity:.7;padding:2px}.sc .cd{border:1px solid var(--border);border-radius:8px;min-height:68px;padding:3px 5px;font-size:11px;overflow:hidden;word-wrap:break-word}.sc .cd .dn{font-weight:700;opacity:.8}.sc .cd .sl{font-weight:700;font-size:12px}.sc .cd .tm{opacity:.75}.sc .cd .cmt{opacity:.85;font-style:italic;margin-top:2px}.sc .cd.sM{background:rgba(250,204,21,.30)}.sc .cd.sA{background:rgba(249,115,22,.32)}.sc .cd.sN{background:rgba(139,92,246,.34)}.sc .cd.sO{background:rgba(128,128,128,.22)}.sc .cd.sX{background:rgba(34,197,94,.22)}.sc .cd.today{box-shadow:0 0 0 2px #3b82f6}.sc .cards{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}.sc .cards div{border:1px solid var(--border);border-radius:10px;padding:8px 12px}.sc .cards b{display:block;font-size:16px}.sc .subbar{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;border-bottom:1px solid var(--border);padding-bottom:8px}.sc .subbar button{font-weight:600}.sc td.m{text-align:center;min-width:58px}.sc .x{border:0;background:none;color:#ef4444;padding:2px 6px}.sc .hint{font-size:12px;opacity:.7;margin-top:8px}';
     document.head.appendChild(st);
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
     function iso(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
@@ -21243,14 +21354,14 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       h += sec('Attendance (building access)', evs.length ? kv('Last event', new Date(+evs[0].ts).toLocaleString() + ' · ' + (evs[0].dir === 'in' ? 'Entry' : 'Exit')) + kv('Events saved', evs.length) : '', ac ? 'No access events for this code yet.' : 'No access code set. Add one in the Edit tab or in FMD > Staff.');
       var ap = jget('totAppearanceDept', {}), un = ((ap && ap.uniforms) || []).filter(function (u) { return u && u.employee && has(u.employee); });
       var apOk = !window.totCan || window.totCan('appearance_view');
-      h += sec('Uniform', apOk ? (un.length ? un.slice(0, 8).map(function (u) { return kv((u.type || 'Item') + (u.size ? ' ' + u.size : '') + ' · ' + (u.id || ''), u.status || ''); }).join('') : '') : '', apOk ? 'No uniform items recorded for this person.' : 'You do not have access to Appearance.');
+      h += sec('Uniform', apOk ? (un.length ? un.slice(0, 8).map(function (u) { return kv((u.type || 'Item') + (u.size ? ' ' + u.size : '') + ' · ' + (u.id || ''), u.status || ''); }).join('') : '') : '', apOk ? 'No uniform items recorded for this person.' : 'You do not have access to Uniforms.');
       var tk = (jget('totTasks', []) || []).filter(function (t) { return t && has([t.title, t.details, t.rel, t.toName].join(' ')); }), open = tk.filter(function (t) { return t.status !== 'done' && t.status !== 'cancelled'; });
       h += sec('Tasks mentioning this person', tk.length ? kv('Open / total', open.length + ' / ' + tk.length) + open.slice(0, 5).map(function (t) { return kv(t.title, (t.toName || t.toRole || '') + (t.due ? ' · due ' + t.due : '')); }).join('') : '', 'No tasks found.');
       var rc = (jget('totRecruitment', []) || []).filter(function (r) { return r && has(JSON.stringify(r)); });
       h += sec('Recruitment history', rc.length ? rc.slice(0, 3).map(function (r) { return kv(r.name || r.fullName || 'Candidate', r.stage || r.status || ''); }).join('') : '', 'No recruitment record.');
       var cs = window.TasksCaseSummary ? window.TasksCaseSummary(wid, p.name) : [], cs2 = window.TasksCaseSummary ? window.TasksCaseSummary(p.name, wid) : []; cs = cs.length ? cs : cs2;
       h += sec('Cases', cs.length ? cs.map(function (c) { return kv(c.title, c.done + '/' + c.n + ' completed' + (c.closed ? ' · closed' : '')); }).join('') : '', 'No cases for this person.');
-      h += '<div style="margin:6px 0 4px"><button data-n="' + esc(p.name) + '" data-i="' + esc(wid) + '" onclick="if(window.TasksRequestReeval)TasksRequestReeval(this.dataset.n,this.dataset.i)" style="padding:6px 12px;border-radius:8px;border:1px solid #3b82f6;background:transparent;color:inherit">Request re-evaluation…</button></div><div style="margin:6px 0 10px"><button data-n="' + esc(p.name) + '" data-i="' + esc(wid) + '" onclick="if(window.TasksStartCase)TasksStartCase(this.dataset.n,this.dataset.i)" style="padding:6px 12px;border-radius:8px;border:1px solid #ef4444;background:transparent;color:inherit">Start termination case…</button></div>';
+      h += '<div style="margin:6px 0 4px"><button data-n="' + esc(p.name) + '" data-i="' + esc(wid) + '" onclick="if(window.TasksRequestReeval)TasksRequestReeval(this.dataset.n,this.dataset.i)" style="padding:6px 12px;border-radius:8px;border:1px solid #3b82f6;background:transparent;color:inherit">Request re-evaluation…</button></div>' + (window.TasksCanCase && TasksCanCase() ? '<div style="margin:6px 0 10px"><button data-n="' + esc(p.name) + '" data-i="' + esc(wid) + '" onclick="if(window.TasksStartCase)TasksStartCase(this.dataset.n,this.dataset.i,\'termination\')" style="padding:6px 12px;border-radius:8px;border:1px solid #ef4444;background:transparent;color:inherit">Start termination case…</button></div>' : '');   /* v3.25: only for people who may start a case */
       return h;
     }
     function tabsHtml() {
@@ -21510,7 +21621,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     function lab(r) { return (ROLES[r] || {}).label || r; }
     function regSites() { try { var a = JSON.parse(localStorage.getItem('totSites') || 'null'); a = Array.isArray(a) ? a.filter(function (x) { return x && x.id && !x.archived; }) : []; if (!a.some(function (x) { return x.id === 'main'; })) a.unshift({ id: 'main', name: 'Main site' }); return a; } catch (e) { return [{ id: 'main', name: 'Main site' }]; } }
     function siteNames(ids) { if (!Array.isArray(ids)) ids = ['main']; var r = regSites(); return ids.map(function (i) { var n = i; r.forEach(function (x) { if (x.id === i) n = x.name; }); return n; }).join(', '); }
-    var CAPS = [['Academy', 'onboarding', 'Onboarding tool'], ['Academy', 'ws_register', 'Workshop Registration (files and registers)'], ['Academy', 'ws_checklist', 'Workshop Checklist / Workshop Evaluation (grid)'], ['Academy', 'id', 'ID Creation'], ['Academy', 'logbooks', 'Logbooks'], ['Performance', 'exam_check', 'Exam Checklist / Exam Evaluation (one by one)'], ['Performance', 'results_view', 'See exam and workshop results'], ['Performance', 'results_edit', 'Edit, delete or clear results'], ['Performance', 'results_send', 'Send results to employees'], ['Performance', 'retrain', 'Retraining Register'], ['Performance', 'videos_view', 'Watch evaluation videos'], ['Performance', 'videos_upload', 'Upload or replace evaluation videos'], ['FMD', 'fmd_view', 'FMD: rotation and schedule'], ['Appearance', 'appearance_view', 'Appearance: dashboard, inventory and history (look only)'], ['Appearance', 'appearance_issue', 'Appearance: checkout, return, trainees, forms and tablet kiosk'], ['Appearance', 'appearance_manage', 'Appearance: add/edit uniforms, teams and types, import/export, audit']];
+    var CAPS = [['Academy', 'onboarding', 'Onboarding tool'], ['Academy', 'ws_register', 'Workshop Registration (files and registers)'], ['Academy', 'ws_checklist', 'Workshop Checklist / Workshop Evaluation (grid)'], ['Academy', 'id', 'ID Creation'], ['Academy', 'logbooks', 'Logbooks'], ['Performance', 'exam_check', 'Exam Checklist / Exam Evaluation (one by one)'], ['Performance', 'results_view', 'See exam and workshop results'], ['Performance', 'results_edit', 'Edit, delete or clear results'], ['Performance', 'results_send', 'Send results to employees'], ['Performance', 'retrain', 'Retraining Register'], ['Performance', 'videos_view', 'Watch evaluation videos'], ['Performance', 'videos_upload', 'Upload or replace evaluation videos'], ['FMD', 'fmd_view', 'FMD: rotation and schedule'], ['Uniforms', 'appearance_view', 'Uniforms: dashboard, inventory and history (look only)'], ['Uniforms', 'appearance_issue', 'Uniforms: checkout, return, trainees, forms and tablet kiosk'], ['Uniforms', 'appearance_manage', 'Uniforms: add/edit uniforms, teams and types, import/export, audit']];
     var CAPV = { onboarding: ['onboarding'], ws_register: ['exam'], ws_checklist: ['exam'], exam_check: ['exam'], results_view: ['exam'], results_edit: ['exam'], results_send: ['exam'], retrain: ['exam'], videos_upload: ['exam'], id: ['id'], logbooks: ['logbooks'], fmd_view: ['schedule'], appearance_view: ['appearance'], appearance_issue: ['appearance'], appearance_manage: ['appearance'] };
     function defCaps(r, views) { var o = {}; CAPS.forEach(function (c) { var id = c[1]; o[id] = id === 'videos_view' ? r === 'manager' : (CAPV[id] || []).some(function (v) { return views.indexOf(v) >= 0; }); }); return o; }
     function capsOf(r) { var p = pol(), ex = p.roles[r] && p.roles[r].caps; if (ex && typeof ex === 'object') return ex; return defCaps(r, (p.roles[r] && p.roles[r].views) || BASE[r] || []); }
@@ -21588,9 +21699,9 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     me.querySelector('#mySave').onclick = function () { var v = me.querySelector('#myNm').value.trim(), m = me.querySelector('#myMsg'); if (!v) { m.style.color = '#ef4444'; m.textContent = 'Type a name.'; return; } setTrainerName(v); m.style.color = '#22c55e'; m.textContent = 'Saved.'; try { document.dispatchEvent(new Event('visibilitychange')); } catch (e) {} };
     /* spaces per role */
     var sp = mk('🧭 Space access by role', '<div style="font-size:12px;opacity:.7;margin:6px 0">Tick the spaces each role can open. Home is always on. Changes reach everyone on their next sync.</div><div id="spTab" style="overflow:auto"></div><div class="adMsg" id="spMsg"></div><button class="adBtn" id="spSave" type="button">Save space access</button>');
-    function vlabel(v) { var e = document.querySelector('[onclick*="switchView(\'' + v + '\'"]'); var t = e ? e.textContent.replace(/\s+/g, ' ').trim() : ''; return t || v; }
+    function vlabel(v) { var N = { home: 'Home', onboarding: 'Onboarding', exam: 'Workshop', id: 'ID Creation', logbooks: 'Logbooks', schedule: 'FMD · Schedule', appearance: 'Uniforms', tasks: 'My tickets', empdata: 'Employees' }; if (N[v]) return N[v]; var e = document.querySelector('[onclick*="switchView(\'' + v + '\'"]'); var t = e ? (e.getAttribute('data-vl') || e.textContent.replace(/\s+/g, ' ').trim()) : ''; return t || v; }   /* v3.25: top-bar buttons no longer name every screen */
     function drawSp() { applyViews(); var h = '<table style="border-collapse:collapse;font-size:12px"><tr><th style="text-align:left;padding:3px 6px">Role</th>' + ALL_VIEWS.filter(function (v) { return v !== 'empdata'; }).map(function (v) { return '<th style="padding:3px 6px">' + esc(vlabel(v)) + '</th>'; }).join('') + '<th style="padding:3px 6px">Department</th></tr>';
-      Object.keys(ROLES).forEach(function (r) { h += '<tr><td style="padding:3px 6px;white-space:nowrap">' + esc(lab(r)) + '</td>' + ALL_VIEWS.filter(function (v) { return v !== 'empdata'; }).map(function (v) { return '<td style="text-align:center"><input type="checkbox" data-r="' + r + '" data-v="' + v + '"' + (ROLES[r].views.indexOf(v) >= 0 ? ' checked' : '') + ((v === 'home' || v === 'tasks') ? ' disabled' : '') + '></td>'; }).join('') + '<td><select data-dr="' + r + '" style="padding:3px;border-radius:6px;background:transparent;color:inherit;border:1px solid var(--border,#2a3150)">' + window.__dept.DEPTS.map(function (d) { return '<option value="' + d.id + '"' + (window.__dept.ofRole(r) === d.id ? ' selected' : '') + '>' + d.label + '</option>'; }).join('') + '</select></td></tr>'; });
+      Object.keys(ROLES).forEach(function (r) { h += '<tr><td style="padding:3px 6px;white-space:nowrap">' + esc(lab(r)) + '</td>' + ALL_VIEWS.filter(function (v) { return v !== 'empdata'; }).map(function (v) { return '<td style="text-align:center"><input type="checkbox" data-r="' + r + '" data-v="' + v + '"' + (ROLES[r].views.indexOf(v) >= 0 ? ' checked' : '') + ((v === 'home' || v === 'tasks') ? ' disabled' : '') + '></td>'; }).join('') + '<td><select data-dr="' + r + '" style="padding:3px;border-radius:6px;background:transparent;color:inherit;border:1px solid var(--border,#2a3150)">' + ((r === 'manager' || r === 'senior') ? '<option value=""' + (window.__dept.DEPTS.some(function (d) { return window.__dept.ofRole(r) === d.id; }) ? '' : ' selected') + '>— all departments (position) —</option>' : '') + window.__dept.DEPTS.map(function (d) { return '<option value="' + d.id + '"' + (window.__dept.ofRole(r) === d.id ? ' selected' : '') + '>' + d.label + '</option>'; }).join('') + '</select></td></tr>'; });   /* v3.25: manager/senior are positions that see every department; '' = no single department */
       sp.querySelector('#spTab').innerHTML = h + '</table>'; }
     sp.addEventListener('toggle', function () { if (sp.open) drawSp(); });
     sp.querySelector('#spSave').onclick = function () { var p = pol(); Object.keys(ROLES).forEach(function (r) { var nv = ALL_VIEWS.filter(function (v) { var cb = sp.querySelector('input[data-r="' + r + '"][data-v="' + v + '"]'); return (v === 'home' || v === 'tasks') || (cb && cb.checked); }), oc = p.roles[r] && p.roles[r].caps; p.roles[r] = (oc && JSON.stringify(viewsFromCaps(oc)) === JSON.stringify(nv)) ? { views: nv, caps: oc } : { views: nv }; });
@@ -21864,8 +21975,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   }
   function setSpace(id) { try { localStorage.setItem(LK, id); } catch (e) {} refresh(true); }
   function refresh(go) {
-    mkPill(); var c = cur(), show = spaces().length > 0 || adm();
-    pill.style.display = show ? '' : 'none';
+    mkPill(); var c = cur(); vis();
     if (c) { pill.textContent = (c.s.icon || '\uD83D\uDCC1') + ' ' + c.s.name + (c.role === 'viewer' ? ' \uD83D\uDC41' : ''); pill.classList.toggle('ro', c.role === 'viewer'); }
     else { pill.textContent = spaces().length ? '\uD83D\uDCC1 No space' : '\uD83D\uDCC1 Spaces'; pill.classList.remove('ro'); }
     document.documentElement.setAttribute('data-space', c ? c.s.id : ''); document.documentElement.setAttribute('data-space-role', c ? c.role : '');
@@ -21933,45 +22043,51 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     });
     draw();
   }
+  /* v3.25: the legacy Spaces pill shows only for the admin and only once a space exists; the admin manages spaces from More */
+  function vis() { var a = adm(); if (pill) pill.style.display = a && spaces().length > 0 ? '' : 'none'; var mi = document.getElementById('moreSpaces'); if (mi) mi.style.display = a ? '' : 'none'; }
+  window.totSpacesManage = manage;
   function init() { refresh(false); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else setTimeout(init, 0);
   window.addEventListener('storage', function (e) { if (e.key === PK) refresh(false); });
-  setInterval(function () { try { var c = cur(), id = c ? c.s.id + ':' + c.role : ''; if (id !== (window.__spSig || '')) { window.__spSig = id; refresh(false); } } catch (e) {} }, 3000);   /* a Drive sync may change spaces or roles */
+  setInterval(function () { try { var c = cur(), id = c ? c.s.id + ':' + c.role : ''; if (id !== (window.__spSig || '')) { window.__spSig = id; refresh(false); } vis(); } catch (e) {} }, 3000);   /* a Drive sync may change spaces or roles */
 })();
 </script>
 
 
 <script id="deptHome">
-/* Departments: Academy, Performance, FMD, Management. A position belongs to one department (admin can change it in Admin > Space access by role). Home cards, reminders, task boards and the overview follow the department. */
+/* Departments: Academy, Performance, FMD, Uniforms, HR, Building access, IT. A position belongs to one department (admin can change it in Admin > Space access by role). Home cards, reminders, task boards and the overview follow the department. */
+/* v3.25: Management is a position, not a department: managers and seniors (and the admin, or a device with no role) see every department through __dept.wide(). */
 (function () {
   try {
-    var DEPTS = [{ id: 'academy', label: 'Academy' }, { id: 'performance', label: 'Performance' }, { id: 'fmd', label: 'FMD' }, { id: 'appearance', label: 'Appearance' }, { id: 'hr', label: 'HR / Recruitment' }, { id: 'access', label: 'Building access' }, { id: 'it', label: 'IT' }, { id: 'management', label: 'Management' }],
-      DEF = { training_coordinator: 'academy', performance_coach: 'performance', shift_lead: 'performance', scheduling_coordinator: 'fmd', senior: 'management', manager: 'management', hr_recruiter: 'hr' };
+    var DEPTS = [{ id: 'academy', label: 'Academy' }, { id: 'performance', label: 'Performance' }, { id: 'fmd', label: 'FMD' }, { id: 'appearance', label: 'Uniforms' }, { id: 'hr', label: 'HR' }, { id: 'access', label: 'Building access' }, { id: 'it', label: 'IT' }],
+      DEF = { training_coordinator: 'academy', performance_coach: 'performance', shift_lead: 'performance', scheduling_coordinator: 'fmd', hr_recruiter: 'hr' };
     function rd(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
     function adm() { try { return sessionStorage.getItem('totAdmin') === '1' && !sessionStorage.getItem('totViewAs'); } catch (e) { return false; } }
     function role() { try { return getTrainerRole() || ''; } catch (e) { return ''; } }
     function ofRole(r) { var p = rd('totAccessPolicy'); return (p && p.depts && p.depts[r]) || DEF[r] || ''; }
     function isD(x) { return DEPTS.some(function (d) { return d.id === x; }); }
     function norm(x) { x = String(x || ''); return isD(x) ? x : (ofRole(x) || x); }
-    function all() { return adm() || !role() || ofRole(role()) === 'management'; }
+    /* v3.25: wide access = admin (not view-as), no role, the manager/senior positions, or (legacy) a position the admin mapped to the old Management department */
+    function wide() { if (adm()) return true; var r = role(), p; if (!r || r === 'manager' || r === 'senior') return true; p = rd('totAccessPolicy'); return !!(p && p.depts && p.depts[r] === 'management'); }
+    function all() { return wide(); }
     function mine() { if (adm() || !role()) return DEPTS.map(function (d) { return d.id; }); var d = ofRole(role()); return d ? [d] : []; }
     function sees(d) { return all() || mine().indexOf(d) >= 0; }
     function board(x) { return mine().indexOf(norm(x)) >= 0; }
     /* v3.24: a synced non-admin device holds only its own department's people (everyone for managers, seniors and Management), so "x / y have read it" is only counted when everyone it was sent to is on this device */
-    function knowsAll(to) { var r = role(); if (all() || r === 'manager' || r === 'senior') return true; to = Array.isArray(to) ? to : []; return to.length > 0 && to.every(board); }
-    function label(x) { var n = norm(x), f = DEPTS.filter(function (d) { return d.id === n; })[0]; return f ? f.label : ((ROLES[x] || {}).label || x || '—'); }
+    function knowsAll(to) { if (wide()) return true; to = Array.isArray(to) ? to : []; return to.length > 0 && to.every(board); }
+    function label(x) { var n = norm(x), f = DEPTS.filter(function (d) { return d.id === n; })[0]; return f ? f.label : n === 'management' ? 'Management' : ((ROLES[x] || {}).label || x || '—'); }   /* v3.25: legacy 'management' tickets keep their label */
     function options() { return DEPTS.map(function (d) { return '<option value="' + d.id + '">' + d.label + '</option>'; }).join(''); }
     function today() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
     function extra() {
       var out = [], tk = (rd('totTasks') || []).filter(function (t) { return (t.status !== 'done' && t.status !== 'cancelled'); });
-      ['academy', 'performance', 'fmd', 'appearance', 'hr', 'access', 'it', 'management'].forEach(function (d) { if (!sees(d)) return; var l = tk.filter(function (t) { return norm(t.toRole) === d; }), un = l.filter(function (t) { return !(t.toEmail || t.toName); }), od = l.filter(function (t) { return t.due && t.due < today(); });
+      DEPTS.map(function (x) { return x.id; }).forEach(function (d) { if (!sees(d)) return; var l = tk.filter(function (t) { return norm(t.toRole) === d; }), un = l.filter(function (t) { return !(t.toEmail || t.toName); }), od = l.filter(function (t) { return t.due && t.due < today(); });
         if (un.length) out.push({ d: d, h: '<b>' + un.length + ' task' + (un.length > 1 ? 's' : '') + ' waiting on the ' + label(d) + ' board</b>: nobody has taken ' + (un.length > 1 ? 'them' : 'it') + ' yet' });
         if (od.length) out.push({ d: d, h: '<b>' + od.length + ' overdue task' + (od.length > 1 ? 's' : '') + '</b> for ' + label(d) }); });
       if (sees('fmd')) { var sc = rd('totSchedule'), rq = (sc && sc.reqs) || [], p = rq.filter(function (r) { return r && /pending|new/i.test(String(r.status || '')); }).length; if (p) out.push({ d: 'fmd', h: '<b>' + p + ' schedule request' + (p > 1 ? 's' : '') + ' pending</b> an answer' }); }
       return out; }
     var css = document.createElement('style'); css.textContent = 'html:not(.dept-academy) #todayCard,html:not(.dept-academy) #logCard,html:not(.dept-academy) #rptCard,html:not(.dept-academy) #recCard{display:none!important}'; document.head.appendChild(css);
-    function apply() { var c = document.documentElement.classList; DEPTS.forEach(function (d) { c.toggle('dept-' + d.id, sees(d.id)); }); var lab = document.querySelector('.brand-text p'); }
-    window.__dept = { DEPTS: DEPTS, norm: norm, mine: mine, sees: sees, board: board, knowsAll: knowsAll, label: label, options: options, extra: extra, ofRole: ofRole, apply: apply };
+    function apply() { var c = document.documentElement.classList; DEPTS.forEach(function (d) { c.toggle('dept-' + d.id, sees(d.id)); }); }
+    window.__dept = { DEPTS: DEPTS, norm: norm, mine: mine, sees: sees, board: board, knowsAll: knowsAll, label: label, options: options, extra: extra, ofRole: ofRole, apply: apply, wide: wide };
     apply(); setInterval(apply, 3000);
   } catch (e) { console.warn('Departments disabled:', e); }
 })();
@@ -21998,7 +22114,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     function same(x, m) { return m.e && x.fromEmail ? x.fromEmail === m.e : x.fromName === m.n; }
     function cSame(c, m) { return m.e && c.email ? c.email === m.e : c.who === m.n; }
     function canPost(m) { return adm() || POSTERS.indexOf(m.r) >= 0; }
-    function canAll(m) { return adm() || m.r === 'manager' || m.r === 'senior'; }
+    function canAll(m) { return window.__dept && __dept.wide ? __dept.wide() : (adm() || m.r === 'manager' || m.r === 'senior'); }   /* v3.25: one wide-access rule */
     function visible(a, m) { return adm() || !(a.toRoles || []).length || a.toRoles.some(function (x) { return __dept.sees(__dept.norm(x)); }) || same(a, m); }
     function acks(id) { return arr(CK).filter(function (c) { return c.kind === 'ack' && c.ref === id; }); }
     function acked(id, m) { return acks(id).some(function (c) { return cSame(c, m); }); }
@@ -22045,8 +22161,8 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       tk.forEach(function (t) { var mine = toMe(t), sent = same(t, m);
         if (mine && !sent && !(asg(t) && (t.hist || []).some(function (h) { return h.to !== undefined; }))) out.push({ ts: t.created, text: (asg(t) ? '📥 Task assigned to you: ' : '📋 New task on your board: ') + t.title + ' (from ' + t.fromName + ')', go: ['inbox', t.id], cat: cat(t) });
         if (mine || sent) (t.hist || []).forEach(function (h) { if (h.act === 'created' || h.who === m.n) return; if (h.to !== undefined) { if (h.to && h.to === (m.e || m.n)) out.push({ ts: h.ts, text: '📥 ' + h.who + ' assigned you: ' + t.title, go: ['inbox', t.id], cat: 'me' }); return; } out.push({ ts: h.ts, text: '🔄 ' + h.who + ' ' + h.act + ': ' + t.title, go: [sent && !toMe(t) ? 'sent' : 'inbox', t.id], cat: cat(t) }); }); });
-      /* v3.22 overdue tickets (mine, my board or sent by me) and escalations (Management, the sender and the assignee hear about them) */
-      var td = today(), mgmt = __dept.board('management') || adm();
+      /* v3.22 overdue tickets (mine, my board or sent by me) and escalations (managers and seniors, the sender and the assignee hear about them) */
+      var td = today(), mgmt = __dept.wide ? __dept.wide() : adm();   /* v3.25: managers and seniors are a position, not a Management board */
       tk.forEach(function (t) { if (t.status === 'done' || t.status === 'cancelled') return; var mine = toMe(t), sent = same(t, m);
         if (t.due && t.due < td && (mine || sent)) { var dd = new Date(t.due + 'T08:00:00'); dd.setDate(dd.getDate() + 1); out.push({ ts: dd.getTime(), text: '⏰ Overdue (was due ' + t.due + '): ' + t.title + (mine ? '' : ' — on the ' + __dept.label(t.toRole) + ' board'), go: [sent && !mine ? 'sent' : 'inbox', t.id], cat: mine ? cat(t) : 'other' }); }
         if (t.esc && t.esc.on && t.esc.email !== m.e && t.esc.by !== m.n && (mgmt || mine || sent)) out.push({ ts: t.esc.ts, text: '⚠ Escalated by ' + t.esc.by + ': ' + t.title + ' — ' + snip(t.esc.reason), go: [mine ? 'inbox' : sent ? 'sent' : 'all', t.id], cat: mine ? cat(t) : 'other', act: mgmt && !mine }); });
@@ -22111,7 +22227,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     function assignTo(arr, t, e, n) { var key = e || n, act = !key ? 'returned it to the ' + __dept.label(t.toRole) + ' board' : (key === (me().e || me().n) ? 'took the task' : 'assigned it to ' + n);
       t.toEmail = e; t.toName = n; addHist(t, act); t.hist[t.hist.length - 1].to = key; wr(arr); logA('Task "' + t.title + '": ' + act); render(); }
     function isSent(t, m) { return m.e && t.fromEmail ? t.fromEmail === m.e : t.fromName === m.n; }
-    function canAll(m) { return adm() || !m.r || m.r === 'manager' || m.r === 'senior'; }
+    function canAll(m) { return window.__dept && __dept.wide ? __dept.wide() : (adm() || !m.r || m.r === 'manager' || m.r === 'senior'); }   /* v3.25: one wide-access rule */
     /* v3.22 four priority levels; old tickets only have normal / urgent, so nothing needs converting */
     var PRI = { urgent: [3, '🔥 Urgent', 'r'], high: [2, '⬆ High', 'o'], normal: [1, 'Normal', ''], low: [0, '⬇ Low', ''] };
     function prank(t) { return (PRI[t.pri] || PRI.normal)[0]; }
@@ -22153,8 +22269,18 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
         (list.map(function (t) { return card(t, m); }).join('') || '<div class="tkEmpty">' + (st.fl === 'done' ? 'Nothing completed yet.' : st.tab === 'inbox' ? 'Your inbox is empty. 🎉' : 'Nothing here.') + '</div>') + '</div>'; badge();
     }
     function addHist(t, act, note) { t.hist = (t.hist || []).concat([{ ts: Date.now(), who: me().n, act: act, note: note || '' }]).slice(-60); t.u = Date.now(); }
-    function create(o) { var m = me(), t = { id: 'tk' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), title: o.title, details: o.details || '', toRole: o.toRole, toEmail: o.toEmail || '', toName: o.toName || '', fromName: m.n, fromEmail: m.e, fromRole: m.r, pri: o.pri || 'normal', due: o.due || '', rel: o.rel || '', empId: o.empId || '', caseId: o.caseId || '', caseTitle: o.caseTitle || '', reeval: o.reeval || null, ref: o.ref || '', status: 'todo', created: Date.now(), u: Date.now(), hist: [] };
-      addHist(t, 'created'); var a = tasks(); a.push(t); wr(a); logA('Task "' + t.title + '" created for ' + __dept.label(t.toRole) + (t.toName ? ' (' + t.toName + ')' : '')); return t; }
+    function create(o) { var m = me(), t = { id: 'tk' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), title: o.title, details: o.details || '', toRole: o.toRole, toEmail: o.toEmail || '', toName: o.toName || '', fromName: m.n, fromEmail: m.e, fromRole: m.r, pri: o.pri || 'normal', due: o.due || '', rel: o.rel || '', empId: o.empId || '', caseId: o.caseId || '', caseTitle: o.caseTitle || '', reeval: o.reeval || null, ref: o.ref || '', wt: o.wt || '', src: o.src || '', status: 'todo', created: Date.now(), u: Date.now(), hist: [] };
+      /* v3.25 work type rules: only here, on the device that creates the ticket, at creation time (never on sync / poll). Tickets made by a rule or a case carry caseId / ref, so they never fan out again. */
+      var W = t.wt && !t.caseId && !/^(case|wt):/.test(t.ref) && window.__wt ? window.__wt.get(t.wt) : null, kids = [];
+      if (t.wt && !W) t.wt = '';
+      if (W) { var subj = String(t.rel || '').replace(/\s*\([^()]*\)\s*$/, '').trim() || t.title, cid = 'cs' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), ctl = W.label + ': ' + subj, skip = false;
+        t.caseId = cid; t.caseTitle = ctl;
+        var cs = casesAll(); cs.push({ id: cid, kind: W.id, title: ctl, empName: subj, empId: t.empId || '', lastDay: '', note: '', by: m.n, byEmail: m.e, created: Date.now(), u: Date.now(), src: t.id }); casesWr(cs);
+        W.steps.forEach(function (x, i) { if (!skip && t.src && x.d === t.src) { skip = true; return; } kids.push({ x: x, i: i }); }); }
+      addHist(t, 'created'); var a = tasks(); a.push(t);
+      kids.forEach(function (k) { var c = { id: 'tk' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5) + k.i, title: k.x.t + ' — ' + subj, details: 'Part of case “' + t.caseTitle + '”, started by ticket ' + tkCode(t) + ' on the ' + __dept.label(t.src || t.toRole) + ' board. Comment here if something blocks you.', toRole: k.x.d, toEmail: '', toName: '', fromName: m.n, fromEmail: m.e, fromRole: m.r, pri: t.pri, due: dueIn(k.x.days), rel: t.rel, empId: t.empId, caseId: t.caseId, caseTitle: t.caseTitle, reeval: null, ref: 'wt:' + t.id + ':' + k.i, wt: t.wt, src: t.src, status: 'todo', created: Date.now(), u: Date.now(), hist: [] };
+        addHist(c, 'created by the ' + W.label + ' work type'); a.push(c); });
+      wr(a); logA('Task "' + t.title + '" created for ' + __dept.label(t.toRole) + (t.toName ? ' (' + t.toName + ')' : '') + (W ? ' · work type ' + W.label + ' (' + kids.length + ' linked ticket' + (kids.length === 1 ? '' : 's') + ')' : '')); t.kids = kids.length; return t; }
     function form() {
       var ov = document.createElement('div'); ov.className = 'tkOv';
       ov.innerHTML = '<div class="tkBox"><h3 style="margin:0 0 6px">New task / handoff</h3><label>Title *</label><input id="tkTi" maxlength="120" placeholder="e.g. Please schedule first shifts for new hires"><label>Details</label><textarea id="tkDe" rows="3"></textarea>' +
@@ -22202,7 +22328,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     function kcard(t, m) {
       var closed = t.status === 'done' || t.status === 'cancelled', od = t.due && !closed && t.due < today(), A = t.actions || [], dn = A.filter(function (a) { return a.done; }).length, n = cmCount(t.id), ed = canEdit(t, m);
       return '<div class="kbCard' + (t.pri === 'urgent' && !closed ? ' u' : '') + (closed ? ' d' : '') + '" draggable="' + (ed ? 'true' : 'false') + '" data-id="' + esc(t.id) + '"><div class="kbT"><span style="opacity:.55;font-size:11px;font-weight:600">' + tkCode(t) + '</span> ' + esc(t.title) + '</div><div class="kbM">' + (reasonOf(t) ? '<span class="tkChip" title="' + esc(reasonOf(t)) + '">' + (colOf(t) === 'cancelled' ? '🚫 ' : '⏸ ') + esc(reasonOf(t).slice(0, 34)) + (reasonOf(t).length > 34 ? '…' : '') + '</span>' : '') +
-        escChip(t) + priChip(t) + (t.reeval ? '<span class="tkChip b">🔁 Re-eval</span>' : '') + ((t.links || []).length ? '<span class="tkChip">🔗 ' + t.links.length + '</span>' : '') + (t.reopened ? '<span class="tkChip">↩ Reopened</span>' : '') + (t.caseId ? '<span class="tkChip" title=""' + esc(t.caseTitle || 'Case') + '">📁 ' + esc((t.caseTitle || 'Case').slice(0, 26)) + '</span>' : '') + (t.due ? '<span class="tkChip' + (od ? ' r' : '') + '">📅 ' + esc(t.due) + '</span>' : '') + (A.length ? '<span class="tkChip' + (dn === A.length ? ' g' : '') + '">☑ ' + dn + '/' + A.length + '</span>' : '') + (n ? '<span class="tkChip">💬 ' + n + '</span>' : '') + '</div>' +
+        escChip(t) + priChip(t) + (t.reeval ? '<span class="tkChip b">🔁 Re-eval</span>' : '') + ((t.links || []).length ? '<span class="tkChip">🔗 ' + t.links.length + '</span>' : '') + (t.reopened ? '<span class="tkChip">↩ Reopened</span>' : '') + (t.caseId ? '<span class="tkChip" title="' + esc(t.caseTitle || 'Case') + '">📁 ' + esc((t.caseTitle || 'Case').slice(0, 26)) + '</span>' : '') + (t.due ? '<span class="tkChip' + (od ? ' r' : '') + '">📅 ' + esc(t.due) + '</span>' : '') + (A.length ? '<span class="tkChip' + (dn === A.length ? ' g' : '') + '">☑ ' + dn + '/' + A.length + '</span>' : '') + (n ? '<span class="tkChip">💬 ' + n + '</span>' : '') + '</div>' +
         '<div class="kbF"><span>' + (t.toName ? '👤 ' + esc(t.toName) : '📋 ' + esc(__dept.label(t.toRole))) + '</span>' + (ed ? '<span class="kbAr"><button data-mv="-1" title="Move left">◀</button><button data-mv="1" title="Move right">▶</button></span>' : '') + '</div></div>'; }
     function drawBody() {
       var m = me(), qi = document.getElementById('kbQ'), q = (qi ? qi.value : '').toLowerCase(), body = document.getElementById('kbBody'); if (!body) return;
@@ -22214,7 +22340,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     function renderBoard() {
       var v = document.getElementById('tasksView'); if (!v) return; var m = me(); if (!canAll(m) && st.scope === 'all') st.scope = 'mine'; var sc = st.scope || 'mine';
       var chips = [['mine', 'My board'], ['me', '👤 Assigned to me'], ['board', '📋 Unassigned'], ['sent', '📤 Sent by me']].concat(canAll(m) ? [['all', 'All tasks']] : []);
-      v.innerHTML = '<div class="tkW kbW"><div class="tkH"><h2>Tasks</h2>' + ((canAll(m) || m.r === 'hr_recruiter') ? '<button class="tkB s" data-a="cases">📁 Cases</button>' : '') + (reOk(m) ? '<button class="tkB s" data-a="reeval">🔁 Re-evaluation</button>' : '') + '<button class="tkB" data-a="new">＋ New task</button></div><div class="tkTabs"><button data-tab="board" class="on">🗂 Board</button><button data-tab="inbox">☰ List</button><button data-tab="news">📢 News' + (window.__cm ? window.__cm.newsBadge() : '') + '</button></div>' +
+      v.innerHTML = '<div class="tkW kbW"><div class="tkH"><h2>Tasks</h2>' + ((canCase() || casesAll().length) ? '<button class="tkB s" data-a="cases">📁 Cases</button>' : '') + (reOk(m) ? '<button class="tkB s" data-a="reeval">🔁 Re-evaluation</button>' : '') + '<button class="tkB" data-a="new">＋ New task</button></div><div class="tkTabs"><button data-tab="board" class="on">🗂 Board</button><button data-tab="inbox">☰ List</button><button data-tab="news">📢 News' + (window.__cm ? window.__cm.newsBadge() : '') + '</button></div>' +
         '<div class="tkTabs">' + chips.map(function (c) { return '<button data-scope="' + c[0] + '" class="' + (sc === c[0] ? 'on' : '') + '">' + c[1] + '</button>'; }).join('') + '<input id="kbQ" type="search" placeholder="🔍 Filter tasks…" style="flex:1;min-width:110px;padding:6px 10px;border-radius:16px;border:1px solid var(--border);background:transparent;color:inherit;font:inherit;font-size:13px"></div>' +
         (__dept.sees('academy') ? quick(m) : '') + '<div id="kbBody"></div></div>'; drawBody(); badge(); }
     function mutate(id, fn, act, note) { var a = tasks(), t = a.filter(function (x) { return x.id === id; })[0]; if (!t) return null; fn(t); if (act) addHist(t, act, note); t.u = Date.now(); wr(a); return t; }
@@ -22245,7 +22371,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
         (ed ? '<div style="display:flex;gap:6px;margin-top:6px"><input id="kdNew" placeholder="Add an action…" maxlength="140"><button class="tkB s" data-k="addact">Add</button></div>' : '') +
         '<label>Comments</label>' + (thr || '<div class="tkM">No comments yet.</div>') + '<div style="display:flex;gap:6px;margin-top:6px"><input id="kdCm" placeholder="Write a comment…"><button class="tkB s" data-k="comment">Send</button></div>' +
         (hist ? '<div class="tkHist" style="margin-top:10px"><b>History</b><br>' + hist + '</div>' : '') +
-        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap">' + (ed && t.status !== 'done' && t.status !== 'cancelled' ? (t.esc && t.esc.on ? '<button class="tkB s" data-k="desc">Remove escalation</button>' : '<button class="tkB s" data-k="esc" title="Flags it to Management and the sender, and makes it urgent">⚠ Escalate</button>') : '') + (isSent(t, m) || canAll(m) ? '<button class="tkB r" data-k="del">Delete task</button>' : '') + '<button class="tkB" data-k="close">Close</button></div></div>';
+        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap">' + (ed && t.status !== 'done' && t.status !== 'cancelled' ? (t.esc && t.esc.on ? '<button class="tkB s" data-k="desc">Remove escalation</button>' : '<button class="tkB s" data-k="esc" title="Flags it to managers and seniors and the sender, and makes it urgent">⚠ Escalate</button>') : '') + (isSent(t, m) || canAll(m) ? '<button class="tkB r" data-k="del">Delete task</button>' : '') + '<button class="tkB" data-k="close">Close</button></div></div>';
       var bx = ov.querySelector('.tkBox'); bx.scrollTop = sc; if (focus) { var f = ov.querySelector(focus); if (f) f.focus(); } }
     function openTask(id) {
       var ov = document.querySelector('.tkOv.kbOv'); if (!ov) { ov = document.createElement('div'); ov.className = 'tkOv kbOv'; ov.style.alignItems = 'flex-start'; document.body.appendChild(ov);
@@ -22256,7 +22382,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
           if (xa != null) { mutate(id2, function (t) { t.actions.splice(+xa, 1); }, 'removed an action'); drawModal(ov); return; }
           if (k === 'addlink') { var lu = ov.querySelector('#kdLu').value.trim(), lt = ov.querySelector('#kdLt').value.replace(/[<>]/g, '').trim().slice(0, 80); if (!okLink(lu)) { alert('The link must start with https:// (or http://).'); return; } if (((tasks().filter(function (x) { return x.id === id2; })[0] || {}).links || []).length >= 20) { alert('At most 20 links per ticket.'); return; } mutate(id2, function (t) { t.links = (t.links || []).concat([{ title: lt || lu.replace(/^https?:\/\//, '').slice(0, 60), url: lu, by: me().n, ts: Date.now() }]); }, 'added a link', lt || lu); logA('Link added to task "' + (tasks().filter(function (x) { return x.id === id2; })[0] || {}).title + '"'); drawModal(ov, '#kdLu'); return; }
           var xl = b.getAttribute('data-xl'); if (xl != null) { mutate(id2, function (t) { t.links.splice(+xl, 1); }, 'removed a link'); drawModal(ov); return; }
-          if (k === 'esc') { var why = (window.prompt('Why does this need escalating? (required — Management and the sender will see it)') || '').replace(/[<>]/g, '').trim().slice(0, 300); if (!why) return; var m2 = me(); mutate(id2, function (t) { t.esc = { on: true, by: m2.n, email: m2.e, ts: Date.now(), reason: why, was: t.pri || 'normal' }; t.pri = 'urgent'; }, 'escalated it', why); logA('Task "' + (tasks().filter(function (x) { return x.id === id2; })[0] || {}).title + '" escalated: ' + why); drawModal(ov); render(); return; }
+          if (k === 'esc') { var why = (window.prompt('Why does this need escalating? (required — managers and seniors and the sender will see it)') || '').replace(/[<>]/g, '').trim().slice(0, 300); if (!why) return; var m2 = me(); mutate(id2, function (t) { t.esc = { on: true, by: m2.n, email: m2.e, ts: Date.now(), reason: why, was: t.pri || 'normal' }; t.pri = 'urgent'; }, 'escalated it', why); logA('Task "' + (tasks().filter(function (x) { return x.id === id2; })[0] || {}).title + '" escalated: ' + why); drawModal(ov); render(); return; }
           if (k === 'desc') { mutate(id2, function (t) { if (t.esc) { t.esc.on = false; t.esc.off = Date.now(); if (t.pri === 'urgent' && t.esc.was) t.pri = t.esc.was; } }, 'removed the escalation'); drawModal(ov); render(); return; }
           if (k === 'comment') { var c = ov.querySelector('#kdCm'), tx2 = c.value.trim(); if (!tx2) return; window.__cm.addC('task', id2, tx2); drawModal(ov, '#kdCm'); return; }
           if (k === 'del') { var t2 = tasks().filter(function (x) { return x.id === id2; })[0]; if (!t2 || !confirm('Delete this task for everyone?')) return; wr(tasks().filter(function (x) { return x.id !== id2; })); logA('Task "' + t2.title + '" deleted'); ov.remove(); render(); } });
@@ -22282,17 +22408,22 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       tv.addEventListener('dragover', function (e) { var col = e.target.closest && e.target.closest('.kbCol'); if (!col) return; e.preventDefault(); [].forEach.call(tv.querySelectorAll('.over'), function (x) { x.classList.remove('over'); }); col.classList.add('over'); });
       tv.addEventListener('drop', function (e) { var col = e.target.closest && e.target.closest('.kbCol'); if (!col) return; e.preventDefault(); var id = e.dataTransfer.getData('text/plain'); if (id && moveTo(id, col.getAttribute('data-col'))) drawBody(); [].forEach.call(tv.querySelectorAll('.drag,.over'), function (x) { x.classList.remove('drag', 'over'); }); }); })();
     /* ================= v3.9 Cases: one process, linked tasks for several departments ================= */
-    var CASEK = 'totCases', TSTEPS = [{ d: 'hr', t: 'Process the termination', days: 1 }, { d: 'appearance', t: 'Collect the uniform and confirm it was returned', days: 3 }, { d: 'access', t: 'Remove building / fingerprint access', days: 1 }, { d: 'fmd', t: 'Remove from future schedules (check the dates first)', days: 1 }, { d: 'it', t: 'Remove or disable system access', days: 1 }, { d: 'management', t: 'Complete the management actions', days: 3 }];
+    var CASEK = 'totCases', TSTEPS = [{ d: 'hr', t: 'Process the termination', days: 1 }, { d: 'appearance', t: 'Collect the uniform and confirm it was returned', days: 3 }, { d: 'access', t: 'Remove building / fingerprint access', days: 1 }, { d: 'fmd', t: 'Remove from future schedules (check the dates first)', days: 1 }, { d: 'it', t: 'Remove or disable system access', days: 1 }];
     function casesAll() { var a = rd(CASEK); return Array.isArray(a) ? a : []; }
     function casesWr(a) { try { localStorage.setItem(CASEK, JSON.stringify(a)); } catch (e) { alert('Could not save (browser storage is full).'); } }
     function dueIn(n) { var d = new Date(); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
     function caseTasks(c) { return tasks().filter(function (t) { return t.caseId === c.id; }); }
     function caseProg(c) { var l = caseTasks(c), d = l.filter(function (t) { return t.status === 'done'; }).length, x = l.filter(function (t) { return t.status === 'cancelled'; }).length; return { n: l.length, done: d, canc: x, open: l.length - d - x, closed: l.length > 0 && d + x === l.length }; }
     function openCaseFor(name, empId, kind) { var k = String(empId || name).toLowerCase(); return casesAll().filter(function (c) { return c.kind === (kind || 'termination') && String(c.empId || c.empName).toLowerCase() === k && !caseProg(c).closed; })[0]; }
-    var CKIND = { termination: { n: 'termination', t: 'Termination', dl: 'Last working day' }, onboarding: { n: 'onboarding', t: 'Onboarding', dl: 'Start date' }, transfer: { n: 'transfer', t: 'Transfer', dl: 'Effective date' } };
+    /* v3.25: case kinds come from the work types (window.__wt: termination / onboarding / transfer + the admin's own types); an unknown kind is refused instead of becoming a termination */
+    function CKIND(kind) { var w = window.__wt && window.__wt.get(kind); if (w) return { n: w.label.toLowerCase(), t: w.label, dl: w.dl || 'Date', steps: w.steps }; return kind === 'termination' ? { n: 'termination', t: 'Termination', dl: 'Last working day', steps: TSTEPS.slice() } : null; }
+    /* who may start a case by hand: wide access (admin, managers, seniors) or anyone in the HR department (same rule as the server's case visibility) */
+    function canCase() { return canAll(me()) || __dept.board('hr'); }
+    window.TasksCanCase = canCase;
     window.TasksStartCase = function (name, empId, kind) {
-      kind = CKIND[kind] ? kind : 'termination'; var KD = CKIND[kind], m = me(); if (!canAll(m) && m.r !== 'hr_recruiter') { alert('Only a manager, a senior, HR or the admin can start a ' + KD.n + ' case.'); return; }
-      if (!window.__defSteps) window.__defSteps = TSTEPS.slice(); TSTEPS = (window.totProcessSteps && window.totProcessSteps(kind)) || (kind === 'termination' ? window.__defSteps : null);
+      kind = kind || 'termination'; var KD = CKIND(kind), m = me(); if (!KD) { alert('Unknown work type “' + kind + '”. Ask the admin to check the work types.'); return; }
+      if (!canCase()) { alert('Only a manager, a senior, HR or the admin can start a ' + KD.n + ' case.'); return; }
+      var TSTEPS = KD.steps;   /* per dialog (was shared between dialogs) */
       if (!TSTEPS || !TSTEPS.length) { alert('No steps are defined for the ' + KD.n + ' process.'); return; }
       name = String(name || '').trim(); if (!name) return;
       if (openCaseFor(name, empId, kind)) { alert('There is already an open ' + KD.n + ' case for ' + name + '. Open Tasks > Cases to follow it.'); return; }
@@ -22305,18 +22436,20 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       $('tcGo').onclick = function () { var pick = [].slice.call(ov.querySelectorAll('input[data-s]')).filter(function (c) { return c.checked; }).map(function (c) { return TSTEPS[+c.getAttribute('data-s')]; }); if (!pick.length) { $('tcEr').textContent = 'Tick at least one step.'; return; }
         var id = 'cs' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), title = KD.t + ': ' + name, day = $('tcDay').value, note = $('tcNote').value.trim();
         var c = { id: id, kind: kind, title: title, empName: name, empId: empId || '', lastDay: day, note: note, by: m.n, byEmail: m.e, created: Date.now(), u: Date.now() }; var a = casesAll(); a.push(c); casesWr(a);
-        pick.forEach(function (x) { create({ title: title + ' — ' + x.t, details: (day ? KD.dl + ': ' + day + '\n' : '') + (note ? note + '\n' : '') + 'Part of case “' + title + '”. Comment here if something blocks you (for example, the uniform was not returned).', toRole: x.d, due: dueIn(x.days), rel: name + (empId ? ' (' + empId + ')' : ''), empId: empId || '', ref: 'case:' + id, caseId: id, caseTitle: title }); });
+        pick.forEach(function (x) { create({ wt: kind, title: title + ' — ' + x.t, details: (day ? KD.dl + ': ' + day + '\n' : '') + (note ? note + '\n' : '') + 'Part of case “' + title + '”. Comment here if something blocks you (for example, the uniform was not returned).', toRole: x.d, due: dueIn(x.days), rel: name + (empId ? ' (' + empId + ')' : ''), empId: empId || '', ref: 'case:' + id, caseId: id, caseTitle: title }); });
         logA('Case "' + title + '" started with ' + pick.length + ' task(s)'); ov.remove(); render(); toast('Case started: ' + pick.length + ' tasks created.'); window.TasksCasesOpen(); };
     };
-    window.TasksCasesOpen = function () {
+    /* v3.25: TasksCasesOpen(d) — d (optional) lists only cases with a ticket on that department's board or started there */
+    window.TasksCasesOpen = function (d) { d = typeof d === 'string' ? d : '';
       var ov = document.querySelector('.tkOv.csOv'); if (!ov) { ov = document.createElement('div'); ov.className = 'tkOv csOv'; ov.style.alignItems = 'flex-start'; document.body.appendChild(ov);
         ov.addEventListener('click', function (e) { if (e.target === ov) { ov.remove(); return; } var b = e.target.closest('button'); if (!b) return; if (b.getAttribute('data-x')) { ov.remove(); return; } var tid = b.getAttribute('data-t'); if (tid) { openTask(tid); return; } }); }
-      var m = me(), list = casesAll().slice().sort(function (a, b) { return (b.created || 0) - (a.created || 0); });
-      ov.innerHTML = '<div class="tkBox"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">📁 Cases</h3><button class="tkB s" data-x="1">✕</button></div>' +
+      var m = me(), src = function (c) { var t = c.src && tasks().filter(function (x) { return x.id === c.src; })[0]; return t ? __dept.norm(t.src || t.toRole) : ''; };
+      var list = casesAll().filter(function (c) { return !d || src(c) === d || caseTasks(c).some(function (t) { return __dept.norm(t.toRole) === d; }); }).sort(function (a, b) { return (b.created || 0) - (a.created || 0); });
+      ov.innerHTML = '<div class="tkBox"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">📁 Cases' + (d ? ' · ' + esc(__dept.label(d)) : '') + '</h3><button class="tkB s" data-x="1">✕</button></div>' +
         (list.map(function (c) { var p = caseProg(c), pct = p.n ? Math.round((p.done + p.canc) / p.n * 100) : 0;
           return '<div class="tkCard" style="margin:10px 0"><div class="tkT">' + esc(c.title) + '<span class="tkChip ' + (p.closed ? 'g' : 'b') + '">' + (p.closed ? 'Closed' : 'Open') + '</span></div><div class="tkM">Started by ' + esc(c.by) + ' · ' + fmt(c.created) + (c.lastDay ? ' · last day ' + esc(c.lastDay) : '') + '</div>' +
             '<div class="kbPg"><i style="width:' + pct + '%"></i></div><div class="tkM"><b>' + p.done + '/' + p.n + ' completed</b>' + (p.canc ? ' · ' + p.canc + ' cancelled' : '') + '</div>' +
-            caseTasks(c).map(function (t) { var od = t.due && t.status !== 'done' && t.status !== 'cancelled' && t.due < today(); return '<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin:4px 0"><span style="font-size:13px"><b>' + esc(__dept.label(t.toRole)) + '</b> · ' + esc(statusLabel(t)) + (od ? ' · <span style="color:var(--red)">overdue</span>' : '') + (reasonOf(t) ? ' · ' + esc(reasonOf(t).slice(0, 50)) : '') + (t.toName ? ' · 👤 ' + esc(t.toName) : '') + '</span><button class="tkB s" data-t="' + esc(t.id) + '">Open</button></div>'; }).join('') + '</div>'; }).join('') || '<div class="tkEmpty">No cases yet. Start one from a person\'s 360 tab.</div>') + '</div>'; };
+            caseTasks(c).map(function (t) { var od = t.due && t.status !== 'done' && t.status !== 'cancelled' && t.due < today(); return '<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin:4px 0"><span style="font-size:13px"><b>' + esc(__dept.label(t.toRole)) + '</b> · ' + esc(statusLabel(t)) + (od ? ' · <span style="color:var(--red)">overdue</span>' : '') + (reasonOf(t) ? ' · ' + esc(reasonOf(t).slice(0, 50)) : '') + (t.toName ? ' · 👤 ' + esc(t.toName) : '') + '</span><button class="tkB s" data-t="' + esc(t.id) + '">Open</button></div>'; }).join('') + '</div>'; }).join('') || '<div class="tkEmpty">No cases yet. A case starts when a ticket with a work type is created on a department board (New ticket → Work type), or from HR → Lifecycle.</div>') + '</div>'; };
     window.TasksCaseSummary = function (name, empId) { var k = String(empId || name).toLowerCase(); return casesAll().filter(function (c) { return String(c.empId || c.empName).toLowerCase() === k; }).map(function (c) { var p = caseProg(c); return { title: c.title, done: p.done, n: p.n, closed: p.closed }; }); };
     document.getElementById('tasksView').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b && b.getAttribute('data-a') === 'cases') window.TasksCasesOpen(); });
     /* ================= v3.10 Re-evaluation requests: a manager asks, the Performance board handles it ================= */
@@ -22368,7 +22501,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       mutate(id, function (x) { x.reeval.newKey = String(rec.uid || rec.id); x.reeval.newLabel = evLabel(rec) + ' (existing evaluation corrected)'; x.reeval.origTotal = prev; x.reeval.newTotal = rec.total; x.reeval.doneBy = m.n; x.reeval.doneAt = Date.now(); x.reeval.edited = true; }, 'corrected the existing evaluation', prev + '% → ' + rec.total + '%');
       moveTo(id, 'done'); logA('Re-evaluation completed for ' + t.reeval.name + ' (' + prev + '% → ' + rec.total + '%)'); render(); };
     window.TasksOpenTask = openTask;
-    window.TasksApi = { prank: prank, priLab: priLab, priOpts: priOpts, priChip: priChip, escChip: escChip, create: create, mutate: mutate, moveTo: moveTo, open: openTask, code: tkCode, reasonOf: reasonOf, canEdit: function (t) { return canEdit(t, me()); }, casesAll: casesAll, caseProg: caseProg, refresh: function () { render(); } };
+    window.TasksApi = { prank: prank, priLab: priLab, priOpts: priOpts, priChip: priChip, escChip: escChip, create: create, mutate: mutate, moveTo: moveTo, open: openTask, code: tkCode, reasonOf: reasonOf, canEdit: function (t) { return canEdit(t, me()); }, casesAll: casesAll, caseProg: caseProg, canCase: canCase, refresh: function () { render(); } };
     window.TasksMount = function () { render(); }; window.TasksRefresh = render;
     window.TasksOpen = function (tab, id, sub) { if (tab !== 'news') { st.scope = tab === 'sent' ? 'sent' : tab === 'all' ? 'all' : sub === 'me' ? 'me' : sub === 'board' ? 'board' : 'mine'; st.tab = 'board'; st.fl = 'active'; render(); if (id) setTimeout(function () { openTask(id); }, 80); return; } st.tab = tab; st.fl = 'active'; st.sub = sub || 'all'; render(); setTimeout(function () { var el = document.querySelector('#tasksView [data-id="' + id + '"],#tasksView [data-aid="' + id + '"]'); if (el) { el.scrollIntoView({ block: 'center' }); el.style.outline = '2px solid var(--accent)'; setTimeout(function () { el.style.outline = ''; }, 2500); } }, 50); };
     setInterval(function () { var raw = localStorage.getItem(K), v = document.getElementById('tasksView'); badge();
@@ -22391,7 +22524,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     function access(v) { var r = ROLES[me().r]; return adm() || !r || r.views.indexOf(v) >= 0; }
     function norm(x) { return String(x == null ? '' : x).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
     function today() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
-    function privileged(m) { return adm() || m.r === 'manager' || m.r === 'senior'; }
+    function privileged(m) { return window.__dept && __dept.wide ? __dept.wide() : (adm() || m.r === 'manager' || m.r === 'senior'); }   /* v3.25: one wide-access rule */
     function asg(t) { return !!(t.toEmail || t.toName); }
     function toMe(t, m) { return asg(t) ? (t.toEmail ? t.toEmail === m.e : t.toName === m.n) : __dept.board(t.toRole); }
     function sentBy(x, m) { return m.e && x.fromEmail ? x.fromEmail === m.e : x.fromName === m.n; }
@@ -22470,7 +22603,8 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 
 
 <script id="homeDepts">
-/* One Home per department: hero text, quick actions, and the cards that matter for that team. Management can look at any department. */
+/* One Home per department: hero text, quick actions, and the cards that matter for that team. Managers and seniors (wide access) can look at any department. */
+/* v3.25: every department has a hero (Academy, Performance, FMD, Uniforms, HR, Office = Building access + IT); wide access with "Everything" gets a neutral "All departments" hero. */
 (function () {
   try {
     function esc(x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -22479,10 +22613,13 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     function role() { try { return getTrainerRole() || ''; } catch (e) { return ''; } }
     function name() { try { return getTrainerName() || ''; } catch (e) { return ''; } }
     function access(v) { var r = ROLES[role()]; return !r || r.views.indexOf(v) >= 0; }
-    function all() { return __dept.sees('academy') && __dept.sees('performance') && __dept.sees('fmd'); }
+    var SP = [['academy', 'Academy', ['academy']], ['performance', 'Performance', ['performance']], ['fmd', 'FMD', ['fmd']], ['appearance', 'Uniforms', ['appearance']], ['hr', 'HR', ['hr']], ['office', 'Office', ['access', 'it']]];
+    function seen() { return SP.filter(function (x) { return x[2].some(function (d) { return __dept.sees(d); }); }); }
+    function all() { return seen().length > 1; }
+    function wide() { return !!(__dept.wide && __dept.wide()); }
     function isMgr() { return role() === 'manager' || (sessionStorage.getItem('totAdmin') === '1' && !sessionStorage.getItem('totViewAs')); }
     var hv = localStorage.getItem('totHomeDept') || 'all';
-    function applyHv() { var h = all() ? hv : 'all', c = document.documentElement.classList; c.toggle('hvA', h === 'performance' || h === 'fmd'); c.toggle('hvP', h === 'academy' || h === 'fmd'); c.toggle('hvF', h === 'academy' || h === 'performance'); return h; }
+    function applyHv() { var h = all() && seen().some(function (x) { return x[0] === hv; }) ? hv : 'all', c = document.documentElement.classList; c.toggle('hvA', h !== 'all' && h !== 'academy'); c.toggle('hvP', h !== 'all' && h !== 'performance'); c.toggle('hvF', h !== 'all' && h !== 'fmd'); return h; }
     function dayStart() { var d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }
     function pct(a) { return a.length ? Math.round(a.reduce(function (x, y) { return x + (+y.total || 0); }, 0) / a.length) : null; }
     function T(n, l, g) { return '<div class="dbT"' + (g ? ' data-a="' + g + '"' : '') + '><b>' + n + '</b><span>' + l + '</span></div>'; }
@@ -22501,18 +22638,25 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
         (Object.keys(pos).length ? '<div class="dbH">People by position</div><div class="tkM">' + Object.keys(pos).sort(function (a, b) { return pos[b] - pos[a]; }).slice(0, 6).map(function (k) { return esc(k) + ' <b>' + pos[k] + '</b>'; }).join(' · ') + '</div>' : '<div class="tkM">No employee data yet.' + (isMgr() ? ' Managers can import it in Employee data.' : '') + '</div>'); }
     var ACT = { onb: ['📋 Onboarding', 'onboarding', function () { switchView('onboarding'); }], ws: ['🎓 Workshop', 'exam', function () { openWs('menu', 'academy'); }], id: ['🔑 ID Creation', 'id', function () { switchView('id'); }], log: ['📒 Logbooks', 'logbooks', function () { switchView('logbooks'); }],
       ex: ['⭐ Exam Evaluation', 'exam', function () { openWs('exam', 'performance'); }], wsev: ['📊 Workshop Evaluation', 'exam', function () { openWs('checklist', 'performance'); }], vid: ['🎥 Videos', 'exam', function () { perfVidOpen(); }], send: ['📤 Send results', 'exam', function () { perfSendOpen(); }],
-      sch: ['📅 Schedule', 'schedule', function () { switchView('schedule'); }], emp: ['👥 Employee data', 'mgr', function () { switchView('empdata'); }], tasks: ['✅ Tasks', '', function () { switchView('tasks'); }] };
-    function actions(h) { var l = []; if (__dept.sees('academy') && (h === 'all' || h === 'academy')) l.push('onb', 'ws', 'id', 'log'); if (__dept.sees('performance') && (h === 'all' || h === 'performance')) l.push('ex', 'wsev', 'vid', 'send'); if (__dept.sees('fmd') && (h === 'all' || h === 'fmd')) l.push('sch', 'emp'); l.push('tasks');
-      return l.filter(function (k, i) { return l.indexOf(k) === i; }).filter(function (k) { var v = ACT[k][1]; return !v || (v === 'mgr' ? isMgr() : access(v)); }); }
-    var HERO = { academy: ['Academy', 'Trainees, workshops, IDs and logbooks'], performance: ['Performance', 'Evaluations, results and videos'], fmd: ['FMD', 'Schedules, rotation and employee data'], management: ['Management', 'Everything across the departments'] };
+      sch: ['📅 Schedule', 'schedule', function () { switchView('schedule'); }], emp: ['👥 Employee data', 'mgr', function () { switchView('empdata'); }], rq: ['📨 Employee requests', 'requests', function () { switchView('requests'); }],
+      uni: ['👕 Uniforms', 'appearance', function () { switchView('appearance'); }], unib: ['🗂 Uniforms board', 'dept', function () { DeptOpen('appearance', 'board'); }],
+      hrb: ['🗂 HR board', 'dept', function () { DeptOpen('hr', 'board'); }], rc: ['🧲 Recruiting', 'recruiting', function () { switchView('recruiting'); }],
+      acc: ['🔑 Building access board', 'dept', function () { DeptOpen('access', 'board'); }], itb: ['💻 IT board', 'dept', function () { DeptOpen('it', 'board'); }],
+      ov: ['🏢 All departments', 'wide', function () { DeptOpen('', 'overview'); }], tasks: ['✅ Tasks', '', function () { switchView('tasks'); }] };
+    function can(v) { if (!v) return true; if (v === 'mgr') return isMgr(); if (v === 'wide') return wide() && !!window.__dwAllowed && __dwAllowed(); if (v === 'dept') return !!(window.__dwAllowed && __dwAllowed()); if (v === 'requests') return !!(window.__rqAllowed && __rqAllowed()); if (v === 'recruiting') return !!(window.__rcAllowed && __rcAllowed()); return access(v); }
+    function actions(h) { var l = [], S = __dept.sees, on = function (x) { return h === 'all' || h === x; }; if (h === 'all' && wide()) l.push('ov'); if (S('academy') && on('academy')) l.push('onb', 'ws', 'id', 'log'); if (S('performance') && on('performance')) l.push('ex', 'wsev', 'vid', 'send'); if (S('fmd') && on('fmd')) l.push('sch', 'emp', 'rq');
+      var bd = h !== 'all'; if (S('appearance') && on('appearance')) l.push('uni'); if (S('appearance') && bd && on('appearance')) l.push('unib'); if (S('hr') && on('hr')) l.push(bd ? 'hrb' : 'rc', 'rc'); if (S('access') && on('office')) l.push('acc'); if (S('it') && on('office')) l.push('itb'); l.push('tasks');
+      return l.filter(function (k, i) { return l.indexOf(k) === i; }).filter(function (k) { return can(ACT[k][1]); }); }
+    var HERO = { academy: ['Academy', 'Trainees, workshops, IDs and logbooks'], performance: ['Performance', 'Evaluations, results and videos'], fmd: ['FMD', 'Schedules, rotation and employee data'], appearance: ['Uniforms', 'Uniform inventory, checkout and returns'], hr: ['HR', 'Recruiting, candidates, employee lifecycle and documents'], office: ['Office', 'Building access and IT'], all: ['All departments', 'Everything across the departments'] };
     function render() {
       var hv0 = document.getElementById('homeView'); if (!hv0 || hv0.hidden) return; var h = applyHv(), box = document.getElementById('deptHomeBox');
       if (!box) { var dc = document.getElementById('dashCard'); if (!dc) return; box = document.createElement('div'); box.id = 'deptHomeBox'; dc.insertAdjacentElement('afterend', box); box.innerHTML = '<div id="hvChips" class="hvChips"></div><div id="qaRow" class="qa"></div><div class="eds-card" id="perfHome" style="margin-bottom:16px;padding:12px 16px"></div><div class="eds-card" id="fmdHome" style="margin-bottom:16px;padding:12px 16px"></div>';
         box.addEventListener('click', function (e) { var c = e.target.closest('[data-hv]'); if (c) { hv = c.getAttribute('data-hv'); localStorage.setItem('totHomeDept', hv); render(); return; } var a = e.target.closest('[data-a]'); if (a && ACT[a.getAttribute('data-a')]) ACT[a.getAttribute('data-a')][2](); }); }
-      var d = all() ? (h === 'all' ? 'management' : h) : (__dept.sees('academy') ? 'academy' : __dept.sees('performance') ? 'performance' : __dept.sees('fmd') ? 'fmd' : 'management');
+      var own = (__dept.mine() || [])[0], sp = seen(); own = own === 'access' || own === 'it' ? 'office' : own;
+      var d = h !== 'all' && HERO[h] ? h : wide() ? 'all' : HERO[own] && own !== 'all' ? own : sp.length ? sp[0][0] : 'all';
       var t = document.querySelector('#homeView .home-hero h1'), p = document.querySelector('#homeView .home-hero p'), b = document.querySelector('#homeView .home-badge');
-      if (t) t.textContent = 'Welcome back' + (name() && !/^Preview/.test(name()) ? ', ' + name().split(' ')[0] : '') + ' · ' + HERO[d][0]; if (p) p.textContent = HERO[d][1] + '.'; if (b) b.textContent = HERO[d][0] + ' home';
-      document.getElementById('hvChips').innerHTML = all() ? [['all', 'Everything'], ['academy', 'Academy'], ['performance', 'Performance'], ['fmd', 'FMD']].map(function (x) { return '<button data-hv="' + x[0] + '" class="' + (h === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') : '';
+      if (t) t.textContent = 'Welcome back' + (name() && !/^Preview/.test(name()) ? ', ' + name().split(' ')[0] : '') + ' · ' + HERO[d][0]; if (p) p.textContent = HERO[d][1] + '.'; if (b) b.textContent = d === 'all' ? 'All departments' : HERO[d][0] + ' home';
+      document.getElementById('hvChips').innerHTML = all() ? [['all', 'Everything']].concat(seen()).map(function (x) { return '<button data-hv="' + x[0] + '" class="' + (h === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') : '';
       document.getElementById('qaRow').innerHTML = actions(h).map(function (k) { return '<button data-a="' + k + '">' + ACT[k][0] + '</button>'; }).join('');
       if (__dept.sees('performance') && access('exam')) document.getElementById('perfHome').innerHTML = perfCard(); if (__dept.sees('fmd')) document.getElementById('fmdHome').innerHTML = fmdCard(); }
     setTimeout(render, 700); setInterval(render, 5000);
@@ -22982,15 +23126,16 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       return c;
     }
     function bar() {
-      var B = function (k, l) { if (!okMode(k)) return ''; return '<button type="button" data-am="' + k + '" class="' + (mode === k ? 'on' : '') + '" style="padding:8px 12px;border-radius:8px;border:1px solid var(--border,#2a3150);background:' + (mode === k ? 'var(--accent,#d63a67)' : 'transparent') + ';color:' + (mode === k ? '#fff' : 'inherit') + ';cursor:pointer;font:inherit">' + l + '</button>'; };
-      return '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px">' +
+      /* v3.25: tab pills use the shared .tkTabs style */
+      var B = function (k, l) { if (!okMode(k)) return ''; return '<button type="button" data-am="' + k + '" class="' + (mode === k ? 'on' : '') + '">' + l + '</button>'; };
+      return '<div class="tkTabs apTabs">' +
         B('dash', 'Dashboard') + B('inv', 'Inventory') + B('issue', 'Checkout') + B('ret', 'Return') +
         B('hist', 'History') + B('teams', 'Teams / Types') + B('train', 'Trainees') + B('forms', 'Forms') +
         B('io', 'Import / Export') + B('kiosk', 'Tablet kiosk') + B('audit', 'Audit') + '</div>';
     }
     function renderDash(d) {
       var c = counts(d), recent = (d.txs || []).slice(0, 8);
-      var h = '<h2 style="margin:0 0 8px">Appearance Department</h2><p class="hint" style="opacity:.8;margin:0 0 12px">Uniforms, spare checkout, history. Employee list is shared with the rest of Pass-to-Floor. Academy link is prepared but not auto-synced yet.</p>';
+      var h = '<h2 style="margin:0 0 8px">Uniforms</h2><p class="hint" style="opacity:.8;margin:0 0 12px">Uniforms, spare checkout, history. Employee list is shared with the rest of Pass-to-Floor. Academy link is prepared but not auto-synced yet.</p>';
       h += '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px">';
       [['Total', c.total], ['Available', c.avail], ['Issued', c.issued], ['Damaged', c.damaged], ['Trainees waiting', c.awaitTrainee]].forEach(function (x) {
         h += '<div style="min-width:110px;padding:12px 14px;border:1px solid var(--border,#2a3150);border-radius:10px"><small style="opacity:.7">' + x[0] + '</small><div style="font-size:22px;font-weight:700">' + x[1] + '</div></div>';
@@ -23185,7 +23330,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       if (!root) return;
       var d = load();
       var body = '';
-      if (!okMode(mode)) { var fm = ['dash', 'inv', 'hist', 'issue', 'ret', 'train', 'forms', 'kiosk', 'teams', 'io', 'audit'].filter(okMode)[0]; if (!fm) { root.innerHTML = '<div class="home-wrap" style="padding:30px;text-align:center"><h2>Appearance</h2><p>Your position cannot open any part of Appearance.</p></div>'; return; } mode = fm; }
+      if (!okMode(mode)) { var fm = ['dash', 'inv', 'hist', 'issue', 'ret', 'train', 'forms', 'kiosk', 'teams', 'io', 'audit'].filter(okMode)[0]; if (!fm) { root.innerHTML = '<div class="tkW apW" style="padding:30px;text-align:center"><h2>Uniforms</h2><p>Your position cannot open any part of Uniforms.</p></div>'; return; } mode = fm; }
       if (mode === 'dash') body = renderDash(d);
       else if (mode === 'inv') body = renderInv(d);
       else if (mode === 'issue') body = renderIssue(d);
@@ -23198,7 +23343,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       else if (mode === 'kiosk') body = renderKiosk(d);
       else if (mode === 'audit') body = renderAudit(d);
       else body = renderDash(d);
-      root.innerHTML = '<div class="home-wrap" style="padding:20px 16px 40px;max-width:1100px;margin:0 auto">' + bar() + body + '</div>';
+      root.innerHTML = '<div class="tkW apW">' + bar() + body + '</div>'; /* v3.25: same scale as other screens (was .home-wrap 16px) */
       Array.prototype.forEach.call(root.querySelectorAll('[data-ap]'), function (el) { if (!okAct(el.getAttribute('data-ap'))) el.remove(); });
     }
     function csvEscape(v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; }
@@ -23210,7 +23355,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       var t = e.target, am = t.getAttribute && t.getAttribute('data-am'), ap = t.getAttribute && t.getAttribute('data-ap');
       if (am) { if (!okMode(am)) return; mode = am; draw(); return; }
       if (!ap) return;
-      if (!okAct(ap)) { try { showShellToast('Your position cannot do this in Appearance.', 'error'); } catch (e) {} return; }
+      if (!okAct(ap)) { try { showShellToast('Your position cannot do this in Uniforms.', 'error'); } catch (e) {} return; }
       var d = load();
       if (ap === 'filter') {
         q = (root.querySelector('#apQ') || {}).value || '';
@@ -23374,7 +23519,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     };
     window.totAppearanceTraineePull = function () {
       /* Future Academy integration — returns empty until connected. */
-      return { ok: false, msg: 'Academy auto-pull not connected yet. Add trainees manually in Appearance → Trainees.', trainees: [] };
+      return { ok: false, msg: 'Academy auto-pull not connected yet. Add trainees manually in Uniforms → Trainees.', trainees: [] };
     };
   } catch (e) { console.warn('Appearance Department failed to load:', e); }
 })();
@@ -23702,11 +23847,11 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   ];
   function render() {
     if (!adm()) { host.innerHTML = '<div style="padding:30px;text-align:center"><h2>Integrations</h2><p>Admin only.</p></div>'; return; }
-    var c = cfg(), h = '<div style="padding:14px 16px"><h2 style="margin:0 0 4px">🔌 Integrations</h2><div style="font-size:12px;color:#64748b;margin-bottom:8px">Every connection below is <b>Not connected</b>: no connector code is installed, and nothing is sent anywhere. You can record the settings you will need and download the data in a ready-to-import format. <b>Never type passwords, secrets or API keys here</b> — this page is saved in the browser and synced to Drive.</div>';
+    var c = cfg(), h = '<div style="padding:14px 16px"><h2 style="margin:0 0 4px">🔌 Integrations</h2><div style="font-size:12px;color:var(--muted);margin-bottom:8px">Every connection below is <b>Not connected</b>: no connector code is installed, and nothing is sent anywhere. You can record the settings you will need and download the data in a ready-to-import format. <b>Never type passwords, secrets or API keys here</b> — this page is saved in the browser and synced to Drive.</div>';
     C.forEach(function (x) {
       var s = c[x.id] || {};
-      h += '<div style="border:1px solid var(--border,#cbd5e1);border-radius:10px;padding:12px;margin:8px 0"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>' + x.ic + ' ' + esc(x.n) + '</b><span style="background:#fee2e2;color:#991b1b;border-radius:10px;padding:1px 9px;font-size:12px;font-weight:700">Not connected</span></div><div style="font-size:13px;margin:4px 0">' + esc(x.why) + '</div><div style="font-size:12px;color:#64748b;margin-bottom:6px"><b>What is needed:</b> ' + esc(x.need) + '</div>';
-      x.f.forEach(function (f) { h += '<label style="display:block;font-size:12px;margin-top:4px">' + esc(f[1]) + '</label><input data-int="' + x.id + '" data-f="' + f[0] + '" value="' + esc(s[f[0]] || '') + '" style="width:100%;box-sizing:border-box;padding:5px 8px;border:1px solid var(--border,#cbd5e1);border-radius:6px;background:transparent;color:inherit">'; });
+      h += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin:8px 0"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>' + x.ic + ' ' + esc(x.n) + '</b><span style="background:rgba(239,68,68,.15);color:var(--red);border-radius:10px;padding:1px 9px;font-size:12px;font-weight:700">Not connected</span></div><div style="font-size:13px;margin:4px 0">' + esc(x.why) + '</div><div style="font-size:12px;color:var(--muted);margin-bottom:6px"><b>What is needed:</b> ' + esc(x.need) + '</div>';
+      x.f.forEach(function (f) { h += '<label style="display:block;font-size:12px;margin-top:4px">' + esc(f[1]) + '</label><input data-int="' + x.id + '" data-f="' + f[0] + '" value="' + esc(s[f[0]] || '') + '" style="width:100%;box-sizing:border-box;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:transparent;color:inherit">'; });
       h += '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button data-ia="export" data-id="' + x.id + '">⬇ Download: ' + esc(x.ex[0]) + '</button><button data-ia="test" data-id="' + x.id + '">Test connection</button></div><div class="intMsg" data-msg="' + x.id + '" style="font-size:12px;margin-top:4px"></div></div>';
     });
     host.innerHTML = h + '</div>';
@@ -23714,9 +23859,9 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   host.addEventListener('change', function (e) { var t = e.target; if (!adm() || !t.hasAttribute('data-int')) return; var c = cfg(), id = t.getAttribute('data-int'); c[id] = c[id] || {}; c[id][t.getAttribute('data-f')] = t.value.trim(); try { localStorage.setItem(K, JSON.stringify(c)); } catch (x) {} gAudit('Integration settings for “' + id + '” edited'); });
   host.addEventListener('click', function (e) {
     var b = e.target.closest('[data-ia]'); if (!b || !adm()) return; var x = C.filter(function (q) { return q.id === b.getAttribute('data-id'); })[0], m = host.querySelector('[data-msg="' + x.id + '"]');
-    if (b.getAttribute('data-ia') === 'test') { m.style.color = '#991b1b'; m.textContent = 'Not connected — no connector code is installed, so nothing was sent and nothing can be tested yet.'; return; }
+    if (b.getAttribute('data-ia') === 'test') { m.style.color = 'var(--red)'; m.textContent = 'Not connected — no connector code is installed, so nothing was sent and nothing can be tested yet.'; return; }
     var r = x.ex[1](); if (r.csv != null) dl(r.file + '-' + stamp() + '.csv', '﻿' + r.csv, 'text/csv;charset=utf-8'); else dl(r.file + '-' + stamp() + '.json', JSON.stringify(r.json, null, 2), 'application/json');
-    gAudit('Integration data downloaded: ' + x.ex[0]); m.style.color = '#166534'; m.textContent = 'Downloaded to this device. It was not sent to ' + x.n.split(' (')[0] + '.';
+    gAudit('Integration data downloaded: ' + x.ex[0]); m.style.color = 'var(--green)'; m.textContent = 'Downloaded to this device. It was not sent to ' + x.n.split(' (')[0] + '.';
   });
   window.IntegrationsMount = render;
   function nav() { var b = document.getElementById('navIntegrations'); if (b) b.style.display = adm() ? '' : 'none'; }
@@ -23871,7 +24016,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   function pending() { return rd().filter(function (r) { return r && r.status === 'pending'; }).length; }
   function css() {
     if (document.getElementById('rqCss')) return; var s = document.createElement('style'); s.id = 'rqCss';
-    s.textContent = '#requestsView{padding:14px 16px}.rqBar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}.rqBar button,.rqBar select,.rqBar input{font:inherit;font-size:13px;padding:5px 9px;border:1px solid var(--border,#cbd5e1);border-radius:6px;background:var(--surface,#fff);color:inherit;cursor:pointer}.rqBar button.on{background:#6366f1;color:#fff}.rqCard{border:1px solid var(--border,#cbd5e1);border-radius:10px;padding:12px;margin:8px 0}.rqSt{border-radius:10px;padding:1px 9px;font-size:12px;font-weight:700}.rqSt.pending{background:#fef3c7;color:#92400e}.rqSt.approved{background:#dcfce7;color:#166534}.rqSt.rejected{background:#fee2e2;color:#991b1b}.rqSt.cancelled{background:#e5e7eb;color:#374151}.rqNote{font-size:12px;color:#64748b;margin:4px 0}';
+    s.textContent = '#requestsView{padding:14px 16px}.rqBar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}.rqBar button,.rqBar select,.rqBar input{font:inherit;font-size:13px;padding:5px 9px;border:1px solid var(--border,#cbd5e1);border-radius:6px;background:var(--surface,#fff);color:inherit;cursor:pointer}.rqBar button.on{background:var(--accent);border-color:var(--accent);color:#fff}.rqCard{border:1px solid var(--border,#cbd5e1);border-radius:10px;padding:12px;margin:8px 0}.rqSt{border-radius:10px;padding:1px 9px;font-size:12px;font-weight:700}.rqSt.pending{background:#fef3c7;color:#92400e}.rqSt.approved{background:#dcfce7;color:#166534}.rqSt.rejected{background:#fee2e2;color:#991b1b}.rqSt.cancelled{background:#e5e7eb;color:#374151}.rqNote{font-size:12px;color:#64748b;margin:4px 0}';
     document.head.appendChild(s);
   }
   function render() {
@@ -23884,7 +24029,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     h += '<select id="rqType"><option value="">All types</option>' + Object.keys(TYPES).map(function (k) { return '<option value="' + k + '"' + (st.t === k ? ' selected' : '') + '>' + TYPES[k] + '</option>'; }).join('') + '</select><input id="rqQ" placeholder="Search name / ID / note" value="' + esc(st.q) + '"></div>';
     if (!list.length) h += '<div class="rqNote">Nothing here.</div>';
     list.forEach(function (r) {
-      h += '<div class="rqCard"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>' + esc(r.name || '(unknown)') + ' <span style="font-weight:400;color:#64748b">' + esc(r.workId || '') + '</span></b><span class="rqSt ' + esc(r.status) + '">' + esc(r.status) + '</span></div>';
+      h += '<div class="rqCard"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>' + esc(r.name || '(unknown)') + ' <span style="font-weight:400;color:var(--muted)">' + esc(r.workId || '') + '</span></b><span class="rqSt ' + esc(r.status) + '">' + esc(r.status) + '</span></div>';
       h += '<div style="margin:4px 0"><b>' + esc(TYPES[r.type] || r.type) + '</b> · ' + esc(range(r)) + (r.shift ? ' · ' + esc(r.shift) + ' shift' : '') + (r.with ? ' · with ' + esc(r.with) : '') + '</div>';
       if (r.note) h += '<div style="margin:4px 0">“' + esc(r.note) + '”</div>';
       h += '<div class="rqNote">Sent ' + esc(fmt(r.created)) + (r.status !== 'pending' && r.decidedBy ? ' · ' + esc(r.status) + ' by ' + esc(r.decidedBy) + ' ' + esc(fmt(r.decidedAt)) : '') + (r.decisionNote ? ' · note: ' + esc(r.decisionNote) : '') + '</div>';
@@ -23907,7 +24052,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   });
   host.addEventListener('input', function (e) { if (e.target.id === 'rqQ') { st.q = e.target.value; var c = e.target.selectionStart; render(); var i = document.getElementById('rqQ'); if (i) { i.focus(); try { i.setSelectionRange(c, c); } catch (x) {} } } });
   host.addEventListener('change', function (e) { if (e.target.id === 'rqType') { st.t = e.target.value; render(); } });
-  window.RequestsMount = render; window.__rqAllowed = allowed;
+  window.RequestsMount = render; window.__rqAllowed = allowed; window.__rqPending = function () { return allowed() ? pending() : 0; };   /* v3.25: count for FMD → Employee requests */
   badge(); setInterval(badge, 3000);
 })();
 
@@ -23915,47 +24060,69 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 <script>
 (function () {
   'use strict';
-  var K = 'totProcessTpl';
-  var DEF = [{ d: 'hr', t: 'Process the termination', days: 1 }, { d: 'appearance', t: 'Collect the uniform and confirm it was returned', days: 3 }, { d: 'access', t: 'Remove building / fingerprint access', days: 1 }, { d: 'fmd', t: 'Remove from future schedules (check the dates first)', days: 1 }, { d: 'it', t: 'Remove or disable system access', days: 1 }, { d: 'management', t: 'Complete the management actions', days: 3 }];
-  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  /* v3.25: WORK TYPES (one registry for every department). A work type = { id, label, dept, steps: [{ d, t, days }] }: when a ticket of this type is created on
+     <dept>'s board, one linked ticket per step is also created for department d (title t, due in days), all grouped in one case (TasksApi.create, tasksSpace).
+     Storage: totProcessTpl (admin-only to write on the server, synced, backed up, not read-gated, so every device has the rules):
+       totProcessTpl.termination / .onboarding / .transfer = custom steps of the three built-in types (owned by HR); missing = built-in default steps
+       totProcessTpl.types = [ { id, label, dept, steps } ] custom types. 'types' is never a process kind. */
+  var K = 'totProcessTpl', MAXS = 12, MAXT = 20;
+  var BUILTIN = {
+    termination: { label: 'Termination', dl: 'Last working day', o: 3, steps: [{ d: 'hr', t: 'Process the termination', days: 1 }, { d: 'appearance', t: 'Collect the uniform and confirm it was returned', days: 3 }, { d: 'access', t: 'Remove building / fingerprint access', days: 1 }, { d: 'fmd', t: 'Remove from future schedules (check the dates first)', days: 1 }, { d: 'it', t: 'Remove or disable system access', days: 1 }] },
+    onboarding: { label: 'Onboarding', dl: 'Start date', o: 1, steps: [{ d: 'hr', t: 'Prepare the contract and the employee file', days: 2 }, { d: 'it', t: 'Create system accounts', days: 2 }, { d: 'access', t: 'Issue building access / register fingerprint', days: 2 }, { d: 'appearance', t: 'Issue the uniform', days: 3 }, { d: 'academy', t: 'Plan the training', days: 3 }, { d: 'fmd', t: 'Add to the schedule and rotation', days: 3 }] },
+    transfer: { label: 'Transfer', dl: 'Effective date', o: 2, steps: [{ d: 'hr', t: 'Update the employee record and contract', days: 3 }, { d: 'fmd', t: 'Update the schedule and rotation', days: 2 }, { d: 'it', t: 'Update system access', days: 2 }, { d: 'access', t: 'Update building access', days: 2 }, { d: 'appearance', t: 'Check the uniform for the new role', days: 3 }] }   /* no Management step: Management is a position */
+  };
   function adm() { try { return sessionStorage.getItem('totAdmin') === '1' && !sessionStorage.getItem('totViewAs'); } catch (e) { return false; } }
   function jget(k, d) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
-  function depts() { try { return window.__dept.DEPTS.map(function (x) { return x.id; }); } catch (e) { return ['hr', 'appearance', 'access', 'fmd', 'it', 'management']; } }
-  function clean(a) {
-    if (!Array.isArray(a)) return null; var ok = depts(), out = [];
-    a.forEach(function (x) { if (!x) return; var t = String(x.t || '').replace(/[<>]/g, '').trim().slice(0, 120), d = Math.round(+x.days); if (ok.indexOf(x.d) >= 0 && t && d >= 1 && d <= 60) out.push({ d: x.d, t: t, days: d }); });
-    return out.length && out.length <= 12 ? out : null;
-  }
-  window.totProcessSteps = function (kind) { var o = jget(K, {}); return o && o[kind] ? clean(o[kind]) : null; };
-  window.totProcessDefault = function () { return DEF.map(function (x) { return Object.assign({}, x); }); };
-  function gAudit(act) { try { var a = jget('auditLog', []); a.push({ id: 'pt' + Date.now().toString(36), ts: Date.now(), who: (typeof getTrainerName === 'function' ? getTrainerName() : '') || 'Admin', role: 'admin', cat: 'templates', act: act }); localStorage.setItem('auditLog', JSON.stringify(a.slice(-5000))); } catch (e) {} }
-  var work = null;
-  function draw(card) {
-    var custom = !!window.totProcessSteps('termination'); if (!work) work = (window.totProcessSteps('termination') || window.totProcessDefault());
-    var opts = window.__dept ? window.__dept.DEPTS : [];
-    var h = '<b>📋 Process template: termination case</b><div style="font-size:12px;margin:4px 0">These are the steps (one task per department) created when someone starts a termination case. Changes apply to <b>new</b> cases only; cases already started keep their tasks. Currently: <b>' + (custom ? 'custom template' : 'built-in default') + '</b>.</div>';
-    work.forEach(function (x, i) {
-      h += '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin:4px 0"><select data-pt="d" data-i="' + i + '" style="padding:4px">' + opts.map(function (o) { return '<option value="' + esc(o.id) + '"' + (o.id === x.d ? ' selected' : '') + '>' + esc(o.label) + '</option>'; }).join('') + '</select><input data-pt="t" data-i="' + i + '" value="' + esc(x.t) + '" maxlength="120" style="flex:1;min-width:160px;padding:4px"><input data-pt="days" data-i="' + i + '" type="number" min="1" max="60" value="' + esc(x.days) + '" style="width:60px;padding:4px"> day(s)<button data-pa="up" data-i="' + i + '">↑</button><button data-pa="down" data-i="' + i + '">↓</button><button data-pa="del" data-i="' + i + '">✖</button></div>';
-    });
-    h += '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><button data-pa="add">+ Add step</button><button data-pa="save">Save template</button><button data-pa="reset">Reset to default</button></div><div id="ptMsg" style="font-size:12px;margin-top:4px"></div>';
-    card.innerHTML = h;
-  }
+  function depts() { try { return window.__dept.DEPTS.map(function (x) { return x.id; }); } catch (e) { return ['academy', 'performance', 'fmd', 'appearance', 'hr', 'access', 'it']; } }
+  function cp(a) { return a.map(function (x) { return { d: x.d, t: x.t, days: x.days }; }); }
+  function tpl() { var o = jget(K, {}); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; }
+  /* THE one rule for steps (the editor and the engine both use it): steps for a department that no longer exists (the old 'management') are dropped
+     silently; any other bad step (no title, days outside 0-60) or more than 12 steps makes the whole list invalid (built-in types then use their default) */
+  function clean(a, empty) {
+    if (!Array.isArray(a)) return null; var ok = depts(), out = [], bad = false;
+    a.forEach(function (x) { if (!x || ok.indexOf(x.d) < 0) return; var t = String(x.t || '').replace(/[<>]/g, '').trim().slice(0, 120), d = Math.round(+x.days); if (t && d >= 0 && d <= 60) out.push({ d: x.d, t: t, days: d }); else bad = true; });
+    return !bad && (out.length || empty) && out.length <= MAXS ? out : null; }
+  function cleanLabel(s) { return String(s || '').replace(/[<>]/g, '').trim().slice(0, 40); }
+  /* custom types: invalid entries are skipped, never the whole list; at most 20 per department */
+  function cleanTypes(a) { var ok = depts(), out = [], seen = {}, per = {};
+    (Array.isArray(a) ? a : []).forEach(function (x) { if (!x) return; var id = String(x.id || ''), lb = cleanLabel(x.label), st = clean(x.steps, true);
+      if (!/^wt_[a-z0-9]{2,20}$/.test(id) || seen[id] || !lb || ok.indexOf(x.dept) < 0 || !st) return; per[x.dept] = (per[x.dept] || 0) + 1; if (per[x.dept] > MAXT) return;
+      seen[id] = 1; out.push({ id: id, label: lb, dept: x.dept, steps: st }); });
+    return out; }
+  function builtinSteps(id) { var o = tpl(); return (o[id] && clean(o[id])) || cp(BUILTIN[id].steps); }
+  function all() {
+    var l = Object.keys(BUILTIN).sort(function (a, b) { return BUILTIN[a].o - BUILTIN[b].o; }).map(function (id) { var o = tpl(); return { id: id, label: BUILTIN[id].label, dept: 'hr', dl: BUILTIN[id].dl, builtin: true, custom: !!(o[id] && clean(o[id])), steps: builtinSteps(id) }; });
+    return l.concat(cleanTypes(tpl().types).map(function (x) { return { id: x.id, label: x.label, dept: x.dept, dl: 'Date', builtin: false, custom: true, steps: x.steps }; })); }
+  function get(id) { return all().filter(function (x) { return x.id === id; })[0] || null; }
+  function forDept(d) { return all().filter(function (x) { return x.dept === d; }); }
+  /* writes (admin only: the server refuses totProcessTpl from anyone else). Every write keeps the other kinds and the custom types. */
+  function put(o) { try { localStorage.setItem(K, JSON.stringify(o)); return true; } catch (e) { alert('NOT SAVED — browser storage is full or blocked.'); return false; } }
+  function saveSteps(id, steps) { if (!adm()) return 'Only the admin can change work types.'; var o = tpl(), cl;
+    if (BUILTIN[id]) { cl = clean(steps); if (!cl || cl.length !== steps.length) return 'Every step needs a department, a title and 0–60 days. 1 to 12 steps.'; o[id] = cl; return put(o) ? '' : 'Not saved.'; }
+    var ty = cleanTypes(o.types), x = ty.filter(function (y) { return y.id === id; })[0]; if (!x) return 'This work type no longer exists.';
+    cl = clean(steps, true); if (!cl || cl.length !== steps.length) return 'Every step needs a department, a title and 0–60 days. At most 12 steps.'; x.steps = cl; o.types = ty; return put(o) ? '' : 'Not saved.'; }
+  function resetSteps(id) { if (!adm() || !BUILTIN[id]) return; var o = tpl(); delete o[id]; put(o); }
+  function addType(d, label) { if (!adm()) return 'Only the admin can add work types.'; var lb = cleanLabel(label), o = tpl(), ty = cleanTypes(o.types);
+    if (depts().indexOf(d) < 0) return 'Unknown department.'; if (!lb) return 'Enter a name.';
+    if (forDept(d).some(function (x) { return x.label.toLowerCase() === lb.toLowerCase(); })) return 'This department already has a work type with that name.';
+    if (ty.filter(function (x) { return x.dept === d; }).length >= MAXT) return 'At most ' + MAXT + ' work types per department.';
+    var id = 'wt_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); ty.push({ id: id, label: lb, dept: d, steps: [] }); o.types = ty; return put(o) ? { id: id } : 'Not saved.'; }
+  function renameType(id, label) { if (!adm()) return 'Only the admin can rename work types.'; var lb = cleanLabel(label), o = tpl(), ty = cleanTypes(o.types), x = ty.filter(function (y) { return y.id === id; })[0];
+    if (!x) return 'Built-in work types keep their name.'; if (!lb) return 'Enter a name.';
+    if (forDept(x.dept).some(function (y) { return y.id !== id && y.label.toLowerCase() === lb.toLowerCase(); })) return 'This department already has a work type with that name.';
+    x.label = lb; o.types = ty; return put(o) ? '' : 'Not saved.'; }
+  function delType(id) { if (!adm()) return 'Only the admin can delete work types.'; var o = tpl(), ty = cleanTypes(o.types); o.types = ty.filter(function (y) { return y.id !== id; }); return put(o) ? '' : 'Not saved.'; }
+  window.__wt = { BUILTIN: BUILTIN, MAXS: MAXS, MAXT: MAXT, clean: clean, cleanTypes: cleanTypes, all: all, get: get, forDept: forDept, saveSteps: saveSteps, resetSteps: resetSteps, addType: addType, renameType: renameType, delType: delType };
+  /* old entry points: the effective steps of a type (custom or default); null for an unknown type */
+  window.totProcessSteps = function (kind) { var x = get(kind); return x ? cp(x.steps) : null; };
+  window.totProcessDefault = function () { return cp(BUILTIN.termination.steps); };
+  /* v3.25: the termination template card on the Integrations page wrote the same key with its own validator; it is now a pointer to the one editor */
   function card() {
-    var v = document.getElementById('integrationsView'); if (!v || !adm()) return; var c = document.getElementById('tplCard');
-    if (!c) { c = document.createElement('div'); c.id = 'tplCard'; c.style.cssText = 'border:1px solid var(--border,#cbd5e1);border-radius:10px;padding:12px;margin:8px 16px'; v.insertBefore(c, v.firstChild); }
-    work = null; draw(c);
-    c.onchange = function (e) { var t = e.target, k = t.getAttribute('data-pt'); if (!k) return; var i = +t.getAttribute('data-i'); if (!work[i]) return; work[i][k] = k === 'days' ? Math.round(+t.value) : t.value; };
-    c.onclick = function (e) {
-      var b = e.target.closest('[data-pa]'); if (!b) return; var a = b.getAttribute('data-pa'), i = +b.getAttribute('data-i'), msg = c.querySelector('#ptMsg');
-      /* read any text being typed into the form before redrawing */
-      [].slice.call(c.querySelectorAll('[data-pt]')).forEach(function (el) { var k = el.getAttribute('data-pt'), j = +el.getAttribute('data-i'); if (work[j]) work[j][k] = k === 'days' ? Math.round(+el.value) : el.value; });
-      if (a === 'up' && i > 0) { var t = work[i]; work[i] = work[i - 1]; work[i - 1] = t; draw(c); return; }
-      if (a === 'down' && i < work.length - 1) { var t2 = work[i]; work[i] = work[i + 1]; work[i + 1] = t2; draw(c); return; }
-      if (a === 'del') { work.splice(i, 1); draw(c); return; }
-      if (a === 'add') { if (work.length >= 12) { msg.style.color = '#991b1b'; msg.textContent = 'At most 12 steps.'; return; } work.push({ d: depts()[0], t: 'New step', days: 1 }); draw(c); return; }
-      if (a === 'reset') { if (!confirm('Go back to the built-in steps?')) return; var o = jget(K, {}); delete o.termination; localStorage.setItem(K, JSON.stringify(o)); gAudit('Termination template reset to default'); work = null; draw(c); return; }
-      if (a === 'save') { var cl = clean(work); if (!cl || cl.length !== work.length) { msg.style.color = '#991b1b'; msg.textContent = 'Each step needs a department, a title and 1–60 days. Between 1 and 12 steps.'; return; } var o2 = jget(K, {}); if (!o2 || typeof o2 !== 'object' || Array.isArray(o2)) o2 = {}; o2.termination = cl; localStorage.setItem(K, JSON.stringify(o2)); gAudit('Termination template saved (' + cl.length + ' steps)'); work = cl.slice(); draw(c); c.querySelector('#ptMsg').style.color = '#166534'; c.querySelector('#ptMsg').textContent = 'Saved. New termination cases will use these steps.'; }
-    };
+    var v = document.getElementById('integrationsView'); if (!v) return; var c = document.getElementById('tplCard');
+    if (!adm()) { if (c) c.remove(); return; }
+    if (!c) { c = document.createElement('div'); c.id = 'tplCard'; c.style.cssText = 'border:1px solid var(--border);border-radius:10px;padding:12px;margin:8px 16px;color:var(--text)'; v.insertBefore(c, v.firstChild); }
+    c.innerHTML = '<b>⚡ Work types (termination, onboarding, transfer and your own)</b><div style="font-size:12px;margin:4px 0;color:var(--text2)">The follow-up tickets each work type creates are edited in each department → <b>⚡ Work types</b>. Termination, onboarding and transfer belong to HR.</div><button type="button" class="tkB s" id="tplGo">Open HR → Work types</button>';
+    c.querySelector('#tplGo').onclick = function () { if (window.DeptOpen) window.DeptOpen('hr', 'wt'); };
   }
   var _m = window.IntegrationsMount; window.IntegrationsMount = function () { var r = _m && _m.apply(this, arguments); card(); return r; };
 })();
@@ -23983,7 +24150,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   function key(p) { return nz(p.workId) || ('n:' + nz(p.fullName)); }
   function css() {
     if (document.getElementById('chCss')) return; var s = document.createElement('style'); s.id = 'chCss';
-    s.textContent = '#coachView{padding:12px 16px}.chWrap{display:grid;grid-template-columns:300px 1fr;gap:14px;align-items:start}@media(max-width:760px){.chWrap{grid-template-columns:1fr}}.chL{border:1px solid var(--border,#cbd5e1);border-radius:10px;padding:10px;max-height:72vh;overflow:auto}.chL input{width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid var(--border,#cbd5e1);border-radius:6px;background:transparent;color:inherit;margin-bottom:6px}.chRow{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:6px 8px;border-radius:6px;cursor:pointer}.chRow:hover{background:rgba(99,102,241,.1)}.chRow.on{background:rgba(99,102,241,.22)}.chB{min-width:24px;text-align:center;border-radius:12px;padding:1px 8px;font-weight:700;font-size:12px;background:#22c55e;color:#fff}.chH{font-size:12px;font-weight:700;color:#64748b;margin:8px 0 2px;display:flex;justify-content:space-between;cursor:default}.chCard{border:1px solid var(--border,#cbd5e1);border-radius:10px;padding:12px;margin:8px 0}.chBtn{font:inherit;font-size:13px;padding:5px 10px;border:1px solid var(--border,#cbd5e1);border-radius:6px;background:var(--surface,#fff);color:inherit;cursor:pointer;margin:2px 4px 2px 0}.chBtn.pri{background:#6366f1;color:#fff;border-color:#6366f1}.chM{font-size:12px;color:#64748b}';
+    s.textContent = '#coachView{padding:12px 16px}.chWrap{display:grid;grid-template-columns:300px 1fr;gap:14px;align-items:start}@media(max-width:760px){.chWrap{grid-template-columns:1fr}}.chL{border:1px solid var(--border,#cbd5e1);border-radius:10px;padding:10px;max-height:72vh;overflow:auto}.chL input{width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid var(--border,#cbd5e1);border-radius:6px;background:transparent;color:inherit;margin-bottom:6px}.chRow{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:6px 8px;border-radius:6px;cursor:pointer}.chRow:hover{background:rgba(99,102,241,.1)}.chRow.on{background:rgba(99,102,241,.22)}.chB{min-width:24px;text-align:center;border-radius:12px;padding:1px 8px;font-weight:700;font-size:12px;background:#22c55e;color:#fff}.chH{font-size:12px;font-weight:700;color:var(--muted);margin:8px 0 2px;display:flex;justify-content:space-between;cursor:default}.chCard{border:1px solid var(--border,#cbd5e1);border-radius:10px;padding:12px;margin:8px 0}.chBtn{font:inherit;font-size:13px;padding:5px 10px;border:1px solid var(--border,#cbd5e1);border-radius:6px;background:var(--surface,#fff);color:inherit;cursor:pointer;margin:2px 4px 2px 0}.chBtn.pri{background:#6366f1;color:#fff;border-color:#6366f1}.chM{font-size:12px;color:#64748b}';
     document.head.appendChild(s);
   }
   function vids() { return jget('evalVideos', {}) || {}; }
@@ -24070,7 +24237,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   function DP() { return window.__dept; }
   function depts() { return DP() ? DP().DEPTS.filter(function (d) { return DP().sees(d.id); }) : []; }
   function dlabel(id) { return DP() ? DP().label(id) : id; }
-  function isMgmt() { return adm() || !role() || (DP() && DP().ofRole(role()) === 'management'); }
+  function isMgmt() { return DP() && DP().wide ? DP().wide() : (adm() || !role()); }   /* v3.25: wide access is a position (manager/senior), see __dept.wide() */
   function allowed() { return adm() || !role() || depts().length > 0; }
   function T() { return window.TasksApi || null; }
   function tasks() { var a = jget(KT, []); return Array.isArray(a) ? a : []; }
@@ -24116,20 +24283,27 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   function deptStats(d) {
     var all = tasks().filter(function (t) { return DP().norm(t.toRole) === d; }), open = all.filter(function (t) { return !closed(t); }), td = today();
     return { all: all, open: open, mine: open.filter(isMeT).length, od: open.filter(function (t) { return t.due && t.due < td; }).length, un: open.filter(function (t) { return !assigned(t); }).length }; }
+  /* v3.25: the workspace is always locked to one department (st.d); the department switcher and the tab row now live in the space's second bar (#spaceSub, from tabsFor(d)) */
+  function defDept(ds) { var m0 = DP().mine(), d = (m0.length === 1 ? m0[0] : (ds.some(function (x) { return x.id === 'hr'; }) ? 'hr' : ds[0].id)); return ds.some(function (x) { return x.id === d; }) ? d : ds[0].id; }
   function render() {
     var ds = depts(); if (!ds.length) { host.innerHTML = '<div class="tkW"><div class="tkEmpty">Your position is not linked to a department. Ask the admin (Admin → Space access by role).</div></div>'; return; }
-    if (!st.d || !ds.some(function (x) { return x.id === st.d; })) { var m0 = DP().mine(); st.d = (m0.length === 1 ? m0[0] : (ds.some(function (x) { return x.id === 'hr'; }) ? 'hr' : ds[0].id)); if (!ds.some(function (x) { return x.id === st.d; })) st.d = ds[0].id; }
+    if (!st.d) st.d = defDept(ds);
+    if (!ds.some(function (x) { return x.id === st.d; })) { host.innerHTML = '<div class="tkW"><div class="tkEmpty">🔒 You do not have access to the ' + esc(dlabel(st.d)) + ' department. Ask the admin if you need it.</div></div>'; return; }
     var tabs = visibleTabs(st.d); if (!tabs.some(function (t) { return t.id === st.tab; })) st.tab = 'board';
-    var s = deptStats(st.d);
-    host.innerHTML = '<div class="tkW kbW"><div class="tkH"><h2>🏢 ' + esc(dlabel(st.d)) + '</h2></div>' +
-      (ds.length > 1 ? '<div class="tkTabs">' + ds.map(function (x) { return '<button data-dd="' + esc(x.id) + '" class="' + (x.id === st.d ? 'on' : '') + '">' + esc(x.label) + '</button>'; }).join('') + '</div>' : '') +
-      '<div class="tkM" style="margin:2px 0 6px">You are in the <b>' + esc(dlabel(st.d)) + '</b> workspace · <b>' + s.open.length + '</b> open · <b style="color:' + (s.mine ? '#f59e0b' : 'inherit') + '">' + s.mine + '</b> assigned to you · <b>' + s.un + '</b> unassigned · <b style="color:' + (s.od ? '#ef4444' : 'inherit') + '">' + s.od + '</b> overdue</div>' +
-      '<div class="tkTabs">' + tabs.map(function (t) { return '<button data-dt="' + esc(t.id) + '" class="' + (t.id === st.tab ? 'on' : '') + '">' + t.label + '</button>'; }).join('') + '</div><div id="dwBody"></div></div>';
-    drawTab(); }
+    var s = deptStats(st.d), ov = st.tab === 'overview';
+    host.innerHTML = '<div class="tkW kbW"><div class="tkH"><h2>🏢 ' + (ov ? 'All departments' : esc(dlabel(st.d))) + '</h2></div>' +
+      (ov ? '' : '<div class="tkM" style="margin:2px 0 6px">You are in the <b>' + esc(dlabel(st.d)) + '</b> workspace · <b>' + s.open.length + '</b> open · <b style="color:' + (s.mine ? '#f59e0b' : 'inherit') + '">' + s.mine + '</b> assigned to you · <b>' + s.un + '</b> unassigned · <b style="color:' + (s.od ? '#ef4444' : 'inherit') + '">' + s.od + '</b> overdue</div>') +
+      '<div id="dwBody"></div></div>';
+    drawTab(); try { if (window.spaceSubRender) window.spaceSubRender(); } catch (e) {} }
   function drawTab() { var b = document.getElementById('dwBody'); if (!b) return; var t = TABS.filter(function (x) { return x.id === st.tab; })[0]; if (!t) return; b.onclick = b.onchange = b.oninput = b.ondragstart = b.ondragover = b.ondrop = b.ondragend = b.onkeydown = null; try { t.render(b, st.d); } catch (e) { b.innerHTML = '<div class="tkEmpty">This tab could not be drawn: ' + esc(e.message) + '</div>'; console.warn(e); } }
-  host.addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; var dd = b.getAttribute('data-dd'), dt = b.getAttribute('data-dt'); if (dd) { st.d = dd; st.scope = 'all'; st.fa = ''; st.fp = ''; work = null; render(); } else if (dt) { st.tab = dt; work = null; render(); } });
+  function go(d, tab) { if (tab === 'tpl') tab = 'wt';   /* v3.25: the old HR "Process templates" tab is now "Work types" */
+    if (d && d !== st.d) { st.d = d; st.scope = 'all'; st.fa = ''; st.fp = ''; work = null; } if (tab && tab !== st.tab) { st.tab = tab; work = null; } }
   window.DeptMount = render; window.__dwAllowed = allowed;
-  window.DeptOpen = function (d, tab) { if (d) st.d = d; if (tab) st.tab = tab; try { switchView('dept'); } catch (e) {} render(); };
+  /* DeptOpen(d, tab): open the workspace locked to department d (default: the open/own department) on that tab; switchView('dept') draws it */
+  window.DeptOpen = function (d, tab) { var ds = depts(), vis = function (x) { return ds.some(function (y) { return y.id === x; }); }; go(d || (st.d && vis(st.d) ? st.d : ds.length ? defDept(ds) : ''), tab || ''); try { switchView('dept'); } catch (e) {} };
+  DW.cur = function () { if (!st.d) { var ds = depts(); if (ds.length) st.d = defDept(ds); } return st.d; };
+  DW.tab = function () { return st.tab; };
+  DW.tabsFor = function (d) { if (!allowed() || !DP() || !DP().sees(d)) return []; return visibleTabs(d).filter(function (t) { return t.id !== 'overview'; }).map(function (t) { return { id: t.id, label: t.label }; }); };
   function nav() { var b = document.getElementById('navDept'); if (b) b.style.display = allowed() ? '' : 'none'; }
   nav(); setInterval(nav, 2000);
 
@@ -24138,7 +24312,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   function scoped(d) {
     var all = tasks(), e = myEmail(), sc = st.scope;
     return all.filter(function (t) { var inD = DP().norm(t.toRole) === d;
-      if (sc === 'out') return DP().norm(t.fromRole) === d && !inD;
+      if (sc === 'out') return (t.src ? t.src === d : DP().norm(t.fromRole) === d) && !inD;   /* v3.25: the board it was created on (src), else the creator's department */
       if (!inD) return false; if (sc === 'me') return assigned(t) && isMeT(t); if (sc === 'board') return !assigned(t); return true; }); }
   function age(t) { var dd = Math.floor((Date.now() - (t.created || Date.now())) / 864e5); return dd < 1 ? 'today' : dd + 'd'; }
   function card(t, d, cl, col) {
@@ -24163,11 +24337,11 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
         l.sort(sorter());
         h += '<div class="kbCol" data-col="' + esc(c.id) + '"><div class="kbHd" style="border-top:3px solid ' + esc(c.c) + '"><b>' + esc(c.label) + '</b><span class="kbN">' + l.length + '</span>' + (c.base === 'todo' && c.id === cl.filter(function (x) { return x.base === 'todo'; })[0].id ? '<button class="kbAdd" data-a="new" title="New ticket">＋</button>' : '') + '</div><div class="kbList">' + (l.map(function (t) { return card(t, d, cl, c); }).join('') || '<div class="kbEmpty">—</div>') + '</div></div>'; });
       el.querySelector('#dwCols').innerHTML = '<div class="kbCols">' + h + '</div>' + (older ? '<div style="text-align:center;margin-top:8px"><button class="tkB s" data-a="old">' + (st.old ? 'Hide' : 'Show') + ' older completed / cancelled (' + older + ')</button></div>' : ''); }
-    el.innerHTML = '<div class="tkTabs">' + Object.keys(PL).map(function (k) { return '<button data-sc="' + k + '" class="' + (st.scope === k ? 'on' : '') + '">' + PL[k] + '</button>'; }).join('') + '<input id="dwQ" type="search" placeholder="🔍 Filter…" style="flex:1;min-width:110px;padding:6px 10px;border-radius:16px;border:1px solid var(--border);background:transparent;color:inherit;font:inherit;font-size:13px"><button class="tkB" data-a="new">＋ New ticket</button></div>' + filterBar(d) +
+    el.innerHTML = '<div class="tkTabs">' + Object.keys(PL).map(function (k) { return '<button data-sc="' + k + '" class="' + (st.scope === k ? 'on' : '') + '">' + PL[k] + '</button>'; }).join('') + '<input id="dwQ" type="search" placeholder="🔍 Filter…" style="flex:1;min-width:110px;padding:6px 10px;border-radius:16px;border:1px solid var(--border);background:transparent;color:inherit;font:inherit;font-size:13px">' + (casesOk(d) ? '<button class="tkB s" data-a="cases" title="Cases: work types and processes with their linked tickets">📁 Cases</button>' : '') + '<button class="tkB" data-a="new">＋ New ticket</button></div>' + filterBar(d) +
       (A ? '' : '<div class="tkM" style="color:#ef4444">The Tasks module did not load, so the board is read-only.</div>') + '<div id="dwCols"></div><div class="tkM" style="margin-top:6px">Columns for this department can be changed by the admin (Setup tab). Moving a card to a Waiting, Delayed or Cancelled column asks for a reason. “Assigned” is shown by the 👤 name on the card.</div>';
     body();
     el.onclick = function (e) { var b = e.target.closest('button'); if (b) { var sc = b.getAttribute('data-sc'), a = b.getAttribute('data-a'), mv = b.getAttribute('data-mv');
-        if (sc) { st.scope = sc; boardTab(el, d); return; } if (a === 'old') { st.old = !st.old; body(); return; } if (a === 'new') { newTicket(d); return; }
+        if (sc) { st.scope = sc; boardTab(el, d); return; } if (a === 'old') { st.old = !st.old; body(); return; } if (a === 'new') { newTicket(d); return; } if (a === 'cases' && window.TasksCasesOpen) { window.TasksCasesOpen(d === 'hr' ? '' : d); return; }
         if (mv && A) { var c = b.closest('.kbCard'), t = tasks().filter(function (x) { return x.id === c.getAttribute('data-id'); })[0]; if (!t) return; var i = cl.indexOf(colFor(t, cl)) + (+mv); if (i >= 0 && i < cl.length) { var nc = cl[i]; if (A.moveTo(t.id, nc.base, nc.id, nc.label)) { body(); render0(); } } } return; }
       var cd = e.target.closest('.kbCard'); if (cd && A) A.open(cd.getAttribute('data-id')); };
     el.oninput = function (e) { if (e.target.id === 'dwQ') body(); };
@@ -24177,6 +24351,8 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     el.ondragover = function (e) { var col = e.target.closest && e.target.closest('.kbCol'); if (!col) return; e.preventDefault(); [].forEach.call(el.querySelectorAll('.over'), function (x) { x.classList.remove('over'); }); col.classList.add('over'); };
     el.ondrop = function (e) { var col = e.target.closest && e.target.closest('.kbCol'); if (!col || !A) return; e.preventDefault(); var id = e.dataTransfer.getData('text/plain'), nc = cl.filter(function (c) { return c.id === col.getAttribute('data-col'); })[0]; if (id && nc && A.moveTo(id, nc.base, nc.id, nc.label)) { body(); render0(); } [].forEach.call(el.querySelectorAll('.drag,.over'), function (x) { x.classList.remove('drag', 'over'); }); };
   }
+  /* v3.25: the 📁 Cases button shows where the person may see cases: HR / wide access (they start them) or a board that has case tickets on this device */
+  function casesOk(d) { var A = T(); if (!A || !window.TasksCasesOpen) return false; if (A.canCase && A.canCase()) return true; return tasks().some(function (t) { return t.caseId && DP().norm(t.toRole) === d; }); }
   function filterBar(d) {
     var S = 'padding:5px 8px;border-radius:8px;border:1px solid var(--border);background:transparent;color:inherit;font:inherit;font-size:13px', ppl = {};
     tasks().forEach(function (t) { if (DP().norm(t.toRole) === d && (t.toEmail || t.toName)) ppl[t.toEmail || t.toName] = t.toName || t.toEmail; });
@@ -24188,8 +24364,9 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   function render0() { /* refresh the header counters only */ var s = deptStats(st.d), h = host.querySelector('.tkM'); if (h) h.innerHTML = 'You are in the <b>' + esc(dlabel(st.d)) + '</b> workspace · <b>' + s.open.length + '</b> open · <b style="color:' + (s.mine ? '#f59e0b' : 'inherit') + '">' + s.mine + '</b> assigned to you · <b>' + s.un + '</b> unassigned · <b style="color:' + (s.od ? '#ef4444' : 'inherit') + '">' + s.od + '</b> overdue'; }
   function dueIn(n) { var d = new Date(); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
   function newTicket(d) {
-    var A = T(); if (!A) { alert('The Tasks module did not load.'); return; } var tp = tickets(d), mem = Object.keys(users()).filter(function (e) { return DP().norm(users()[e].role) === d; });
+    var A = T(); if (!A) { alert('The Tasks module did not load.'); return; } var wts = window.__wt ? window.__wt.forDept(d) : [], tp = tickets(d), mem = Object.keys(users()).filter(function (e) { return DP().norm(users()[e].role) === d; });
     var ov = modal('<h3 style="margin:0 0 6px">New ticket</h3>' + (tp.length ? '<label>Start from a template</label><select id="ntTp"><option value="">— none —</option>' + tp.map(function (x) { return '<option value="' + esc(x.id) + '">' + esc(x.name) + '</option>'; }).join('') + '</select>' : '') +
+      '<label>Work type</label><select id="ntWt"><option value="">General (just this ticket)</option>' + wts.map(function (x) { return '<option value="' + esc(x.id) + '">' + esc(x.label) + '</option>'; }).join('') + '</select><div id="ntWp" class="tkM" style="margin:4px 0 2px">' + (wts.length ? '' : 'This department has no work types yet' + (adm() ? ' (add them in ⚡ Work types).' : '.')) + '</div>' +
       '<label>Title *</label><input id="ntTi" maxlength="120"><label>Details</label><textarea id="ntDe" rows="4"></textarea><label>Department that handles it</label><select id="ntTo">' + DP().DEPTS.map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === d ? ' selected' : '') + '>' + esc(x.label) + '</option>'; }).join('') + '</select>' +
       '<label>Assign to a person (optional)</label><select id="ntPe"><option value="">Anyone in the department</option>' + mem.map(function (e) { return '<option value="' + esc(e) + '">' + esc(users()[e].name || e) + '</option>'; }).join('') + '</select>' +
       '<div style="display:flex;gap:8px"><div style="flex:1"><label>Priority</label><select id="ntPr">' + (A.priOpts ? A.priOpts('normal') : '<option value="normal">Normal</option><option value="urgent">Urgent</option>') + '</select></div><div style="flex:1"><label>Due date</label><input id="ntDu" type="date" min="' + today() + '"></div></div>' +
@@ -24197,11 +24374,15 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       '<div id="ntEr" style="color:var(--red);font-size:12px;min-height:16px;margin-top:6px"></div><div style="display:flex;gap:8px;justify-content:flex-end"><button class="tkB s" id="ntNo">Cancel</button><button class="tkB" id="ntGo">Create</button></div>');
     var $ = function (i) { return ov.querySelector('#' + i); };
     if ($('ntTp')) $('ntTp').onchange = function () { var x = tp.filter(function (y) { return y.id === this.value; }.bind(this))[0]; if (!x) return; $('ntTi').value = x.title; $('ntDe').value = x.details || ''; $('ntPr').value = x.pri; $('ntDu').value = x.days ? dueIn(x.days) : ''; };
+    /* v3.25: live preview of the linked tickets the chosen work type creates (the first step for this department is this ticket itself) */
+    $('ntWt').onchange = function () { var w = wts.filter(function (x) { return x.id === this.value; }.bind(this))[0], skip = false; if (!w) { $('ntWp').textContent = wts.length ? '' : $('ntWp').textContent; return; }
+      var l = w.steps.filter(function (x) { if (!skip && x.d === d) { skip = true; return false; } return true; });
+      $('ntWp').innerHTML = l.length ? '<b>Also creates:</b> ' + l.map(function (x) { return esc(dlabel(x.d)) + ' — ' + esc(x.t) + ' (' + (x.days ? x.days + ' day' + (x.days === 1 ? '' : 's') : 'today') + ')'; }).join(' · ') + '<br>All of them are grouped in one 📁 case named “' + esc(w.label) + ': <i>related employee or title</i>”.' : 'No follow-up tickets: this ticket starts a “' + esc(w.label) + '” case on its own.'; };
     $('ntTo').onchange = function () { var v = this.value, m = Object.keys(users()).filter(function (e) { return DP().norm(users()[e].role) === v; }); $('ntPe').innerHTML = '<option value="">Anyone in the department</option>' + m.map(function (e) { return '<option value="' + esc(e) + '">' + esc(users()[e].name || e) + '</option>'; }).join(''); };
     $('ntNo').onclick = ov.close;
     $('ntGo').onclick = function () { var ti = $('ntTi').value.trim(); if (!ti) { $('ntEr').textContent = 'Enter a title.'; return; } var pe = $('ntPe').value, re = $('ntRe').value.trim(), m = /\(([^()]+)\)\s*$/.exec(re);
-      A.create({ title: ti, details: $('ntDe').value.trim(), toRole: $('ntTo').value, toEmail: pe, toName: pe ? (users()[pe] || {}).name || pe : '', pri: $('ntPr').value, due: $('ntDu').value, rel: re, empId: m ? m[1].trim() : '' });
-      ov.close(); st.scope = $('ntTo').value === d ? 'all' : 'out'; render(); toast('Ticket created.'); }; }
+      var wt = $('ntWt').value, nt = A.create({ title: ti, details: $('ntDe').value.trim(), toRole: $('ntTo').value, toEmail: pe, toName: pe ? (users()[pe] || {}).name || pe : '', pri: $('ntPr').value, due: $('ntDu').value, rel: re, empId: m ? m[1].trim() : '', wt: wt, src: d });
+      ov.close(); st.scope = $('ntTo').value === d ? 'all' : 'out'; render(); toast(wt && nt && nt.caseId ? 'Ticket created with ' + (nt.kids || 0) + ' linked ticket' + (nt.kids === 1 ? '' : 's') + ' (📁 ' + nt.caseTitle + ').' : 'Ticket created.'); }; }
 
   /* ---------- DASHBOARD ---------- */
   function tile(n, l, c) { return '<div class="dwTile"><b style="' + (c ? 'color:' + c : '') + '">' + n + '</b><span>' + esc(l) + '</span></div>'; }
@@ -24242,7 +24423,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     (DW.dashExtra.__overview || []).forEach(function (f) { try { h += f(); } catch (e) { console.warn(e); } });
     var urgent = tasks().filter(function (t) { return !closed(t) && (t.pri === 'urgent' || (t.due && t.due < today())); }).sort(function (a, b) { return String(a.due || '9999').localeCompare(String(b.due || '9999')); });
     h += tlist('Urgent or overdue across the company', urgent, A);
-    el.innerHTML = h; el.onclick = function (e) { var b = e.target.closest('button'); if (!b) return; if (b.getAttribute('data-go')) { st.d = b.getAttribute('data-go'); st.tab = 'dash'; render(); } else if (b.getAttribute('data-o') && A) A.open(b.getAttribute('data-o')); }; }
+    el.innerHTML = h; el.onclick = function (e) { var b = e.target.closest('button'); if (!b) return; if (b.getAttribute('data-go')) { window.DeptOpen(b.getAttribute('data-go'), 'dash'); } else if (b.getAttribute('data-o') && A) A.open(b.getAttribute('data-o')); }; }
 
   /* ---------- DOCUMENTS ---------- */
   var CATS = ['Policy', 'Form / template', 'Guide / SOP', 'Contract', 'Report', 'Other'];
@@ -24283,7 +24464,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     h += '<div style="display:flex;gap:6px;flex-wrap:wrap"><button data-s="addtk">+ Add template</button><button data-s="savetk">Save templates</button></div><div id="suMsg" style="font-size:12px;margin-top:6px"></div>';
     el.innerHTML = h;
     function pull() { [].forEach.call(el.querySelectorAll('[data-c]'), function (n) { var i = +n.getAttribute('data-i'); if (work.cols[i]) work.cols[i][n.getAttribute('data-c')] = n.value; }); [].forEach.call(el.querySelectorAll('[data-t]'), function (n) { var i = +n.getAttribute('data-i'); if (work.tk[i]) work.tk[i][n.getAttribute('data-t')] = n.getAttribute('data-t') === 'days' ? Math.round(+n.value || 0) : n.value; }); }
-    function msg(t, ok) { var m = el.querySelector('#suMsg'); m.style.color = ok ? '#166534' : '#991b1b'; m.textContent = t; }
+    function msg(t, ok) { var m = el.querySelector('#suMsg'); m.style.color = ok ? 'var(--green)' : 'var(--red)'; m.textContent = t; }
     el.onclick = function (e) { var b = e.target.closest('[data-s]'); if (!b) return; pull(); var a = b.getAttribute('data-s'), i = +b.getAttribute('data-i');
       if (a === 'up' && i > 0) { var t = work.cols[i]; work.cols[i] = work.cols[i - 1]; work.cols[i - 1] = t; setupTab(el, d); return; }
       if (a === 'down' && i < work.cols.length - 1) { var t2 = work.cols[i]; work.cols[i] = work.cols[i + 1]; work.cols[i + 1] = t2; setupTab(el, d); return; }
@@ -24293,10 +24474,10 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       if (a === 'addtk') { if (work.tk.length >= 12) { msg('At most 12 templates.'); return; } work.tk.push({ id: 'tp' + Date.now().toString(36), name: 'New template', title: 'Title', details: '', pri: 'normal', days: 3 }); setupTab(el, d); return; }
       if (a === 'resetc') { if (!confirm('Go back to the built-in columns for this department?')) return; var o = cfgAll(); if (o[d]) { delete o[d].cols; } jset(KC, o); gAudit('Reset board columns of ' + dlabel(d), 'departments'); work = null; setupTab(el, d); return; }
       if (a === 'savec') { var cl = cleanCols(work.cols); if (!cl) { msg('Each column needs a unique name, a status and a colour. 2–10 columns, with at least one “To do” and one “Done”.'); return; } var seen = {}, dup = false; cl.forEach(function (c) { var k = c.label.toLowerCase(); if (seen[k]) dup = true; seen[k] = 1; }); if (dup) { msg('Two columns have the same name.'); return; }
-        var o2 = cfgAll(); o2[d] = o2[d] || {}; o2[d].cols = cl; o2[d].u = Date.now(); if (jset(KC, o2)) { gAudit('Saved board columns of ' + dlabel(d) + ' (' + cl.length + ')', 'departments'); work = null; setupTab(el, d); var m2 = el.querySelector('#suMsg'); m2.style.color = '#166534'; m2.textContent = 'Saved. The board now uses these columns.'; } return; }
-      if (a === 'savetk') { var tk = cleanTk(work.tk); if (!tk) { msg('Could not save the templates.'); return; } var o3 = cfgAll(); o3[d] = o3[d] || {}; o3[d].tickets = tk; o3[d].u = Date.now(); if (jset(KC, o3)) { gAudit('Saved ticket templates of ' + dlabel(d) + ' (' + tk.length + ')', 'departments'); work = null; setupTab(el, d); var m3 = el.querySelector('#suMsg'); m3.style.color = '#166534'; m3.textContent = 'Saved.'; } } }; }
+        var o2 = cfgAll(); o2[d] = o2[d] || {}; o2[d].cols = cl; o2[d].u = Date.now(); if (jset(KC, o2)) { gAudit('Saved board columns of ' + dlabel(d) + ' (' + cl.length + ')', 'departments'); work = null; setupTab(el, d); var m2 = el.querySelector('#suMsg'); m2.style.color = 'var(--green)'; m2.textContent = 'Saved. The board now uses these columns.'; } return; }
+      if (a === 'savetk') { var tk = cleanTk(work.tk); if (!tk) { msg('Could not save the templates.'); return; } var o3 = cfgAll(); o3[d] = o3[d] || {}; o3[d].tickets = tk; o3[d].u = Date.now(); if (jset(KC, o3)) { gAudit('Saved ticket templates of ' + dlabel(d) + ' (' + tk.length + ')', 'departments'); work = null; setupTab(el, d); var m3 = el.querySelector('#suMsg'); m3.style.color = 'var(--green)'; m3.textContent = 'Saved.'; } } }; }
 
-  addTab({ id: 'overview', label: '🏢 Overview', o: 5, show: function (d) { return d === 'management' && isMgmt(); }, render: overviewTab });
+  addTab({ id: 'overview', label: '🏢 Overview', o: 5, show: function (d) { return isMgmt() && st.tab === 'overview'; }, render: overviewTab });   /* v3.25: no Management department; wide-access users open it from Home → 🏢 All departments (DeptOpen('', 'overview')) */
   addTab({ id: 'board', label: '🗂 Board', o: 10, render: boardTab });
   addTab({ id: 'dash', label: '📊 Dashboard', o: 20, render: dashTab });
   addTab({ id: 'docs', label: '📄 Documents', o: 60, render: docsTab });
@@ -24322,36 +24503,41 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   function role() { return DW.role(); }
   function hrOk() { return adm() || !role() || DW.isMgmt() || (DP() && DP().board('hr')); }
 
-  /* ================= process templates (onboarding / transfer / termination) ================= */
-  var DEFTPL = {
-    onboarding: [{ d: 'hr', t: 'Prepare the contract and the employee file', days: 2 }, { d: 'it', t: 'Create system accounts', days: 2 }, { d: 'access', t: 'Issue building access / register fingerprint', days: 2 }, { d: 'appearance', t: 'Issue the uniform', days: 3 }, { d: 'academy', t: 'Plan the training', days: 3 }, { d: 'fmd', t: 'Add to the schedule and rotation', days: 3 }],
-    transfer: [{ d: 'hr', t: 'Update the employee record and contract', days: 3 }, { d: 'fmd', t: 'Update the schedule and rotation', days: 2 }, { d: 'it', t: 'Update system access', days: 2 }, { d: 'access', t: 'Update building access', days: 2 }, { d: 'appearance', t: 'Check the uniform for the new role', days: 3 }, { d: 'management', t: 'Confirm the move with the new manager', days: 2 }]
-  };
-  var KINDS = { onboarding: 'Onboarding (new hire)', transfer: 'Transfer (new position / team)', termination: 'Termination' };
-  var raw = window.totProcessSteps;
-  window.totProcessSteps = function (kind) { var r = raw ? raw(kind) : null; if (r) return r; return DEFTPL[kind] ? DEFTPL[kind].map(function (x) { return Object.assign({}, x); }) : null; };
-  var KP = 'totProcessTpl';
-  function tpl() { var o = jget(KP, {}); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; }
-  function depIds() { return DP() ? DP().DEPTS.map(function (x) { return x.id; }) : []; }
-  function cleanSteps(a) { if (!Array.isArray(a)) return null; var ok = depIds(), out = []; a.forEach(function (x) { if (!x) return; var t = String(x.t || '').replace(/[<>]/g, '').trim().slice(0, 120), d = Math.round(+x.days); if (ok.indexOf(x.d) >= 0 && t && d >= 1 && d <= 60) out.push({ d: x.d, t: t, days: d }); }); return out.length && out.length === a.length && out.length <= 12 ? out : null; }
-  var tw = null;
-  function tplTab(el, dd) {
-    var kind = (tw && tw.kind) || 'onboarding', def = kind === 'termination' ? (window.__defSteps || (window.totProcessDefault ? window.totProcessDefault() : [])) : DEFTPL[kind], custom = !!(tpl()[kind] && cleanSteps(tpl()[kind]));
-    var cur = (tw && tw.kind === kind && tw.steps) || (window.totProcessSteps(kind) || def).map(function (x) { return Object.assign({}, x); }); tw = { kind: kind, steps: cur };
-    var h = '<div class="tkTabs">' + Object.keys(KINDS).map(function (k) { return '<button data-k="' + k + '" class="' + (k === kind ? 'on' : '') + '">' + KINDS[k] + '</button>'; }).join('') + '</div>' +
-      '<div class="tkM">One task per step is created for the department shown, when someone starts a <b>' + KINDS[kind] + '</b> case (HR workspace → Lifecycle, or the employee’s page). Changes affect <b>new</b> cases only. Currently: <b>' + (custom ? 'custom template' : 'built-in default') + '</b>.</div>';
-    var A = adm(), opts = DP().DEPTS;
-    cur.forEach(function (x, i) { h += A ? '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin:4px 0"><select data-f="d" data-i="' + i + '" style="padding:4px">' + opts.map(function (o) { return '<option value="' + esc(o.id) + '"' + (o.id === x.d ? ' selected' : '') + '>' + esc(o.label) + '</option>'; }).join('') + '</select><input data-f="t" data-i="' + i + '" value="' + esc(x.t) + '" maxlength="120" style="flex:1;min-width:160px;padding:4px"><input data-f="days" data-i="' + i + '" type="number" min="1" max="60" value="' + esc(x.days) + '" style="width:60px;padding:4px"> day(s)<button data-a="up" data-i="' + i + '">↑</button><button data-a="down" data-i="' + i + '">↓</button><button data-a="del" data-i="' + i + '">✖</button></div>' :
-      '<div style="margin:4px 0;font-size:13px"><b>' + esc(DW.dlabel(x.d)) + '</b>: ' + esc(x.t) + ' <span class="tkM">(due in ' + x.days + ' day' + (x.days > 1 ? 's' : '') + ')</span></div>'; });
-    h += A ? '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><button data-a="add">+ Add step</button><button data-a="save">Save template</button><button data-a="reset">Reset to default</button></div><div id="tpMsg" style="font-size:12px;margin-top:4px"></div>' : '<div class="tkM" style="margin-top:6px">Only the admin can change templates.</div>';
-    el.innerHTML = h;
-    function pull() { [].forEach.call(el.querySelectorAll('[data-f]'), function (n) { var i = +n.getAttribute('data-i'), k = n.getAttribute('data-f'); if (cur[i]) cur[i][k] = k === 'days' ? Math.round(+n.value) : n.value; }); }
-    function msg(t, ok) { var m = el.querySelector('#tpMsg'); if (m) { m.style.color = ok ? '#166534' : '#991b1b'; m.textContent = t; } }
-    el.onclick = function (e) { var b = e.target.closest('button'); if (!b) return; var k = b.getAttribute('data-k'); if (k) { pull(); tw = { kind: k, steps: null }; tplTab(el, dd); return; } if (!A) return; pull(); var a = b.getAttribute('data-a'), i = +b.getAttribute('data-i');
-      if (a === 'up' && i > 0) { var t = cur[i]; cur[i] = cur[i - 1]; cur[i - 1] = t; tplTab(el, dd); return; } if (a === 'down' && i < cur.length - 1) { var t2 = cur[i]; cur[i] = cur[i + 1]; cur[i + 1] = t2; tplTab(el, dd); return; }
-      if (a === 'del') { cur.splice(i, 1); tplTab(el, dd); return; } if (a === 'add') { if (cur.length >= 12) { msg('At most 12 steps.'); return; } cur.push({ d: depIds()[0], t: 'New step', days: 1 }); tplTab(el, dd); return; }
-      if (a === 'reset') { if (!confirm('Go back to the built-in steps?')) return; var o = tpl(); delete o[kind]; jset(KP, o); gAudit(KINDS[kind] + ' template reset to default', 'templates'); tw = { kind: kind, steps: null }; tplTab(el, dd); return; }
-      if (a === 'save') { var cl = cleanSteps(cur); if (!cl) { msg('Every step needs a department, a title and 1–60 days. 1 to 12 steps.'); return; } var o2 = tpl(); o2[kind] = cl; if (jset(KP, o2)) { gAudit(KINDS[kind] + ' template saved (' + cl.length + ' steps)', 'templates'); tw = { kind: kind, steps: cl.map(function (x) { return Object.assign({}, x); }) }; tplTab(el, dd); msg('Saved. New ' + kind + ' cases will use these steps.', true); } } }; }
+  /* ================= v3.25 ⚡ Work types (every department; replaces the HR-only "Process templates" tab, old tab id 'tpl' still opens it) =================
+     Rules live in window.__wt (totProcessTpl). Admin adds / renames / deletes this department's own types and edits the steps; everyone else reads them. */
+  var we = null;   /* the type being edited: { d, id, label, steps } */
+  function wtTab(el, d) {
+    var W = window.__wt; if (!W) { el.innerHTML = '<div class="tkEmpty">Work types did not load.</div>'; return; }
+    var A = adm(), list = W.forDept(d), opts = DP().DEPTS, dl = DW.dlabel;
+    if (we && (we.d !== d || !list.some(function (x) { return x.id === we.id; }))) we = null;
+    var h = '<div class="tkM" style="margin:0 0 8px">When a ticket of one of these types is created on the <b>' + esc(dl(d)) + '</b> board (＋ New ticket → Work type), one linked ticket per step is also created for the department shown, and all of them are grouped in one 📁 case. A step for ' + esc(dl(d)) + ' itself is filled by the new ticket. Changes apply to new tickets only.</div>';
+    list.forEach(function (x) { var ed = A && we && we.id === x.id, own = false;
+      h += '<div class="dwBox" style="margin:8px 0"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' + (ed && !x.builtin ? '<input id="wtLb" maxlength="40" value="' + esc(we.label) + '" style="flex:1;min-width:160px;padding:5px;font-weight:700">' : '<b>' + esc(x.label) + '</b>') +
+        '<span class="tkChip">' + (x.builtin ? (x.custom ? 'built-in · custom steps' : 'built-in') : 'custom') + '</span><span style="flex:1"></span>' +
+        (A && !ed ? '<button class="tkB s" data-e="' + esc(x.id) + '">✏ Edit</button>' + (x.builtin ? '' : '<button class="tkB s" data-x="' + esc(x.id) + '" title="Delete this work type">🗑</button>') : '') + '</div>';
+      if (ed) { we.steps.forEach(function (s, i) { h += '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin:4px 0"><select data-f="d" data-i="' + i + '" style="padding:4px">' + opts.map(function (o) { return '<option value="' + esc(o.id) + '"' + (o.id === s.d ? ' selected' : '') + '>' + esc(o.label) + '</option>'; }).join('') + '</select><input data-f="t" data-i="' + i + '" value="' + esc(s.t) + '" maxlength="120" placeholder="Title of the linked ticket" style="flex:1;min-width:160px;padding:4px"><input data-f="days" data-i="' + i + '" type="number" min="0" max="60" value="' + esc(s.days) + '" style="width:60px;padding:4px"> day(s)<button class="tkB s" data-a="up" data-i="' + i + '" title="Up">↑</button><button class="tkB s" data-a="down" data-i="' + i + '" title="Down">↓</button><button class="tkB s" data-a="del" data-i="' + i + '" title="Remove step">✖</button></div>'; });
+        h += (we.steps.length ? '' : '<div class="tkM">No steps: the ticket starts a case on its own.</div>') + '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><button class="tkB s" data-a="add">＋ Add step</button><button class="tkB" data-a="save">Save</button><button class="tkB s" data-a="cancel">Cancel</button>' + (x.builtin && x.custom ? '<button class="tkB s" data-a="reset">Reset to default</button>' : '') + '</div><div class="tkM">Days 0–60 (0 = due the same day), at most ' + W.MAXS + ' steps.</div>'; }
+      else h += (x.steps.map(function (s) { var me0 = !own && s.d === d; if (me0) own = true; return '<div style="margin:4px 0;font-size:13px"><b>' + esc(dl(s.d)) + '</b>: ' + esc(s.t) + ' <span class="tkM">(' + (s.days ? 'due in ' + s.days + ' day' + (s.days === 1 ? '' : 's') : 'due the same day') + ')' + (me0 ? ' · this is the new ticket itself' : '') + '</span></div>'; }).join('') || '<div class="tkM">No follow-up tickets.</div>');
+      h += '</div>'; });
+    if (!list.length) h += '<div class="tkEmpty">No work types for ' + esc(dl(d)) + ' yet.' + (A ? ' Add one below.' : '') + '</div>';
+    h += A ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><input id="wtNew" maxlength="40" placeholder="New work type, e.g. Uniform replacement" style="flex:1;min-width:180px;padding:6px"><button class="tkB" data-a="addt">＋ Add work type</button></div>' : '<div class="tkM" style="margin-top:6px">Only the admin can change work types.</div>';
+    el.innerHTML = h + '<div id="wtMsg" class="tkM" style="margin-top:4px"></div>';
+    function msg(t, ok) { var m = el.querySelector('#wtMsg'); if (m) { m.style.color = ok ? 'var(--green)' : 'var(--red)'; m.textContent = t; } }
+    function pull() { if (!we) return; [].forEach.call(el.querySelectorAll('[data-f]'), function (n) { var i = +n.getAttribute('data-i'), k = n.getAttribute('data-f'); if (we.steps[i]) we.steps[i][k] = k === 'days' ? Math.round(+n.value) : n.value; }); var lb = el.querySelector('#wtLb'); if (lb) we.label = lb.value; }
+    el.onclick = function (e) { var b = e.target.closest('button'); if (!b || !A) return; pull(); var a = b.getAttribute('data-a'), i = +b.getAttribute('data-i'), eid = b.getAttribute('data-e'), xid = b.getAttribute('data-x'), r;
+      if (eid) { var x0 = W.get(eid); if (x0) we = { d: d, id: x0.id, label: x0.label, steps: x0.steps.map(function (s) { return { d: s.d, t: s.t, days: s.days }; }) }; wtTab(el, d); return; }
+      if (xid) { var x1 = W.get(xid); if (!x1 || !confirm('Delete the work type “' + x1.label + '”? Tickets and cases already created stay as they are.')) return; r = W.delType(xid); if (r) { msg(r); return; } gAudit('Work type “' + x1.label + '” deleted (' + dl(d) + ')', 'templates'); we = null; wtTab(el, d); msg('Deleted.', true); return; }
+      if (a === 'addt') { r = W.addType(d, (el.querySelector('#wtNew') || {}).value || ''); if (typeof r === 'string') { msg(r); return; } gAudit('Work type added on ' + dl(d), 'templates'); we = { d: d, id: r.id, label: W.get(r.id).label, steps: [] }; wtTab(el, d); msg('Added. Now add its steps and save.', true); return; }
+      if (!we) return;
+      if (a === 'cancel') { we = null; wtTab(el, d); return; }
+      if (a === 'up' && i > 0) { var t = we.steps[i]; we.steps[i] = we.steps[i - 1]; we.steps[i - 1] = t; wtTab(el, d); return; }
+      if (a === 'down' && i < we.steps.length - 1) { var t2 = we.steps[i]; we.steps[i] = we.steps[i + 1]; we.steps[i + 1] = t2; wtTab(el, d); return; }
+      if (a === 'del') { we.steps.splice(i, 1); wtTab(el, d); return; }
+      if (a === 'add') { if (we.steps.length >= W.MAXS) { msg('At most ' + W.MAXS + ' steps.'); return; } we.steps.push({ d: d === 'hr' ? 'appearance' : d, t: '', days: 1 }); wtTab(el, d); return; }
+      if (a === 'reset') { if (!confirm('Go back to the built-in steps?')) return; W.resetSteps(we.id); gAudit(we.label + ' work type reset to default', 'templates'); we = null; wtTab(el, d); msg('Back to the built-in steps.', true); return; }
+      if (a === 'save') { var x2 = W.get(we.id); if (!x2) return; if (!x2.builtin && we.label !== x2.label) { r = W.renameType(we.id, we.label); if (r) { msg(r); return; } }
+        r = W.saveSteps(we.id, we.steps); if (r) { msg(r); return; } gAudit('Work type “' + we.label + '” saved (' + we.steps.length + ' step' + (we.steps.length === 1 ? '' : 's') + ', ' + dl(d) + ')', 'templates'); we = null; wtTab(el, d); msg('Saved. New tickets of this type use these steps.', true); } };
+    el.onkeydown = function (e) { if (e.key === 'Enter' && e.target.id === 'wtNew') { var b = el.querySelector('[data-a="addt"]'); if (b) b.click(); } }; }
 
   /* ================= candidates (reads the Recruiting workbooks) ================= */
   var STAGES = ['New', 'Contacted', 'Interview', 'Offer sent', 'Accepted', 'Started training', 'Rejected', 'Withdrawn'], CLOSED = ['Rejected', 'Withdrawn'];
@@ -24436,7 +24622,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 
   DW.addTab({ id: 'cand', label: '🧲 Candidates', o: 12, show: function (d) { return d === 'hr'; }, render: candTab });
   DW.addTab({ id: 'life', label: '🔄 Lifecycle', o: 14, show: function (d) { return d === 'hr' && hrOk(); }, render: lifeTab });
-  DW.addTab({ id: 'tpl', label: '🧩 Process templates', o: 70, show: function (d) { return d === 'hr' || d === 'management'; }, render: tplTab });
+  DW.addTab({ id: 'wt', label: '⚡ Work types', o: 70, show: function (d) { return !!d; }, render: wtTab });   /* v3.25: every department (was HR-only "🧩 Process templates", id 'tpl') */
   DW.candidates = candidates;
 })();
 
@@ -24451,7 +24637,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   var KG = 'totGameCounts', KH = 'totImportHistory';
   var SOURCES = ['Grafana (CSV export)', 'Other analytics system (CSV export)', 'Manual spreadsheet'];
   function role() { return DW.role(); }
-  function ok() { return adm() || !role() || ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter'].indexOf(role()) >= 0; }
+  function ok() { return adm() || !role() || ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'].indexOf(role()) >= 0; }   /* v3.25: Game counts live in FMD */
   function arr(k) { var a = jget(k, []); return Array.isArray(a) ? a : []; }
   function norm(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().toLowerCase(); }
 
@@ -24565,7 +24751,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     var inner = el.querySelector('#gcIn'), bar = el.querySelector('.tkTabs');
     function show() { [].forEach.call(bar.children, function (b) { b.classList.toggle('on', b.getAttribute('data-v') === S.view); }); inner.onclick = inner.onchange = inner.oninput = null; (S.view === 'import' ? importUi : S.view === 'hist' ? histUi : dataUi)(inner); }
     bar.onclick = function (e) { var b = e.target.closest('button'); if (b) { S.view = b.getAttribute('data-v'); show(); } }; el.onclick = null; show(); }
-  DW.addTab({ id: 'games', label: '🎮 Game counts', o: 40, show: function (d) { return ['performance', 'hr', 'management'].indexOf(d) >= 0 && ok(); }, render: gameTab });
+  DW.addTab({ id: 'games', label: '🎮 Game counts', o: 40, show: function (d) { return d === 'fmd' && ok(); }, render: gameTab });   /* v3.25: FMD only */
 
   /* ---------- self-test of the pipeline (used on the Integrations page; writes nothing) ---------- */
   window.gcSelfTest = function () {
@@ -24598,22 +24784,22 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   ];
   var FIELDS = [['Name, work ID, status, position, team, shift, start date', 'Local source (Employees page or CSV import)'], ['Game counts', 'External source — imported, read-only in the tool'], ['Evaluation scores and notes', 'Local source'], ['Weighted evaluation %', 'Calculated from the scores and criterion weights'], ['Ticket status and board column', 'Local source (the column is mapped to one of six basic statuses)'], ['Ticket number (TK-…)', 'Calculated from the creation time, read-only'], ['Lifecycle stage', 'Calculated from the employee status and open cases, read-only'], ['Schedule, rotation', 'Local source'], ['What an employee sees on the employee page', 'Read-only copy published by the Apps Script, built from the tool’s data'], ['Candidate stage', 'Local source (the Status cell of the Recruiting workbook)']];
   var CONTRACT = 'connector = {\n  name, direction: "in" | "out" | "both",\n  sourceOfTruth: "local" | "external",\n  fields: [{ field, owner: "local" | "external" | "both" | "calculated" | "read-only" }],\n  status(): "not connected" | "connected" | "error",\n  pull(since): records[]            // external → tool\n  push(records): result             // tool → external\n  match(record): employee | null    // by work ID first, then exact name\n  onConflict(local, remote): winner // never silently overwrite\n  log: every run written to the audit log\n}\n// Not implemented. A browser page cannot hold secrets, so a real connector needs a small server (for example the Apps Script, or a company service).';
-  function driveStatus() { var c = jget('totSyncCfg', {}), b = document.getElementById('tdBadge'); return c && c.url ? ['Set up on this device', '#166534', b ? b.textContent : ''] : ['Not set up on this device', '#991b1b', '']; }
+  function driveStatus() { var c = jget('totSyncCfg', {}), b = document.getElementById('tdBadge'); return c && c.url ? ['Set up on this device', 'var(--green)', b ? b.textContent : ''] : ['Not set up on this device', 'var(--red)', '']; }
   function draw(c) {
     var ig = jget('totIntegrations', {}), ds = driveStatus();
     var h = '<b>🔌 Connection status and data rules</b><div style="font-size:12px;margin:4px 0">What is real, what is not, and who owns each piece of data. Nothing on this page sends data anywhere.</div>' +
       '<table style="border-collapse:collapse;font-size:13px;width:100%"><tr><td style="padding:4px 6px"><b>Google Drive sync</b></td><td style="padding:4px 6px;color:' + ds[1] + ';font-weight:700">' + esc(ds[0]) + (ds[2] ? ' <span style="font-weight:400;color:inherit">· ' + esc(ds[2]) + '</span>' : '') + '</td></tr>' +
-      '<tr><td style="padding:4px 6px"><b>Employee sign-in page (Google)</b></td><td style="padding:4px 6px">Runs from the Apps Script; its status cannot be read from this page</td></tr>' + CONN.map(function (x) { var s = ig[x[0]] || {}, any = Object.keys(s).some(function (k) { return s[k]; }); return '<tr><td style="padding:4px 6px">' + x[1] + '</td><td style="padding:4px 6px"><span style="background:#fee2e2;color:#991b1b;border-radius:10px;padding:1px 9px;font-size:12px;font-weight:700">Not connected</span>' + (any ? ' <span style="font-size:12px">settings noted, not active</span>' : '') + '</td></tr>'; }).join('') +
-      '<tr><td style="padding:4px 6px">🎮 Game-count file import</td><td style="padding:4px 6px"><span style="background:#dcfce7;color:#166534;border-radius:10px;padding:1px 9px;font-size:12px;font-weight:700">Works (manual file)</span> Departments → Performance / HR → Game counts</td></tr></table>';
+      '<tr><td style="padding:4px 6px"><b>Employee sign-in page (Google)</b></td><td style="padding:4px 6px">Runs from the Apps Script; its status cannot be read from this page</td></tr>' + CONN.map(function (x) { var s = ig[x[0]] || {}, any = Object.keys(s).some(function (k) { return s[k]; }); return '<tr><td style="padding:4px 6px">' + x[1] + '</td><td style="padding:4px 6px"><span style="background:rgba(239,68,68,.15);color:var(--red);border-radius:10px;padding:1px 9px;font-size:12px;font-weight:700">Not connected</span>' + (any ? ' <span style="font-size:12px">settings noted, not active</span>' : '') + '</td></tr>'; }).join('') +
+      '<tr><td style="padding:4px 6px">🎮 Game-count file import</td><td style="padding:4px 6px"><span style="background:rgba(34,197,94,.15);color:var(--green);border-radius:10px;padding:1px 9px;font-size:12px;font-weight:700">Works (manual file)</span> FMD → 🎮 Game counts</td></tr></table>';
     h += POL.map(function (p) { return '<details style="margin:8px 0"><summary style="cursor:pointer;font-weight:600">' + esc(p[0]) + '</summary>' + p.slice(1).map(function (r) { return '<div style="font-size:13px;margin:3px 0 3px 12px"><b>' + esc(r[0]) + ':</b> ' + esc(r[1]) + '</div>'; }).join('') + '</details>'; }).join('');
-    h += '<details style="margin:8px 0"><summary style="cursor:pointer;font-weight:600">Who owns which field</summary><table style="border-collapse:collapse;font-size:13px;margin-top:4px">' + FIELDS.map(function (f) { return '<tr><td style="padding:3px 8px;border-bottom:1px solid var(--border,#cbd5e1)">' + esc(f[0]) + '</td><td style="padding:3px 8px;border-bottom:1px solid var(--border,#cbd5e1)">' + esc(f[1]) + '</td></tr>'; }).join('') + '</table></details>';
+    h += '<details style="margin:8px 0"><summary style="cursor:pointer;font-weight:600">Who owns which field</summary><table style="border-collapse:collapse;font-size:13px;margin-top:4px">' + FIELDS.map(function (f) { return '<tr><td style="padding:3px 8px;border-bottom:1px solid var(--border)">' + esc(f[0]) + '</td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">' + esc(f[1]) + '</td></tr>'; }).join('') + '</table></details>';
     h += '<details style="margin:8px 0"><summary style="cursor:pointer;font-weight:600">Planned connector contract (not built)</summary><pre style="font-size:12px;white-space:pre-wrap;margin:6px 0">' + esc(CONTRACT) + '</pre></details>';
     h += '<div style="margin-top:8px"><button data-cn="test">Run the import-rules self-test</button> <span style="font-size:12px">Uses made-up sample rows; saves nothing. It checks the matching, validation and duplicate rules, not any connection.</span></div><div id="cnRes" style="font-size:13px;margin-top:6px"></div>';
     c.innerHTML = h; }
   function card() {
     var v = document.getElementById('integrationsView'); if (!v || !adm()) return; var c = document.getElementById('connCard');
-    if (!c) { c = document.createElement('div'); c.id = 'connCard'; c.style.cssText = 'border:1px solid var(--border,#cbd5e1);border-radius:10px;padding:12px;margin:8px 16px'; v.insertBefore(c, v.firstChild);
-      c.addEventListener('click', function (e) { var b = e.target.closest('[data-cn]'); if (!b) return; var res = c.querySelector('#cnRes'); if (!window.gcSelfTest) { res.textContent = 'The game-count module did not load.'; return; } var t = window.gcSelfTest(), bad = t.filter(function (x) { return !x.ok; }).length; res.innerHTML = '<b style="color:' + (bad ? '#991b1b' : '#166534') + '">' + (bad ? bad + ' check(s) FAILED' : 'All ' + t.length + ' checks passed') + '</b>' + t.map(function (x) { return '<div>' + (x.ok ? '✅' : '❌') + ' ' + esc(x.n) + '</div>'; }).join(''); }); }
+    if (!c) { c = document.createElement('div'); c.id = 'connCard'; c.style.cssText = 'border:1px solid var(--border);border-radius:10px;padding:12px;margin:8px 16px'; v.insertBefore(c, v.firstChild);
+      c.addEventListener('click', function (e) { var b = e.target.closest('[data-cn]'); if (!b) return; var res = c.querySelector('#cnRes'); if (!window.gcSelfTest) { res.textContent = 'The game-count module did not load.'; return; } var t = window.gcSelfTest(), bad = t.filter(function (x) { return !x.ok; }).length; res.innerHTML = '<b style="color:' + (bad ? 'var(--red)' : 'var(--green)') + '">' + (bad ? bad + ' check(s) FAILED' : 'All ' + t.length + ' checks passed') + '</b>' + t.map(function (x) { return '<div>' + (x.ok ? '✅' : '❌') + ' ' + esc(x.n) + '</div>'; }).join(''); }); }
     draw(c); }
   var _m = window.IntegrationsMount; window.IntegrationsMount = function () { var r = _m && _m.apply(this, arguments); card(); return r; };
 })();
@@ -24643,7 +24829,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   'use strict';
   /* v3.21 Admin-only mode: in a shared (Drive-synced) setup every screen except Home is locked for everybody but the admin. A person asks for access with a button; the admin approves (optionally for a limited time) or rejects. Grants are kept in totAccessGrants (only the admin may write it, enforced by the Apps Script); requests in totAccessAsks. */
   var KG = 'totAccessGrants', KA = 'totAccessAsks', host = document.getElementById('permView');
-  var LOCK = { onboarding: ['Onboarding', '📋', 'navOnboarding'], exam: ['Workshop / Exam', '📝', 'navExam'], id: ['ID generator', '🪪', 'navId'], logbooks: ['Logbooks', '📒', 'navLogbooks'], schedule: ['Scheduling', '📅', 'navSchedule'], appearance: ['Appearance', '👕', 'navAppearance'], tasks: ['Tasks', '✅', 'navTasks'], recruiting: ['Recruiting', '🧲', 'navRecruiting'], coach: ['Coach board', '🎯', 'navCoach'], requests: ['Requests', '📨', 'navRequests'], dept: ['Departments', '🏢', 'navDept'], empdata: ['Employees', '👥', 'navEmpdata'] };
+  var LOCK = { onboarding: ['Onboarding', '📋', 'navOnboarding'], exam: ['Workshop / Exam', '📝', 'navExam'], id: ['ID generator', '🪪', 'navId'], logbooks: ['Logbooks', '📒', 'navLogbooks'], schedule: ['Scheduling', '📅', 'navSchedule'], appearance: ['Uniforms', '👕', 'navAppearance'], tasks: ['Tasks', '✅', 'navTasks'], recruiting: ['Recruiting', '🧲', 'navRecruiting'], coach: ['Coach board', '🎯', 'navCoach'], requests: ['Requests', '📨', 'navRequests'], dept: ['Departments', '🏢', 'navDept'], empdata: ['Employees', '👥', 'navEmpdata'] };
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function jget(k, d) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
   function jset(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { alert('NOT SAVED — browser storage is full or blocked.'); return false; } }
@@ -24687,7 +24873,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   /* ---------- admin page ---------- */
   function users() { var p = jget('totAccessPolicy', {}); return (p && p.users) || {}; }
   function pending() { return asks().filter(function (r) { return r && r.status === 'pending'; }); }
-  var SPECIAL = { tasks: 'all', dept: 'all', recruiting: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], requests: ['manager', 'senior', 'scheduling_coordinator', 'hr_recruiter'], coach: ['performance_coach', 'manager', 'senior', 'training_coordinator'], empdata: ['manager', 'senior'] };
+  var SPECIAL = { tasks: 'all', dept: 'all', recruiting: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], requests: ['manager', 'senior', 'scheduling_coordinator', 'hr_recruiter'], coach: ['performance_coach', 'manager', 'senior', 'training_coordinator'], empdata: ['manager'] };   /* v3.25: empdata = __emp.can() (manager or admin) */
   var DUR = [['0', 'until I remove it'], ['1', '1 day'], ['7', '7 days'], ['30', '30 days']];
   function setGrant(k, nm, v, on, days) { var g = G(); g.v = 1; var u = g.byEmail[k] = g.byEmail[k] || { name: nm || k, views: {} }; u.views = u.views || {}; if (nm) u.name = nm; if (on) u.views[v] = { by: pname() || 'Admin', ts: Date.now(), until: days ? Date.now() + days * 864e5 : 0 }; else delete u.views[v]; g.u = Date.now(); return jset(KG, g); }
   function render() {

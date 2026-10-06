@@ -40,7 +40,7 @@ function setPolicy(f) { const d = gas.data(), p = JSON.parse(d.keys.totAccessPol
   ok('Tasks: ticket window lists both Performance people', (await opts('#kdAs')) === 'Cora Coach,Levan Lead', await opts('#kdAs'));
   await P.evaluate(() => { document.querySelectorAll('.tkOv').forEach(o => o.remove()); DeptOpen('performance', 'board'); }); await P.waitForTimeout(300);
   ok('Department board: assignee filter lists the shift lead', /Levan Lead/.test(await opts('#dwFa')), await opts('#dwFa'));
-  await P.evaluate(() => document.querySelector('button[data-a="new"]').click()); await P.waitForTimeout(300);
+  await P.evaluate(() => document.querySelector('#deptView button[data-a="new"]').click()); await P.waitForTimeout(300);
   ok('New ticket: "Assign to a person" lists both Performance people', (await opts('#ntPe')) === 'Cora Coach,Levan Lead', await opts('#ntPe'));
   await P.evaluate(() => { const s = document.getElementById('ntTo'); s.value = 'hr'; s.dispatchEvent(new Event('change')); });
   ok('New ticket to HR: no HR names on this device', (await opts('#ntPe')) === '', await opts('#ntPe'));
