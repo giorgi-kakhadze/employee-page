@@ -17,6 +17,8 @@
  * v3.23: tickets, cases, comments and announcements are sent per person (own department, own tickets, tickets they sent or are assigned; managers,
  *   seniors and Management see all; HR sees every case). Saves are merged ticket by ticket, so a device that only sees part of the list never removes
  *   the rest, and deleted tickets stay deleted. The audit log is sent to non-admins with only their own entries; their new entries are added, never replaced.
+ * v3.24: the access list sent to a non-admin also holds a colleague directory for "Assign to…" (name and position only): their own department,
+ *   or everyone for managers, seniors and Management. Their own entry is unchanged.
  * Data lives in your Google Drive folder "Tool Data": tool-data.json (shared data) and access.json (who may use the tool).
  */
 const ADMIN_SECRET = 'CHANGE-ME-ADMIN-KEY';
@@ -207,7 +209,12 @@ const KEY_CAPS = { totWorkshopFiles: { read: ['ws_register'], write: ['ws_regist
 function capsFor_(cur, role) { var p = policy_(cur), r = (p.roles || {})[role], c = r && r.caps; if (c && typeof c === 'object') return c;
   var views = r && Array.isArray(r.views) ? r.views : (DEFAULT_VIEWS[role] || ['onboarding', 'exam', 'id', 'logbooks', 'schedule', 'appearance']), o = {}; Object.keys(CAP_VIEW).forEach(function (k) { o[k] = views.indexOf(CAP_VIEW[k]) >= 0; }); o.videos_view = role === 'manager'; return o; }
 function capOk_(name, me, mode) { var r = KEY_CAPS[name]; if (!r) return true; return r[mode].some(function (k) { return !!(me.caps && me.caps[k]); }); }
-function redactPolicy_(e, em) { try { var p = JSON.parse(e.v), me = (p.users || {})[em], u = {}; if (me) u[em] = me; return { v: JSON.stringify({ roles: p.roles || {}, depts: p.depts || {}, users: u, upd: p.upd || 0 }), t: e.t }; } catch (x) { return { v: JSON.stringify({ roles: {}, users: {}, upd: 0 }), t: e.t }; } }
+/* v3.24: a non-admin receives their own full entry plus a directory of colleagues for "Assign to…", with only { name, role } each:
+   everyone in their own department, or everyone for managers, seniors and Management (c is ctx_, so the department rules match the ticket rules) */
+function redactPolicy_(e, em, c) { try { var p = JSON.parse(e.v), all = p.users || {}, u = {};
+  Object.keys(all).forEach(function (k) { var x = all[k]; if (!x || typeof x !== 'object') return; if (k === em) { u[k] = x; return; }
+    if (c && (c.all || (c.dept && c.dOf(x.role) === c.dept))) u[k] = { name: String(x.name || ''), role: String(x.role || '') }; });
+  return { v: JSON.stringify({ roles: p.roles || {}, depts: p.depts || {}, users: u, upd: p.upd || 0 }), t: e.t }; } catch (x) { return { v: JSON.stringify({ roles: {}, users: {}, upd: 0 }), t: e.t }; } }
 function stripPay_(e) { try { var o = JSON.parse(e.v); if (o && typeof o === 'object' && !Array.isArray(o) && 'pay' in o) { delete o.pay; return { v: JSON.stringify(o), t: e.t }; } } catch (x) {} return e; }
 function keepPay_(newV, oldV) { try { var n = JSON.parse(newV); if (!n || typeof n !== 'object' || Array.isArray(n)) return newV; var o = oldV ? JSON.parse(oldV) : null; if (o && o.pay !== undefined) n.pay = o.pay; else delete n.pay; return JSON.stringify(n); } catch (x) { return newV; } }
 
@@ -367,7 +374,7 @@ function doPost(e) {
       var res = { keys: {}, updatedAt: cur.updatedAt || 0 };
       Object.keys(cur.keys).forEach(function (k) {
         var p = parseKey_(k), en = cur.keys[k]; if (!p || !en) return;
-        if (k === 'totAccessPolicy') { res.keys[k] = redactPolicy_(en, em); return; }
+        if (k === 'totAccessPolicy') { res.keys[k] = redactPolicy_(en, em, cx); return; }
         if (k === 'totSites') { res.keys[k] = en; return; }
         if (p.name === 'totAccessGrants') { res.keys[k] = redactGrants_(en, em); return; }
         if (p.name === 'totAccessAsks') { res.keys[k] = mineAsks_(en, em); return; }
