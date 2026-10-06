@@ -13,6 +13,7 @@
  *  - A dated backup copy of tool-data.json is made once a day (last 14 kept) in the same folder.
  * v2.3: action 'me' lets an employee who signs in with Google see only their own shared evaluation results and their own next 28 days of schedule (set GOOGLE_CLIENT_ID).
  * v3.16 employee board: action 'me' now also returns the employee's own profile, schedule and rotation (reads the format the tool writes now: sx/rx with a release time), and their requests. New actions 'reqNew' and 'reqCancel' let a signed-in employee file or cancel ONE of four request types (swap, giveaway, annual, sick). The employee is always identified from the verified Google token, never from what the browser says.
+ * v3.22: action 'me' also returns the employee's own game counts (last 12 months, matched by work ID) and the manager name when the employee record has one.
  * Data lives in your Google Drive folder "Tool Data": tool-data.json (shared data) and access.json (who may use the tool).
  */
 const ADMIN_SECRET = 'CHANGE-ME-ADMIN-KEY';
@@ -62,7 +63,7 @@ function me_(tok) {
     var hit = jp_(K[k] && K[k].v, []).filter(function (e) { return e && String(e.email || (e.ext && e.ext.email) || '').trim().toLowerCase() === g.email; });
     if (hit.length !== 1) return;
     var e = hit[0], wid = String(e.workId || '').trim().toLowerCase(); found++; out.name = e.fullName || e.nickname || out.name; mypre = pre; myWid = wid;
-    var x0 = e.ext || {}; out.profile = { name: String(e.fullName || '').slice(0, 80), nickname: String(e.nickname || '').slice(0, 40), workId: String(e.workId || '').slice(0, 30), status: String(e.status || '').slice(0, 30), position: String(x0.position || '').slice(0, 60), team: String(x0.team || '').slice(0, 40), shift: String(x0.shift || '').slice(0, 30), startDate: String(x0.startDate || '').slice(0, 20), phone: String(x0.phone || '').slice(0, 30), email: g.email, games: String(x0.games || '').split(/[,;\/]+/).map(function (t) { return t.trim().slice(0, 40); }).filter(Boolean).slice(0, 30) };
+    var x0 = e.ext || {}; out.profile = { name: String(e.fullName || '').slice(0, 80), nickname: String(e.nickname || '').slice(0, 40), workId: String(e.workId || '').slice(0, 30), status: String(e.status || '').slice(0, 30), position: String(x0.position || '').slice(0, 60), team: String(x0.team || '').slice(0, 40), shift: String(x0.shift || '').slice(0, 30), startDate: String(x0.startDate || '').slice(0, 20), phone: String(x0.phone || '').slice(0, 30), manager: String(x0.manager || x0.lineManager || '').slice(0, 80), email: g.email, games: String(x0.games || '').split(/[,;\/]+/).map(function (t) { return t.trim().slice(0, 40); }).filter(Boolean).slice(0, 30) };
     var share = jp_(K[pre + 'evalShare'] && K[pre + 'evalShare'].v, {}), res = jp_(K[pre + 'evalResults'] && K[pre + 'evalResults'].v, []);
     /* v3.11: the employee's own retraining rows (date, reason, status only; trainer names, comments and signatures are never sent) */
     var nm = String(e.fullName || e.nickname || '').trim().toLowerCase(), rt = jp_(K[pre + 'totRetrain'] && K[pre + 'totRetrain'].v, {});
@@ -90,6 +91,10 @@ function me_(tok) {
     if (rx) out.rotation = { group: String(m.group || ''), shift: String(m.shift || ''), days: rx.filter(rel).slice(0, 28).map(function (d) { return { d: d.d, s: String(d.s || ''), f: d.f == null ? null : +d.f, c: (Array.isArray(d.c) ? d.c : []).slice(0, 48).map(function (c) { return String(c || '').slice(0, 40); }) }; }) };
   });
   if (!found) return { error: 'no employee found for this email' };
+  /* v3.22: this employee's own game counts (imported from Grafana/CSV in the tool), last 12 months only; matched by work ID, or by exact full name when the row has no ID */
+  var gcE = K[mypre + 'totGameCounts'], gcAll = jp_(gcE && gcE.v, []), cut = Utilities.formatDate(new Date(Date.now() - 366 * 86400000), Session.getScriptTimeZone(), 'yyyy-MM'), myNm = String(out.name || '').trim().toLowerCase();
+  if (Array.isArray(gcAll)) out.gameCounts = gcAll.filter(function (r) { if (!r || String(r.period || '').slice(0, 7) < cut) return false; var rid = String(r.empId || '').trim().toLowerCase(); return myWid ? rid === myWid : (!rid && myNm && String(r.name || '').trim().toLowerCase() === myNm); })
+    .map(function (r) { return { game: String(r.game || '').slice(0, 60), period: String(r.period || '').slice(0, 10), count: +r.count || 0 }; }).sort(function (a, b) { return b.period.localeCompare(a.period); }).slice(0, 300);
   /* v3.16: this employee's own requests (never anyone else's) */
   out.requests = reqList_(K[mypre + 'totEmpRequests'], g.email).slice(0, 40);
   out.evaluations.sort(function (a, b) { return b.ts - a.ts; });

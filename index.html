@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My work page</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1d2330;--mut:#6b7385;--ac:#2b5cd9;--ok:#1f9d55;--warn:#d9822b;--bad:#c0392b;--bd:#e3e6ec}
+@media(prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b2030;--tx:#e8ebf2;--mut:#98a0b3;--bd:#2a3145;--ac:#6b8ff0}}
+*{box-sizing:border-box}body{margin:0;font:16px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--tx)}
+main{max-width:760px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:1.4rem;margin:0 0 4px}h2{font-size:1.1rem;margin:24px 0 10px}h3{font-size:1rem;margin:0 0 6px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px 16px;margin-bottom:12px}
+.mut{color:var(--mut);font-size:.9rem}.row{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
+.big{font-size:1.6rem;font-weight:700}
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:.8rem;background:var(--bd);margin:2px 2px 2px 0}
+.fb{border-left:3px solid var(--ac);padding-left:10px;margin-top:10px;white-space:pre-wrap}
+.day{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd)}.day:last-child{border:0}
+.work{color:var(--ok);font-weight:600}.off{color:var(--mut)}.leave{color:var(--warn);font-weight:600}.bad{color:var(--bad);font-weight:600}
+button,select,input,textarea{font:inherit;color:var(--tx)}
+button{padding:8px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--card);cursor:pointer}
+button.pri{background:var(--ac);border-color:var(--ac);color:#fff}
+select,input,textarea{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--bd);background:var(--card)}
+label{display:block;font-size:.85rem;color:var(--mut);margin:10px 0 4px}
+#login{text-align:center;margin-top:60px}.err{color:var(--bad);margin:12px 0}
+nav{display:flex;gap:6px;overflow-x:auto;margin:16px 0 4px;padding-bottom:4px}
+nav button{white-space:nowrap;padding:6px 12px;border-radius:99px;font-size:.9rem}
+nav button.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.tile{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;cursor:pointer;text-align:left}
+.tile b{display:block;font-size:1.4rem}.tile span{font-size:.85rem;color:var(--mut)}
+dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;margin:0}dt{color:var(--mut)}dd{margin:0}
+.banner{background:#fff4e0;color:#7a4a00;border:1px solid #f0c27a;border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:.9rem}
+@media(prefers-color-scheme:dark){.banner{background:#3a2a10;color:#f5d39b;border-color:#6b4d1d}}
+table{border-collapse:collapse;width:100%;font-size:.9rem}td,th{padding:6px 8px;border-bottom:1px solid var(--bd);text-align:left}th{color:var(--mut);font-weight:600}
+</style></head><body><main>
+<div id="login"><h1>My work page</h1><p class="mut">Sign in with the Google account your trainer has on file.</p>
+<div id="gbtn" style="display:inline-block"></div><div id="err" class="err"></div></div>
+<div id="app" hidden></div>
+</main>
+<script>
+/* ===== SETTINGS ===== */
+var CLIENT_ID = '121975980339-fu9nd124kov2g6j94qiofOrkjkhbkee6.apps.googleusercontent.com';
+var SERVER_URL = 'PASTE-YOUR-APPS-SCRIPT-WEB-APP-URL-HERE';   /* ends in /exec */
+/* ==================== */
+/* Employee self-service. Everything shown here comes from the Apps Script action "me", which checks the Google sign-in and returns ONLY this person's own data
+   (profile, shared evaluations, retraining, game counts, schedule, rotation, own requests). Nothing about other people is ever sent to this page. */
+var tok = null, D = null, tab = 'home', refreshT = null, DEMO = /[?&]demo\b/.test(location.search);
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function $(id){return document.getElementById(id)}
+function err(m){$('err').textContent=m}
+function configured(){return /^https:\/\/script\.google\.com\/.+\/exec$/.test(SERVER_URL)}
+function init(){
+  if(DEMO){D=demoData();show();return}
+  if(!configured()){err('This page is not set up yet: the Apps Script web app address is missing (SERVER_URL). Ask the tool admin.');}
+  if(!window.google||!google.accounts){return setTimeout(init,200)}
+  google.accounts.id.initialize({client_id:CLIENT_ID,callback:function(r){tok=r.credential;load()},auto_select:false});
+  google.accounts.id.renderButton($('gbtn'),{theme:'outline',size:'large'});
+}
+var ERRS={'no employee found for this email':'This Google account is not on the employee list. Ask your trainer to check your email.','sign-in invalid':'Your sign-in failed or expired. Please sign in again.','not configured':'The service is not set up yet.'};
+function call(body){
+  if(DEMO)return Promise.resolve(demoCall(body));
+  if(!configured())return Promise.reject(new Error('not configured'));
+  body.idToken=tok;
+  return fetch(SERVER_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)}).then(function(r){return r.json()});
+}
+function signedOut(m){tok=null;if(refreshT){clearInterval(refreshT);refreshT=null}$('app').hidden=true;$('login').hidden=false;err(m)}
+function load(silent){
+  if(!silent)err('Loading...');
+  call({action:'me'}).then(function(j){
+    if(j.error){if(j.error==='sign-in invalid')return signedOut(ERRS[j.error]);if(!silent)err(ERRS[j.error]||j.error);return}
+    D=j;show()}).catch(function(){if(!silent)err('Could not reach the server. Please try again.')});
+}
+
+/* ---------- helpers ---------- */
+var SH={morning:'Morning',afternoon:'Afternoon',night:'Night'},OFF={rest:'Day off',vacation:'Vacation',sick:'Sick leave',unpaid:'Unpaid leave'};
+var RT={swap:'Swap a shift',giveaway:'Give away a shift',annual:'Annual leave',sick:'Sick leave'},RS={pending:'Waiting for a decision',approved:'Approved',rejected:'Declined',cancelled:'Cancelled'};
+function hh(n){n=((n%24)+24)%24;return String(Math.floor(n)).padStart(2,'0')+':'+(n%1?'30':'00')}
+function cellTxt(v){v=String(v||'').trim();if(!v)return '-';if(/^\d+$/.test(v))return 'Table '+v;if(/^(b|brk|break)$/i.test(v))return 'Break';if(/^(off|x|-)$/i.test(v))return 'Off';return v}
+function dLabel(d,long){var dt=new Date(d+'T12:00:00');return isNaN(dt)?esc(d):dt.toLocaleDateString(undefined,{weekday:long?'long':'short',day:'numeric',month:'short'})}
+function iso(dt){return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0')}
+function today(){return iso(new Date())}
+function when(ms){return ms?new Date(ms).toLocaleString(undefined,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):''}
+/* points lost per criterion: same rule as before (the best criterion score of that evaluation is the maximum, at least 1) */
+function lostOf(e){var mx=Math.max.apply(null,[1].concat(e.criteria.map(function(c){return c.score||0})));return e.criteria.filter(function(c){return c.score!=null&&c.score<mx}).map(function(c){return{name:c.name,group:c.group,lost:mx-c.score,score:c.score,max:mx}})}
+function mistakes(){
+  var m={};(D.evaluations||[]).forEach(function(e){lostOf(e).forEach(function(c){var k=(e.game||'Evaluation')+'|'+c.name;var x=m[k]=m[k]||{game:e.game||'Evaluation',name:c.name,n:0,last:'',lastTs:0};x.n++;if((e.ts||0)>=x.lastTs){x.lastTs=e.ts||0;x.last=e.date}})});
+  return Object.keys(m).map(function(k){return m[k]}).sort(function(a,b){return b.n-a.n||b.lastTs-a.lastTs});
+}
+function workDays(){return ((D.schedule&&D.schedule.days)||[]).filter(function(y){return SH[y.s]&&y.d>=today()})}
+
+/* ---------- pages ---------- */
+var TABS=[['home','Overview'],['profile','My profile'],['evals','My evaluations'],['mistakes','My mistakes'],['retrain','My retraining'],['games','My games'],['schedule','My schedule'],['requests','My requests']];
+function show(){
+  $('login').hidden=true;var a=$('app');a.hidden=false;
+  var h=(DEMO?'<div class="banner"><b>Demo data.</b> This page is not connected to the server. Nothing you do here is sent anywhere.</div>':'')+
+    '<div class="row"><div><h1>Hello, '+esc((D.profile&&D.profile.nickname)||D.name||D.email)+'</h1><div class="mut">'+esc(D.email)+'</div></div><span><button onclick="load()">&#8635; Refresh</button> <button onclick="location.reload()">Sign out</button></span></div>'+
+    '<nav>'+TABS.map(function(t){return '<button data-t="'+t[0]+'" class="'+(t[0]===tab?'on':'')+'">'+t[1]+'</button>'}).join('')+'</nav><div id="pg"></div>';
+  a.innerHTML=h;
+  a.querySelector('nav').onclick=function(e){var b=e.target.closest('button');if(b){tab=b.getAttribute('data-t');show()}};
+  var on=a.querySelector('nav .on');if(on){var nv=on.parentNode;nv.scrollLeft=on.offsetLeft-nv.offsetLeft-16}
+  var P={home:pHome,profile:pProfile,evals:pEvals,mistakes:pMistakes,retrain:pRetrain,games:pGames,schedule:pSchedule,requests:pRequests};
+  $('pg').innerHTML=(P[tab]||pHome)();
+  if(tab==='requests')wireRequests();
+  [].forEach.call(document.querySelectorAll('[data-go]'),function(x){x.onclick=function(){tab=x.getAttribute('data-go');show();window.scrollTo(0,0)}});
+  if(!refreshT&&!DEMO)refreshT=setInterval(function(){if(!document.querySelector('#rqForm:focus-within'))load(true)},60000);
+}
+function tile(go,n,l){return '<button class="tile" data-go="'+go+'"><b>'+n+'</b><span>'+l+'</span></button>'}
+function pHome(){
+  var ev=D.evaluations||[],last=ev[0],wd=workDays(),next=wd[0],rt=(D.retraining||[]).filter(function(r){return r.status==='Scheduled'}),rq=(D.requests||[]).filter(function(r){return r.status==='pending'}),mi=mistakes();
+  var h='<h2>At a glance</h2><div class="tiles">'+
+    tile('evals',last?(last.total==null?'-':esc(last.total)+'%'):'-',last?'Last result: '+esc(last.game||'Evaluation'):'No results shared yet')+
+    tile('schedule',next?dLabel(next.d):'-',next?'Next shift: '+SH[next.s]+(next.f!=null?' '+hh(next.f):''):'No upcoming shift sent')+
+    tile('retrain',rt.length,'Retraining scheduled')+
+    tile('mistakes',mi.length,'Criteria with points lost')+
+    tile('requests',rq.length,'Requests waiting')+'</div>';
+  var todo=[];
+  if(rt.length)todo.push('You have <b>'+rt.length+'</b> retraining session'+(rt.length>1?'s':'')+' scheduled (next: '+esc(rt[rt.length-1].date)+').');
+  var dec=(D.requests||[]).filter(function(r){return r.status!=='pending'&&r.decidedAt&&r.decidedAt>Date.now()-7*864e5});
+  dec.forEach(function(r){todo.push('Your request "'+esc(RT[r.type]||r.type)+'" for '+esc(r.from)+' was <b>'+esc((RS[r.status]||r.status).toLowerCase())+'</b>'+(r.decisionNote?': '+esc(r.decisionNote):'')+'.')});
+  if(mi[0])todo.push('Most frequent point loss: <b>'+esc(mi[0].name)+'</b> ('+esc(mi[0].game)+', '+mi[0].n+'×).');
+  h+='<h2>For you</h2>'+(todo.length?'<div class="card">'+todo.map(function(t){return '<div class="day"><span>'+t+'</span></div>'}).join('')+'</div>':'<div class="card mut">Nothing needs your attention.</div>');
+  return h;
+}
+function pProfile(){
+  var p=D.profile||{},F=[['Name',p.name],['Nickname',p.nickname],['Employee ID',p.workId],['Position',p.position],['Team',p.team],['Shift',p.shift],['Manager',p.manager],['Start date',p.startDate],['Status',p.status],['Phone',p.phone],['Email',p.email||D.email]];
+  return '<h2>My profile</h2><div class="card"><dl>'+F.map(function(f){return '<dt>'+f[0]+'</dt><dd>'+(f[1]?esc(f[1]):'<span class="mut">not on file</span>')+'</dd>'}).join('')+'</dl>'+
+    ((p.games||[]).length?'<label>Games I am trained on</label>'+p.games.map(function(g){return '<span class="tag">'+esc(g)+'</span>'}).join(''):'')+
+    '</div><div class="mut">Something wrong? Tell your manager or HR. You cannot change these details here.</div>';
+}
+function pEvals(){
+  var ev=D.evaluations||[],h='<h2>My evaluations</h2>';
+  if(!ev.length)return h+'<div class="card mut">No results have been shared with you yet.</div>';
+  ev.forEach(function(e){
+    var lost=lostOf(e),cr=e.criteria.filter(function(c){return c.score!=null}).sort(function(x,y){return x.score-y.score}),mx=Math.max.apply(null,[1].concat(e.criteria.map(function(c){return c.score||0})));
+    h+='<div class="card"><div class="row"><div><b>'+esc(e.game||'Evaluation')+'</b>'+(e.kind?' <span class="tag">'+esc(e.kind)+'</span>':'')+'<div class="mut">'+esc(e.date)+(e.edited?' · corrected '+when(e.edited):'')+'</div></div><div class="big">'+(e.total==null?'-':esc(e.total))+'%</div></div>';
+    h+='<div class="mut" style="margin-top:6px">'+(lost.length?lost.length+' criteria with points deducted':'Full score on every criterion')+'</div>';
+    cr.forEach(function(c){var full=c.score>=mx;h+='<div class="day"><span>'+esc(c.name)+'</span><span class="'+(full?'work':'leave')+'">'+(full?'&#10003; Full score':'&minus;'+(mx-c.score)+' ('+c.score+'/'+mx+')')+'</span></div>'});
+    if(e.improve&&e.improve.length)h+='<div style="margin-top:8px"><span class="mut">Focus on: </span>'+e.improve.map(function(x){return '<span class="tag">'+esc(x)+'</span>'}).join(' ')+'</div>';
+    if(e.feedback)h+='<div class="fb">'+esc(e.feedback)+'</div>';
+    h+='</div>'});
+  return h;
+}
+function pMistakes(){
+  var mi=mistakes(),h='<h2>My procedural mistakes</h2><div class="mut" style="margin-bottom:10px">Criteria where you lost points in the evaluations shared with you, counted per game. Trainer notes are not shown here.</div>';
+  if(!mi.length)return h+'<div class="card mut">No points lost in your shared evaluations.</div>';
+  return h+'<div class="card"><table><tr><th>Game</th><th>Criterion</th><th>Times</th><th>Last</th></tr>'+mi.map(function(m){return '<tr><td>'+esc(m.game)+'</td><td>'+esc(m.name)+'</td><td><b>'+m.n+'</b></td><td>'+esc(m.last)+'</td></tr>'}).join('')+'</table></div>';
+}
+function pRetrain(){
+  var r=D.retraining||[],h='<h2>My retraining</h2>';
+  if(!r.length)return h+'<div class="card mut">No retraining on record.</div>';
+  return h+'<div class="card">'+r.map(function(x){return '<div class="day"><span><b>'+esc(x.date)+'</b><div class="mut">'+esc(x.reason||'')+'</div></span><span class="'+(x.status==='Completed'?'work':x.status==='Missed'?'bad':'leave')+'">'+esc(x.status)+'</span></div>'}).join('')+'</div>';
+}
+function pGames(){
+  var g=D.gameCounts,h='<h2>My games</h2>';
+  if(!g)return h+'<div class="card mut">Game counts are not available yet (the server has not been updated to send them).</div>';
+  if(!g.length)return h+'<div class="card mut">No game counts for you in the last 12 months.</div>';
+  var per={},tot={};g.forEach(function(x){var m=x.period.slice(0,7);per[m]=per[m]||{};per[m][x.game]=(per[m][x.game]||0)+x.count;tot[m]=(tot[m]||0)+x.count});
+  var ms=Object.keys(per).sort().reverse(),mx=Math.max.apply(null,[1].concat(ms.map(function(m){return tot[m]})));
+  h+='<div class="mut" style="margin-bottom:10px">Imported from the company analytics export. Last 12 months.</div>';
+  ms.forEach(function(m){var dt=new Date(m+'-01T12:00:00');h+='<div class="card"><div class="row"><b>'+dt.toLocaleDateString(undefined,{month:'long',year:'numeric'})+'</b><span class="big">'+tot[m].toLocaleString()+'</span></div><div style="height:6px;background:var(--bd);border-radius:3px;margin:6px 0"><div style="height:100%;width:'+(tot[m]/mx*100)+'%;background:var(--ac);border-radius:3px"></div></div>'+
+    Object.keys(per[m]).sort(function(a,b){return per[m][b]-per[m][a]}).map(function(k){return '<div class="day"><span>'+esc(k)+'</span><span>'+per[m][k].toLocaleString()+'</span></div>'}).join('')+'</div>'});
+  return h;
+}
+function pSchedule(){
+  var h='',x=D.schedule;
+  h+='<h2>My schedule</h2>';
+  if(!x||!x.days.length)h+='<div class="card mut">Nothing has been sent to you yet.</div>';
+  else{h+='<div class="card">';x.days.forEach(function(y){var work=SH[y.s],txt=work?SH[y.s]+(y.f!=null?' &middot; '+hh(y.f)+'-'+hh(y.t):''):esc(OFF[y.s]||y.s);h+='<div class="day"><span>'+dLabel(y.d)+'</span><span class="'+(work?'work':y.s==='rest'?'off':'leave')+'">'+txt+'</span></div>'});h+='</div>'}
+  var r=D.rotation;h+='<h2>My rotation</h2>';
+  if(!r||!(r.days||[]).length)return h+'<div class="card mut">No rotation has been shared with you yet.</div>';
+  r.days.forEach(function(e){
+    var c=e.c||[],grp=[],i,v;for(i=0;i<c.length;i++){v=cellTxt(c[i]);if(grp.length&&grp[grp.length-1].v===v)grp[grp.length-1].to=i+1;else grp.push({v:v,from:i,to:i+1})}
+    h+='<div class="card"><b>'+dLabel(e.d,true)+'</b><div class="mut">'+esc(SH[e.s]||e.s)+(e.f!=null?' &middot; starts '+hh(e.f):'')+'</div>';
+    if(!grp.length||e.f==null)h+='<div class="mut">No table plan for this day.</div>';
+    grp.forEach(function(g){var tb=/^Table/.test(g.v);h+='<div class="day"><span>'+hh(e.f+g.from/2)+' - '+hh(e.f+g.to/2)+'</span><span class="'+(tb?'work':'off')+'">'+esc(g.v)+'</span></div>'});
+    h+='</div>'});
+  return h;
+}
+function pRequests(){
+  var rq=D.requests||[],wd=workDays();
+  var h='<h2>New request</h2><div class="card" id="rqForm"><label>What do you need?</label><select id="rqT">'+Object.keys(RT).map(function(k){return '<option value="'+k+'">'+RT[k]+'</option>'}).join('')+'</select>'+
+    '<div id="rqShift"><label>Which shift?</label><select id="rqDay">'+(wd.length?wd.map(function(y){return '<option value="'+y.d+'" data-s="'+y.s+'">'+dLabel(y.d)+' · '+SH[y.s]+'</option>'}).join(''):'<option value="">No working days in the schedule sent to you</option>')+'</select></div>'+
+    '<div id="rqWith"><label>Swap with (colleague\'s name)</label><input id="rqW" maxlength="80"></div>'+
+    '<div id="rqRange" hidden><div class="row" style="flex-wrap:nowrap"><div style="flex:1"><label>From</label><input id="rqF" type="date"></div><div style="flex:1"><label>To</label><input id="rqTo" type="date"></div></div></div>'+
+    '<label>Note (optional)</label><textarea id="rqN" rows="2" maxlength="500"></textarea><div id="rqE" class="err"></div><button class="pri" id="rqGo">Send request</button></div>';
+  h+='<h2>My requests</h2>'+(rq.length?rq.map(function(r){var cls=r.status==='approved'?'work':r.status==='rejected'?'bad':r.status==='pending'?'leave':'off';
+    return '<div class="card"><div class="row"><b>'+esc(RT[r.type]||r.type)+'</b><span class="'+cls+'">'+esc(RS[r.status]||r.status)+'</span></div><div class="mut">'+esc(r.from)+(r.to&&r.to!==r.from?' → '+esc(r.to):'')+(r.shift?' · '+esc(SH[r.shift]||r.shift):'')+(r.withName?' · with '+esc(r.withName):'')+' · sent '+when(r.created)+'</div>'+
+      (r.note?'<div class="fb">'+esc(r.note)+'</div>':'')+(r.decisionNote?'<div class="fb" style="border-color:var(--warn)">'+esc(r.decisionNote)+'</div>':'')+(r.status==='pending'?'<div style="margin-top:8px"><button data-cx="'+esc(r.id)+'">Cancel request</button></div>':'')+'</div>'}).join(''):'<div class="card mut">You have not sent any requests.</div>');
+  return h;
+}
+function wireRequests(){
+  var t=$('rqT');
+  function sync(){var v=t.value,one=v==='swap'||v==='giveaway';$('rqShift').hidden=!one;$('rqWith').hidden=v!=='swap';$('rqRange').hidden=one;var mn=v==='sick'?iso(new Date(Date.now()-14*864e5)):today();$('rqF').min=mn;$('rqTo').min=mn;$('rqE').textContent=''}
+  t.onchange=sync;sync();
+  $('rqGo').onclick=function(){
+    var v=t.value,b={action:'reqNew',type:v,note:$('rqN').value.trim()},e=$('rqE');
+    if(v==='swap'||v==='giveaway'){var o=$('rqDay').selectedOptions[0];if(!o||!o.value){e.textContent='There is no working day you can choose.';return}b.from=b.to=o.value;b.shift=o.getAttribute('data-s');if(v==='swap'){b.withName=$('rqW').value.trim();if(!b.withName){e.textContent='Write who you swap with.';return}}}
+    else{b.from=$('rqF').value;b.to=$('rqTo').value||b.from;if(!b.from){e.textContent='Choose the first day.';return}if(b.to<b.from){e.textContent='The end date is before the start date.';return}}
+    this.disabled=true;e.textContent='Sending...';var btn=this;
+    call(b).then(function(j){btn.disabled=false;if(j.error){if(j.error==='sign-in invalid')return signedOut(ERRS[j.error]);e.textContent=j.error;return}D.requests=j.requests;show()}).catch(function(){btn.disabled=false;e.textContent='Could not reach the server. Nothing was sent.'});
+  };
+  [].forEach.call(document.querySelectorAll('[data-cx]'),function(x){x.onclick=function(){if(!confirm('Cancel this request?'))return;x.disabled=true;
+    call({action:'reqCancel',id:x.getAttribute('data-cx')}).then(function(j){if(j.error){x.disabled=false;if(j.error==='sign-in invalid')return signedOut(ERRS[j.error]);alert(j.error);return}D.requests=j.requests;show()}).catch(function(){x.disabled=false;alert('Could not reach the server.')})}});
+}
+
+/* ---------- demo (only with ?demo in the address; clearly labelled, never talks to the server) ---------- */
+function demoData(){
+  var d=function(n){var x=new Date();x.setDate(x.getDate()+n);return iso(x)},S=['morning','morning','rest','afternoon','afternoon','night','rest'],days=[];
+  for(var i=0;i<14;i++){var s=S[i%7];days.push({d:d(i),s:s,f:s==='morning'?7:s==='afternoon'?15:s==='night'?23:null,t:s==='morning'?15:s==='afternoon'?23:s==='night'?7:null})}
+  var crit=function(a){return[{name:'Card handling',score:a[0]},{name:'Payout accuracy',score:a[1]},{name:'Game protection',score:a[2]},{name:'Customer service',score:a[3]}]};
+  return{email:'demo.employee@example.com',name:'Demo Employee',profile:{name:'Demo Employee',nickname:'Demo',workId:'W-0001',status:'Active',position:'Dealer',team:'Team A',shift:'Rotating',manager:'',startDate:'2025-03-01',phone:'',email:'demo.employee@example.com',games:['Roulette','Blackjack']},
+    evaluations:[{game:'Roulette',date:d(-5),ts:Date.now()-5*864e5,total:88,criteria:crit([5,4,5,3]),improve:['Customer service','Payout accuracy'],feedback:'Good pace. Announce the winning number clearly.',kind:''},{game:'Blackjack',date:d(-40),ts:Date.now()-40*864e5,total:92,criteria:crit([5,5,4,4]),improve:['Game protection'],feedback:'',kind:''}],
+    retraining:[{date:d(3),reason:'Payout accuracy on roulette',status:'Scheduled'}],
+    gameCounts:[{game:'Roulette',period:d(-30).slice(0,7),count:1240},{game:'Blackjack',period:d(-30).slice(0,7),count:860},{game:'Roulette',period:d(-60).slice(0,7),count:1100}],
+    schedule:{days:days},rotation:{days:[{d:d(0),s:'morning',f:7,c:['3','3','3','3','b','5','5','5','5','b','1','1','1','1','1','1']}]},requests:[]};
+}
+function demoCall(b){
+  if(b.action==='me')return D;
+  if(b.action==='reqNew'){D.requests.unshift({id:'demo'+Date.now(),type:b.type,from:b.from,to:b.to,withName:b.withName||'',shift:b.shift||'',note:b.note||'',status:'pending',created:Date.now()});return{ok:true,requests:D.requests}}
+  if(b.action==='reqCancel'){D.requests.forEach(function(r){if(r.id===b.id)r.status='cancelled'});return{ok:true,requests:D.requests}}
+  return{error:'unknown'};
+}
+init();
+</script></body></html>
