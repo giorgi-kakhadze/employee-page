@@ -13,6 +13,7 @@ const cases = () => { const k = gas.data().keys.totCases; return k ? JSON.parse(
     document.querySelectorAll('.tkOv').forEach(x => x.remove()); DeptOpen(dept, 'board');
     document.querySelector('#deptView button[data-a="new"]').click();
     const $ = (i) => document.getElementById(i), wt = $('ntWt'), opts = Array.from(wt.options).map(x => x.textContent);
+    if (o.to) { $('ntTo').value = o.to; $('ntTo').dispatchEvent(new Event('change')); }
     const v = Array.from(wt.options).filter(x => x.textContent === o.type)[0]; wt.value = v ? v.value : ''; wt.dispatchEvent(new Event('change'));
     const prev = $('ntWp').textContent; $('ntTi').value = o.title; $('ntRe').value = o.rel || ''; $('ntGo').click();
     return { opts, prev, found: !!v || !o.type }; }, [dept, o]);
@@ -100,6 +101,33 @@ const cases = () => { const k = gas.data().keys.totCases; return k ? JSON.parse(
   await fm.sync();
   ok('FMD device holds the game counts', JSON.stringify(await fm.local('totGameCounts')) === JSON.stringify(gc), JSON.stringify(await fm.local('totGameCounts')));
   ok('shift lead still does not receive game counts', !pull('lead@x.com').keys.totGameCounts);
+
+  console.log('7. Review fixes');
+  const n7 = gas.tasks().length;
+  const r7 = await create(hr, 'hr', { type: 'Termination', title: 'Termination of Gela', rel: 'Gela Test', to: 'it' }); await hr.sync();
+  const s7 = gas.tasks().filter(t => t.title === 'Termination of Gela')[0] || {}, l7 = gas.tasks().filter(t => s7.caseId && t.caseId === s7.caseId);
+  ok('work type sent to another department: that department gets one ticket, and the HR step is still created', l7.filter(t => t.toRole === 'it').length === 1 && l7.filter(t => t.toRole === 'hr').length === 1 && gas.tasks().length === n7 + 5, l7.map(t => t.toRole).join(','));
+  ok('…and the preview no longer lists IT', !/IT —/.test(r7.prev) && /HR —/.test(r7.prev), r7.prev);
+  setPolicy(p => { p.depts = { performance_coach: 'appearance' }; });
+  const cOld = JSON.stringify(cases().filter(c => c.id === cid)[0]);
+  const cv = (keyOf(pull('coach@x.com'), 'totCases') || []).filter(c => c.id === cid)[0];
+  ok('linked department reads the case', !!cv);
+  const bt = gas.data().keys.totCases.t;
+  gas.post({ action: 'push', email: 'coach@x.com', pwHash: 'pw-coach@x.com', keys: { totCases: { v: JSON.stringify([Object.assign({}, cv, { title: 'Edited by Uniforms', byEmail: 'coach@x.com' })]), t: Date.now(), bt: bt } } });
+  ok('…but cannot rewrite it', JSON.stringify(cases().filter(c => c.id === cid)[0]) === cOld, JSON.stringify(cases().filter(c => c.id === cid)[0]));
+  gas.post({ action: 'push', email: 'coach@x.com', pwHash: 'pw-coach@x.com', keys: { totCases: { v: '[]', t: Date.now(), bt: gas.data().keys.totCases.t } } });
+  ok('…or delete it', cases().some(c => c.id === cid));
+  setPolicy(p => { p.depts = {}; });
+  const tv = gas.data().keys.totTasks.t, mine = keyOf(pull('lead@x.com'), 'totTasks');
+  gas.post({ action: 'push', email: 'lead@x.com', pwHash: 'pw-lead@x.com', keys: { totTasks: { v: JSON.stringify(mine.concat([{ id: 'fake-c1', title: 'peek', toRole: 'performance', fromEmail: 'lead@x.com', fromName: 'Levan Lead', fromRole: 'shift_lead', caseId: 'c1', ref: 'case:c1', status: 'todo' }])), t: Date.now(), bt: tv } } });
+  ok('a made-up ticket with someone else\'s case id does not reveal that case', !(keyOf(pull('lead@x.com'), 'totCases') || []).some(c => c.id === 'c1'));
+  const gr = gas.data(); gr.keys.totAccessGrants = { v: JSON.stringify({ v: 1, on: true, byEmail: { 'mgr@x.com': { views: { dept: { at: 1 }, tasks: { at: 1 } } } } }), t: Date.now() }; gas.setData(gr);
+  const mg = await H.open({ email: 'mgr@x.com', pw: 'pw-mgr@x.com' }); await mg.sync(); await mg.waitForTimeout(800);
+  const land = await mg.evaluate(() => { document.querySelectorAll('#gateOv,.tkOv').forEach(x => x.remove()); openSpace('performance'); return { v: currentView, d: window.__dw && __dw.cur() }; });
+  ok('admin-only mode, manager granted only department boards: Performance opens its board instead of bouncing Home', land.v === 'dept' && land.d === 'performance', JSON.stringify(land));
+  const lk = await mg.evaluate(() => Array.from(document.querySelectorAll('#spaceSub button')).filter(b => b.querySelector('.gtLk')).map(b => b.textContent.trim().slice(0, 20)));
+  ok('…and the locked screens in that space show a lock', lk.some(t => /Exam Evaluation/.test(t)), lk.join(' | '));
+  gr.keys.totAccessGrants = { v: JSON.stringify({ v: 1, on: false, byEmail: {} }), t: Date.now() }; gas.setData(gr);
 
   ok('no page errors', !H.errs.length, H.errs.join(' | '));
   console.log(fails ? fails + ' FAILED' : 'ALL PASSED'); await H.close(); process.exit(fails ? 1 : 0);

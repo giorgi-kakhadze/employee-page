@@ -21,7 +21,7 @@
  *   or everyone for managers, seniors and Management. Their own entry is unchanged.
  * v3.25: Management is a position, not a department: 'management' left the department list and managers/seniors are no longer mapped to a department
  *   (they still see everything; a position the admin mapped to the old Management department keeps that too). Uniforms, Building access and IT
- *   see the case record (title) of every case they have a ticket in. FMD (scheduling coordinators) receives game counts and their import history.
+ *   can read (not edit or delete) the case record of every case that created a ticket for them. FMD (scheduling coordinators) receives game counts and their import history.
  * Data lives in your Google Drive folder "Tool Data": tool-data.json (shared data) and access.json (who may use the tool).
  */
 const ADMIN_SECRET = 'CHANGE-ME-ADMIN-KEY';
@@ -251,14 +251,16 @@ function taskVis_(t, c) {
   if (c.dept && (c.dOf(t.toRole) === c.dept || c.dOf(t.fromRole) === c.dept)) return true;
   return !!t.caseId && c.dept === 'hr';
 }
-/* a case record is visible to HR, to people who see everything, to its creator, and (v3.25) to anyone who can see at least one ticket of that case,
-   so Uniforms / Building access / IT see the case title of their linked ticket. The case-id index is cached per request with the tickets (see push). */
+/* a case record is visible to HR, to people who see everything, to its creator, and (v3.25) for READING to anyone who can see one of the tickets the case
+   itself created (ref 'case:' or 'wt:', sent by the case creator), so Uniforms / Building access / IT see the case title of their linked ticket. A ticket a
+   person makes up with someone else's caseId does not count. Saving a case still needs HR, full access or being its creator (scopedPush_ passes pre=null).
+   The case-id index is cached per request with the tickets (see push). */
 function caseVis_(x, c, pre) {
   if (c.all || c.dept === 'hr') return true; if (!x) return false; if (low_(x.byEmail) === c.em) return true;
   if (pre == null || x.id == null || !c.idx) return false;
   var k = pre + 'totTasks#case';
-  if (!c.cache[k]) { var o = {}, t = c.idx(pre, 'totTasks'); Object.keys(t).forEach(function (i) { var y = t[i]; if (y && y.caseId != null && !o[String(y.caseId)] && taskVis_(y, c)) o[String(y.caseId)] = 1; }); c.cache[k] = o; }
-  return !!c.cache[k][String(x.id)];
+  if (!c.cache[k]) { var o = {}, t = c.idx(pre, 'totTasks'); Object.keys(t).forEach(function (i) { var y = t[i]; if (!y || y.caseId == null || !/^(case|wt):/.test(String(y.ref || '')) || !taskVis_(y, c)) return; var m = o[String(y.caseId)] = o[String(y.caseId)] || {}; m[low_(y.fromEmail)] = 1; }); c.cache[k] = o; }
+  var m = c.cache[k][String(x.id)]; return !!(m && x.byEmail && m[low_(x.byEmail)]);
 }
 function annVis_(a, c) { if (c.all) return true; if (!a) return false; if (low_(a.fromEmail) === c.em) return true; var to = Array.isArray(a.toRoles) ? a.toRoles : []; return !to.length || to.some(function (x) { return c.dOf(x) === c.dept; }); }
 function cmVis_(x, c, pre) {
@@ -276,14 +278,14 @@ function scopedPull_(name, v, c, pre) { var a = jp_(v, null); if (!Array.isArray
    this person may delete it; new records are accepted only if this person can see them; deleted ids are remembered so they never come back */
 function scopedPush_(name, newV, oldV, c, pre, del) {
   var n = jp_(newV, null), o = jp_(oldV, []), now = Date.now(); if (!Array.isArray(n)) return null; if (!Array.isArray(o)) o = [];
-  var inN = {}, seen = {}, out = [];
+  var inN = {}, seen = {}, out = [], vis = function (x) { return recVis_(name, x, c, name === 'totCases' ? null : pre); };   /* v3.25: linked-ticket case visibility is read-only */
   n.forEach(function (x) { if (x && x.id != null) inN[String(x.id)] = x; });
   o.forEach(function (x) { var id = x && x.id != null ? String(x.id) : null; if (id == null) { out.push(x); return; } seen[id] = 1;
-    if (!recVis_(name, x, c, pre)) { out.push(x); return; }
+    if (!vis(x)) { out.push(x); return; }
     if (inN[id] !== undefined) { out.push(inN[id]); return; }
     if (recOwner_(name, x, c)) { del[id] = now; return; }
     out.push(x); });
-  n.forEach(function (x) { var id = x && x.id != null ? String(x.id) : null; if (id == null || seen[id] || del[id]) return; seen[id] = 1; if (recVis_(name, x, c, pre)) out.push(x); });
+  n.forEach(function (x) { var id = x && x.id != null ? String(x.id) : null; if (id == null || seen[id] || del[id]) return; seen[id] = 1; if (vis(x)) out.push(x); });
   return JSON.stringify(out);
 }
 function delMap_(cur, k) { cur.del = cur.del || {}; var m = cur.del[k] = cur.del[k] || {}, cut = Date.now() - DEL_KEEP_DAYS * 86400000; Object.keys(m).forEach(function (i) { if (m[i] < cut) delete m[i]; }); return m; }
