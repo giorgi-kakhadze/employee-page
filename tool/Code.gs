@@ -19,6 +19,8 @@
  *   the rest, and deleted tickets stay deleted. The audit log is sent to non-admins with only their own entries; their new entries are added, never replaced.
  * v3.24: the access list sent to a non-admin also holds a colleague directory for "Assign to…" (name and position only): their own department,
  *   or everyone for managers, seniors and Management. Their own entry is unchanged.
+ * v3.25: spaces reach non-admins. The access list sent to a non-admin holds the spaces they are a member of (members cut to their own entry),
+ *   the spaces whose profile tab everyone may view (no members, no screens), and the "Strict" switch. It used to drop all of them.
  * Data lives in your Google Drive folder "Tool Data": tool-data.json (shared data) and access.json (who may use the tool).
  */
 const ADMIN_SECRET = 'CHANGE-ME-ADMIN-KEY';
@@ -214,7 +216,20 @@ function capOk_(name, me, mode) { var r = KEY_CAPS[name]; if (!r) return true; r
 function redactPolicy_(e, em, c) { try { var p = JSON.parse(e.v), all = p.users || {}, u = {};
   Object.keys(all).forEach(function (k) { var x = all[k]; if (!x || typeof x !== 'object') return; if (k === em) { u[k] = x; return; }
     if (c && (c.all || (c.dept && c.dOf(x.role) === c.dept))) u[k] = { name: String(x.name || ''), role: String(x.role || '') }; });
-  return { v: JSON.stringify({ roles: p.roles || {}, depts: p.depts || {}, users: u, upd: p.upd || 0 }), t: e.t }; } catch (x) { return { v: JSON.stringify({ roles: {}, users: {}, upd: 0 }), t: e.t }; } }
+  var o = { roles: p.roles || {}, depts: p.depts || {}, users: u, upd: p.upd || 0 };
+  if (Array.isArray(p.spaces)) { var sp = redactSpaces_(p.spaces, em); o.spaces = sp.list; if (sp.on) o.spacesOn = true; }
+  if ('spacesStrict' in p) o.spacesStrict = !!p.spacesStrict;
+  return { v: JSON.stringify(o), t: e.t }; } catch (x) { return { v: JSON.stringify({ roles: {}, users: {}, upd: 0 }), t: e.t }; } }
+/* v3.25: spaces (Admin > Manage spaces). A non-admin receives the spaces they are a member of, with only their own entry in members, and the
+   spaces whose profile tab everyone may view (s.open), with no members and no screens. spacesOn tells the device the organisation has spaces,
+   so "Strict" still applies to a person who is in none of them. */
+function redactSpaces_(all, em) { var list = [], on = false;
+  all.forEach(function (s) { if (!s || typeof s !== 'object' || !s.id || !s.name) return; on = true;
+    var m = s.members && typeof s.members === 'object' ? s.members : {}, r = '';
+    Object.keys(m).forEach(function (k) { if (low_(k) === em && m[k]) r = String(m[k]); });
+    if (r) { var x = {}; Object.keys(s).forEach(function (k) { x[k] = s[k]; }); x.members = {}; x.members[em] = r; list.push(x); }
+    else if (s.open) list.push({ id: s.id, name: s.name, icon: s.icon || '', open: true, fields: Array.isArray(s.fields) ? s.fields : [], members: {} }); });
+  return { list: list, on: on }; }
 function stripPay_(e) { try { var o = JSON.parse(e.v); if (o && typeof o === 'object' && !Array.isArray(o) && 'pay' in o) { delete o.pay; return { v: JSON.stringify(o), t: e.t }; } } catch (x) {} return e; }
 function keepPay_(newV, oldV) { try { var n = JSON.parse(newV); if (!n || typeof n !== 'object' || Array.isArray(n)) return newV; var o = oldV ? JSON.parse(oldV) : null; if (o && o.pay !== undefined) n.pay = o.pay; else delete n.pay; return JSON.stringify(n); } catch (x) { return newV; } }
 

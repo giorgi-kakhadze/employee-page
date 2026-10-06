@@ -6,6 +6,8 @@ Checked against `docs/platform-requirements.txt` (35 sections), using the code i
 
 "v3.24" marks the colleague list for "Assign to…" (see `docs/v3_24_notes.md`).
 
+"v3.25" marks spaces on synced devices (see `docs/v3_25_notes.md`).
+
 Legend: **Done** = works in the tool today · **Partial** = some of it works, the rest is listed · **Missing** = not built · **Not connected** = the screens and rules exist, but no live connection, on purpose (no fake integrations).
 
 "v3.22" marks what this round added.
@@ -16,7 +18,7 @@ Legend: **Done** = works in the tool today · **Partial** = some of it works, th
 |---|---|---|---|
 | 1 | Preserve the existing tool | Done | All 16 screens open without errors after the v3.22 changes (headless regression run). |
 | 2 | Microsoft / Entra-ready identity | Partial | Identity today: tool accounts (email + password, approved by the admin) and Google sign-in for the employee page. There is no single "identity provider" layer yet, so Entra would need one (see Next steps). The Integrations page lists Entra as *Not connected*. |
-| 3 | Role-based access | Partial (v3.24) | Positions, departments, per-screen grants (admin-only mode) and server checks for sensitive keys exist. **v3.23:** the server sends each person only the tickets, cases, comments and announcements they may see, and only their own audit log entries. **v3.24:** non-admins also receive a colleague list for "Assign to…" with only names and positions: their own department, or everyone for managers, seniors and Management. Still open: the employee list is sent to every approved account. |
+| 3 | Role-based access | Partial (v3.25) | Positions, departments, per-screen grants (admin-only mode) and server checks for sensitive keys exist. **v3.23:** the server sends each person only the tickets, cases, comments and announcements they may see, and only their own audit log entries. **v3.24:** non-admins also receive a colleague list for "Assign to…" with only names and positions: their own department, or everyone for managers, seniors and Management. **v3.25:** spaces (screens per space, owner / editor / viewer, "Strict") now apply on every synced device, not only the admin's. Each person receives only the spaces they are in. Still open: the employee list is sent to every approved account, and the values typed into a space's profile tab travel with the schedule to everyone who may open it. |
 | 4 | Department workspaces | Done | 8 departments (Academy, Performance, FMD, Appearance, HR/Recruitment, Building access, IT, Management), each with board, dashboard, documents, setup. HR also has candidates, lifecycle, game counts and process templates. Adding a department still needs a small code edit (`DEPTS` list). |
 | 5 | Jira-like tickets | Done (v3.22) | Ticket ID, title, description, creator, dates, department, assignee, priority, status, due date, related employee and ID, comments, history, reassignment, reasons for wait/delay/cancel, reopen counter. **v3.22:** four priority levels (low / normal / high / urgent), escalation with a required reason, links to files on a ticket, completion date. File *uploads* on tickets: not built (links only). |
 | 6 | Department boards | Done (v3.22) | Own columns per department (admin-editable), drag and drop, search. **v3.22:** filters by assignee, priority, escalated, overdue; sort by priority, due date, age, last update. |
