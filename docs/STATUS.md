@@ -10,6 +10,8 @@ Checked against `docs/platform-requirements.txt` (35 sections), using the code i
 
 "v3.26" marks onboarding templates sent to departments as live tickets (see `docs/v3_26_notes.md`).
 
+"v3.29" marks the Service Management department: incidents imported from Jira CSV exports, reports (see `docs/v3_29_notes.md`).
+
 "v3.28" marks department overviews, the FMD staff directory, the change journal (history per department and per person), Settings, and evaluation media and types (see `docs/v3_28_notes.md`).
 
 Legend: **Done** = works in the tool today · **Partial** = some of it works, the rest is listed · **Missing** = not built · **Not connected** = the screens and rules exist, but no live connection, on purpose (no fake integrations).

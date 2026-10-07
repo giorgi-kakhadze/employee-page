@@ -24,6 +24,8 @@
  *   can read (not edit or delete) the case record of every case that created a ticket for them. FMD (scheduling coordinators) receives game counts and their import history.
  * v3.28: change journal 'totJournal' (add-only like the audit log, max 8000 entries): a person receives their own entries, their department's, and the
  *   entries about data they may read themselves. Photos attached to evaluations ('evalPhotos') follow the evaluation rights.
+ * v3.29: Service Management department ('service', position 'service_manager'). Incidents ('totIncidents', import history 'totIncImports', settings
+ *   'totIncCfg') go to service managers, managers, seniors, performance coaches (read only) and positions mapped to the department.
  * Data lives in your Google Drive folder "Tool Data": tool-data.json (shared data) and access.json (who may use the tool).
  */
 const ADMIN_SECRET = 'CHANGE-ME-ADMIN-KEY';
@@ -32,7 +34,7 @@ const FOLDER = 'Tool Data', DATA = 'tool-data.json', ACCESS = 'access.json';
 /* Who may see the pay settings stored inside the schedule (admin always may). */
 const PAY_ROLES = ['manager'];   /* v2.1: matches the tool, where only the Manager sees the Pay tab (was also senior and scheduling_coordinator) */
 /* Data only these roles may read or write (admin always may). Key name without the site prefix. */
-const RESTRICT = { totRecruitment: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totWorkbooks: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totEmpRequests: ['manager', 'senior', 'scheduling_coordinator', 'hr_recruiter'], totGameCounts: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'], totImportHistory: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'], totLifecycle: ['manager', 'senior', 'hr_recruiter'], totMySchedules: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'] };   /* v2.3: per-person 28-day schedules, written only by schedule editors */
+const RESTRICT = { totIncidents: ['manager', 'senior', 'service_manager', 'performance_coach'], totIncImports: ['manager', 'senior', 'service_manager', 'performance_coach'], totIncCfg: ['manager', 'senior', 'service_manager', 'performance_coach'], totRecruitment: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totWorkbooks: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totEmpRequests: ['manager', 'senior', 'scheduling_coordinator', 'hr_recruiter'], totGameCounts: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'], totImportHistory: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'], totLifecycle: ['manager', 'senior', 'hr_recruiter'], totMySchedules: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'] };   /* v2.3: per-person 28-day schedules, written only by schedule editors */
 /* v2.2 employee self-service: paste your Web client ID from Google Cloud (APIs & Services > Credentials > OAuth client ID > Web application). Leave as is to keep the feature off. */
 const GOOGLE_CLIENT_ID = '121975980339-fu9nd124kov2g6j94qiofOrkjkhbkee6.apps.googleusercontent.com';
 const ADMIN_ONLY_WRITE = ['totAccessPolicy', 'totSites', 'wsCustomConfig', 'totEvalKinds', 'totEvalCfgBackups', 'totProcessTpl', 'totIntegrations', 'totDeptCfg', 'totAccessGrants'];   /* v3.19: evaluation setup, kinds, backups, process templates and integration settings can only be written with the admin key */
@@ -192,7 +194,7 @@ function whoIs_(cur, em) { var p = policy_(cur), u = (p.users || {})[em]; if (!u
   return { role: String(u.role), sites: Array.isArray(u.sites) ? u.sites.map(String) : ['main'] }; }
 /* v3.21 ADMIN-ONLY MODE: every screen except Home is locked for non-admins until the admin grants it (tool: Permissions page, key totAccessGrants).
    Switch: totAccessGrants.on === false turns it off; otherwise it is on. Keys not listed here (audit log, employee list, policy, ...) are not gated. */
-const GATE_VIEW = { evalResults: 'exam', traineeNotes: 'exam', coachingActions: 'exam', evalShare: 'exam', evalVideos: 'exam', evalPhotos: 'exam', totWorkshopFiles: 'exam', totRetrain: 'exam', wsCustomConfig: 'exam', totEvalKinds: 'exam',
+const GATE_VIEW = { totIncidents: 'dept', totIncImports: 'dept', totIncCfg: 'dept', evalResults: 'exam', traineeNotes: 'exam', coachingActions: 'exam', evalShare: 'exam', evalVideos: 'exam', evalPhotos: 'exam', totWorkshopFiles: 'exam', totRetrain: 'exam', wsCustomConfig: 'exam', totEvalKinds: 'exam',
   totOnboardingHier: 'onboarding', totOnboardingV2: 'onboarding', totOnboardingFiles: 'onboarding', totSchedule: 'schedule', totMySchedules: 'schedule', totAppearance: 'appearance', totAppearanceDept: 'appearance',
   totTasks: 'tasks', totCases: 'tasks', totComments: 'tasks', totAnnouncements: 'tasks', totRecruitment: 'recruiting', totWorkbooks: 'recruiting', totEmpRequests: 'requests',
   totGameCounts: 'dept', totImportHistory: 'dept', totLifecycle: 'dept', totDeptDocs: 'dept', totDeptCfg: 'dept', idPrintHistory: 'id', logbookDescriptions: 'logbooks', logbookCustomGames: 'logbooks', logbookSettings: 'logbooks' };
@@ -201,11 +203,16 @@ function gateOk_(cur, em, name) { var v = GATE_VIEW[name]; if (!v) return true; 
 function redactGrants_(e, em) { try { var g = JSON.parse(e.v), o = {}; if (g.byEmail && g.byEmail[em]) o[em] = g.byEmail[em]; return { v: JSON.stringify({ v: g.v || 1, on: g.on, u: g.u || 0, byEmail: o }), t: e.t }; } catch (x) { return { v: JSON.stringify({ byEmail: {} }), t: e.t }; } }
 function mineAsks_(e, em) { try { var a = JSON.parse(e.v); return { v: JSON.stringify((Array.isArray(a) ? a : []).filter(function (r) { return r && r.email === em; })), t: e.t }; } catch (x) { return { v: '[]', t: e.t }; } }
 function mergeAsks_(newV, oldV, em) { var n = [], o = []; try { n = JSON.parse(newV); } catch (x) {} try { o = oldV ? JSON.parse(oldV) : []; } catch (x) {} n = (Array.isArray(n) ? n : []).filter(function (r) { return r && r.email === em; }).slice(-200); o = (Array.isArray(o) ? o : []).filter(function (r) { return r && r.email !== em; }); return JSON.stringify(o.concat(n)); }
-function roleOk_(name, role) { var r = RESTRICT[name]; return !r || r.indexOf(role) >= 0; }
+/* v3.29 Service Management: incidents are also open to any position the admin maps to the Service Management department; performance coaches
+   read them (to coach), but only service managers, managers and seniors (and the department) write them */
+const RESTRICT_DEPT = { totIncidents: ['service'], totIncImports: ['service'], totIncCfg: ['service'] };
+const WRITE_ROLES = { totIncidents: ['manager', 'senior', 'service_manager'], totIncImports: ['manager', 'senior', 'service_manager'], totIncCfg: ['manager', 'senior', 'service_manager'] };
+function roleOk_(name, role, dept) { var r = RESTRICT[name]; if (!r || r.indexOf(role) >= 0) return true; var d = RESTRICT_DEPT[name]; return !!(d && dept && d.indexOf(dept) >= 0); }
+function writeOk_(name, role, dept) { var r = WRITE_ROLES[name]; if (!r || r.indexOf(role) >= 0) return true; var d = RESTRICT_DEPT[name]; return !!(d && dept && d.indexOf(dept) >= 0); }
 /* v2.4: detailed access. The admin ticks parts per position in the tool (Admin > Detailed access); the policy keeps policy.roles[role].caps.
    If a position has no ticks yet, its old "spaces" list decides (same defaults as the tool). */
 const CAP_VIEW = { onboarding: 'onboarding', ws_register: 'exam', ws_checklist: 'exam', exam_check: 'exam', results_view: 'exam', results_edit: 'exam', results_send: 'exam', videos_upload: 'exam', id: 'id', logbooks: 'logbooks', fmd_view: 'schedule', appearance_view: 'appearance', appearance_issue: 'appearance', appearance_manage: 'appearance' };
-const DEFAULT_VIEWS = { shift_lead: ['exam', 'id', 'schedule'], performance_coach: ['exam', 'schedule'], scheduling_coordinator: ['schedule'] };
+const DEFAULT_VIEWS = { shift_lead: ['exam', 'id', 'schedule'], performance_coach: ['exam', 'schedule'], scheduling_coordinator: ['schedule'], service_manager: ['schedule'] };
 /* data keys that need a part of the tool: who may read them and who may write them */
 const KEY_CAPS = { totWorkshopFiles: { read: ['ws_register'], write: ['ws_register'] }, totOnboardingFiles: { read: ['onboarding'], write: ['onboarding'] },
   evalResults: { read: ['results_view', 'exam_check', 'ws_checklist'], write: ['exam_check', 'ws_checklist', 'results_edit'] }, evalShare: { read: ['results_send', 'results_view'], write: ['results_send'] },
@@ -227,8 +234,8 @@ function keepPay_(newV, oldV) { try { var n = JSON.parse(newV); if (!n || typeof
 /* ===== v3.23 record-level privacy: tickets (totTasks), cases (totCases), comments (totComments), announcements (totAnnouncements), audit log ===== */
 /* Same department list and default position -> department mapping as the tool (Admin can change the mapping; it is stored in policy.depts). */
 /* v3.25: 'management' is no longer a department (manager and senior are positions that see everything, see c.all) */
-const DEPT_IDS = ['academy', 'performance', 'fmd', 'appearance', 'hr', 'access', 'it'];
-const DEPT_DEF = { training_coordinator: 'academy', performance_coach: 'performance', shift_lead: 'performance', scheduling_coordinator: 'fmd', hr_recruiter: 'hr' };
+const DEPT_IDS = ['academy', 'performance', 'fmd', 'appearance', 'hr', 'access', 'it', 'service'];
+const DEPT_DEF = { training_coordinator: 'academy', performance_coach: 'performance', shift_lead: 'performance', scheduling_coordinator: 'fmd', hr_recruiter: 'hr', service_manager: 'service' };
 const SCOPED = ['totTasks', 'totCases', 'totAnnouncements', 'totComments'];   /* comments last: their visibility depends on the tickets and announcements */
 const DEL_KEEP_DAYS = 180, AUDIT_MAX = 20000, JOURNAL_MAX = 8000;
 function low_(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
@@ -401,11 +408,11 @@ function doPost(e) {
         if (k === 'totSites') { res.keys[k] = en; return; }
         if (p.name === 'totAccessGrants') { res.keys[k] = redactGrants_(en, em); return; }
         if (p.name === 'totAccessAsks') { res.keys[k] = mineAsks_(en, em); return; }
-        if (me.sites.indexOf(p.site) < 0 || !roleOk_(p.name, me.role) || !capOk_(p.name, me, 'read') || !gateOk_(cur, em, p.name)) return;
+        if (me.sites.indexOf(p.site) < 0 || !roleOk_(p.name, me.role, cx.dept) || !capOk_(p.name, me, 'read') || !gateOk_(cur, em, p.name)) return;
         var pre = k.slice(0, k.length - p.name.length);
         if (SCOPED.indexOf(p.name) >= 0) { res.keys[k] = { v: scopedPull_(p.name, en.v, cx, pre), t: en.t }; return; }   /* v3.23 */
         if (p.name === 'auditLog') { res.keys[k] = { v: auditPull_(en.v, cx), t: en.t }; return; }
-        if (p.name === 'totJournal') { res.keys[k] = { v: journalPull_(en.v, cx, function (src) { return src !== 'totJournal' && src !== 'auditLog' && ADMIN_ONLY_WRITE.indexOf(src) < 0 && roleOk_(src, me.role) && capOk_(src, me, 'read') && gateOk_(cur, em, src); }), t: en.t }; return; }   /* v3.28 */
+        if (p.name === 'totJournal') { res.keys[k] = { v: journalPull_(en.v, cx, function (src) { return src !== 'totJournal' && src !== 'auditLog' && ADMIN_ONLY_WRITE.indexOf(src) < 0 && roleOk_(src, me.role, cx.dept) && capOk_(src, me, 'read') && gateOk_(cur, em, src); }), t: en.t }; return; }   /* v3.28 */
         res.keys[k] = (p.name === 'totSchedule' && PAY_ROLES.indexOf(me.role) < 0) ? stripPay_(en) : en;
       });
       return out_(res);
@@ -416,7 +423,7 @@ function doPost(e) {
       Object.keys(b.keys || {}).sort(function (x, y) { return order(x) - order(y); }).forEach(function (k) {
         var n = b.keys[k], p = parseKey_(k);
         if (!p || !n || typeof n.v !== 'string' || n.v.length > 4500000) { denied.push(k); return; }
-        if (!admin && (ADMIN_ONLY_WRITE.indexOf(k) >= 0 || ADMIN_ONLY_WRITE.indexOf(p.name) >= 0 || me.sites.indexOf(p.site) < 0 || !roleOk_(p.name, me.role) || !capOk_(p.name, me, 'write') || !gateOk_(cur, em, p.name))) { denied.push(k); return; }
+        if (!admin && (ADMIN_ONLY_WRITE.indexOf(k) >= 0 || ADMIN_ONLY_WRITE.indexOf(p.name) >= 0 || me.sites.indexOf(p.site) < 0 || !roleOk_(p.name, me.role, cx.dept) || !writeOk_(p.name, me.role, cx.dept) || !capOk_(p.name, me, 'write') || !gateOk_(cur, em, p.name))) { denied.push(k); return; }
         var o = cur.keys[k], t = Math.min(+n.t || now, now + 60000), pre = k.slice(0, k.length - p.name.length);
         if (!admin && p.name === 'totJournal') { var jv = auditPush_(n.v, o && o.v, cx, JOURNAL_MAX); if (jv == null) { denied.push(k); return; } cur.keys[k] = { v: jv, t: Math.max(now, (+(o && o.t) || 0) + 1) }; changed = true; return; }   /* v3.28 add-only */
         if (!admin && p.name === 'auditLog') { var av = auditPush_(n.v, o && o.v, cx); if (av == null) { denied.push(k); return; } cur.keys[k] = { v: av, t: Math.max(now, (+(o && o.t) || 0) + 1) }; changed = true; return; }   /* v3.23 add-only, never a conflict */

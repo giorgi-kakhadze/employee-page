@@ -2,7 +2,7 @@
 const path = require('path'), tool = process.argv[2] || path.join(__dirname, '..', 'tool', 'PTF-pass-to-floor-Gunda.html'), code = process.argv[3] || path.join(__dirname, '..', 'tool', 'Code.gs');
 const gas = require('./fakegas')(code); require('./seed')(gas);
 let fails = 0; function ok(n, c, x) { if (!c) fails++; console.log((c ? '  ✅ ' : '  ❌ ') + n + (x ? '  → ' + x : '')); }
-const DEPT_BTN = { navAcademy: 'academy', navPerformance: 'performance', navSchedule: 'fmd', navAppearance: 'uniforms', navHr: 'hr', navOffice: 'office' };
+const DEPT_BTN = { navAcademy: 'academy', navPerformance: 'performance', navSchedule: 'fmd', navAppearance: 'uniforms', navHr: 'hr', navOffice: 'office', navService: 'service' };
 const UTIL = ['navHome', 'navTasks', 'bellBtn', 'searchBtn', 'sitePill', 'psPill', 'tdBadge', 'spPill'];   /* utilities and the injected pills */
 const GONE = ['navDept', 'navRecruiting', 'navRequests', 'navCoach', 'navEmpdata', 'navIntegrations', 'navPerm'];
 (async () => {
@@ -39,9 +39,9 @@ const GONE = ['navDept', 'navRecruiting', 'navRequests', 'navCoach', 'navEmpdata
     const wrong = Object.keys(r.spaces).filter(s => r.spaces[s].space !== s);
     ok(who + ': the open screen belongs to the clicked space', !wrong.length, wrong.map(s => s + '→' + r.spaces[s].space + ' (' + r.spaces[s].view + ')').join(','));
     const all = [r.bar.text].concat(Object.keys(r.spaces).map(s => r.spaces[s].sub.join(' | ')), r.selects).join(' | ');
-    ok(who + ': no "Management" department in the bar, second bars or department selects', !/Management/.test(all), (all.match(/[^|]*Management[^|]*/) || [''])[0]);
+    ok(who + ': no "Management" department in the bar, second bars or department selects', !/Management/.test(all.replace(/Service Management/g, '')), (all.replace(/Service Management/g, '').match(/[^|]*Management[^|]*/) || [''])[0]);   /* v3.29: the Service Management department is not the old Management one */
     ok(who + ': department selects found and readable', r.selects.length > 0 && !r.selects.some(s => /^ERR/.test(s)), r.selects.filter(s => /^ERR/.test(s)).join(',') || r.selects.length + ' options');
-    ok(who + ': Home hero is not "Management"', !!r.hero && !/Management/.test(r.hero), r.hero);
+    ok(who + ': Home hero is not "Management"', !!r.hero && !/Management/.test(r.hero.replace(/Service Management/g, '')), r.hero);
   }
   const sub = (who, sp) => (R[who].spaces[sp] || { sub: [] }).sub.join(' | ');
   console.log('Expected screens inside the spaces');
