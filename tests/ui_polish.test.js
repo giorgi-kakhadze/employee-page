@@ -22,7 +22,7 @@ let fails = 0; function ok(name, cond, extra) { if (!cond) fails++; console.log(
   ok('a section opens fully (Access management)', L.detailOpen);
   ok('search finds a section by its content', L.found.length >= 1 && L.found.some(t => /Drive/.test(t)), L.found.join(' | '));
   ok('Close in the menu closes the admin space', L.closed);
-  ok('the version is up to date', await A.evaluate(() => window.TOT_VERSION) === '3.37');
+  ok('the version is up to date', await A.evaluate(() => window.TOT_VERSION) === '3.38');
   ok('site and person pills sit in the action row', await A.evaluate(() => document.getElementById('psPill').parentNode.classList.contains('top-bar-actions')));
   ok('no part of the top bar runs off the screen', await A.evaluate(() => [...document.querySelectorAll('.nav-tabs > *, .top-bar-actions > *')].filter(e => getComputedStyle(e).display !== 'none').every(e => e.getBoundingClientRect().right <= window.innerWidth + 1)));
 

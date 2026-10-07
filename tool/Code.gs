@@ -38,6 +38,10 @@
  * v3.36: access to spaces and pages (totAccessPolicy.access, admin-only): per position and per person, each page, space or all can be Hidden, View only
  *   or Edit. Pages' data (KEY_PAGES) is sent only when a page using it is open, saved only from a page set to Edit; parts (ACC_CAPS) and department
  *   boards (tickets: dw.<dept>.board) follow the same levels. Each person receives only their own personal settings.
+ * v3.38: Community ('totChannels', 'totMessages'): only managers and the admin key create, change or delete channels; a direct / group chat is read only by
+ *   its members (managers included only as members); messages are written only under one's own e-mail, in channels and chats one reads, not archived; in an
+ *   announcement channel only managers start posts; managers remove messages in channels; each channel keeps its newest 1500 messages. Each person also gets
+ *   a staff directory (name and position) to start chats.
  * Data lives in your Google Drive folder "Tool Data": tool-data.json (shared data) and access.json (who may use the tool).
  */
 const ADMIN_SECRET = 'CHANGE-ME-ADMIN-KEY';
@@ -268,6 +272,7 @@ const KEY_PAGES = { totIncidents: INC_PAGES, totIncImports: INC_PAGES, totIncCfg
   totEmpRequests: ['fmd.employee_requests'], totBonusCfg: ['dw.fmd.bonus'], totBonusReviews: ['dw.fmd.bonus'], totGameCounts: ['dw.fmd.games'], totImportHistory: ['dw.fmd.games'],
   totSchedule: ['fmd.schedule'], totMySchedules: ['fmd.schedule'], totProjects: PJ_PAGES, totProjItems: PJ_PAGES, totProjBoard: PJ_PAGES,
   totOnboardingHier: ['academy.onboarding', 'academy.trainee_progress'], totOnboardingV2: ['academy.onboarding', 'academy.trainee_progress'], totRetrain: ['academy.retraining', 'performance.retraining', 'fmd.retraining'],
+  totChannels: ['community.channels', 'community.chats'], totMessages: ['community.channels', 'community.chats'],
   idPrintHistory: ['academy.id_creation'], logbookDescriptions: ['academy.logbooks'], logbookCustomGames: ['academy.logbooks'], logbookSettings: ['academy.logbooks'] };
 /* one check for reading or writing a key: page levels first, then the position rules (roleOk_, writeOk_, capOk_) and the admin-only mode (gateOk_) */
 function keyOk_(cur, em, me, cx, name, mode) {
@@ -283,8 +288,9 @@ function capOk_(name, me, mode) { var r = KEY_CAPS[name]; if (!r) return true; r
 function redactPolicy_(e, em, c) { try { var p = JSON.parse(e.v), all = p.users || {}, u = {};
   Object.keys(all).forEach(function (k) { var x = all[k]; if (!x || typeof x !== 'object') return; if (k === em) { u[k] = x; return; }
     if (c && (c.all || (c.dept && c.dOf(x.role) === c.dept))) u[k] = { name: String(x.name || ''), role: String(x.role || '') }; });
+  var cd = {}; Object.keys(all).forEach(function (k) { var x = all[k]; if (x && typeof x === 'object' && x.role) cd[k] = { name: String(x.name || ''), role: String(x.role || '') }; });   /* v3.38 Community: staff directory for direct chats */
   var A = p.access && typeof p.access === 'object' ? p.access : null, ac = A ? { roles: A.roles || {}, users: {} } : undefined; if (A && A.users && A.users[em]) ac.users[em] = A.users[em];   /* v3.36 */
-  return { v: JSON.stringify({ roles: p.roles || {}, depts: p.depts || {}, users: u, upd: p.upd || 0, access: ac }), t: e.t }; } catch (x) { return { v: JSON.stringify({ roles: {}, users: {}, upd: 0 }), t: e.t }; } }
+  return { v: JSON.stringify({ roles: p.roles || {}, depts: p.depts || {}, users: u, upd: p.upd || 0, access: ac, chatDir: cd }), t: e.t }; } catch (x) { return { v: JSON.stringify({ roles: {}, users: {}, upd: 0 }), t: e.t }; } }
 function stripPay_(e) { try { var o = JSON.parse(e.v); if (o && typeof o === 'object' && !Array.isArray(o) && 'pay' in o) { delete o.pay; return { v: JSON.stringify(o), t: e.t }; } } catch (x) {} return e; }
 function keepPay_(newV, oldV) { try { var n = JSON.parse(newV); if (!n || typeof n !== 'object' || Array.isArray(n)) return newV; var o = oldV ? JSON.parse(oldV) : null; if (o && o.pay !== undefined) n.pay = o.pay; else delete n.pay; return JSON.stringify(n); } catch (x) { return newV; } }
 
@@ -293,7 +299,7 @@ function keepPay_(newV, oldV) { try { var n = JSON.parse(newV); if (!n || typeof
 /* v3.25: 'management' is no longer a department (manager and senior are positions that see everything, see c.all) */
 const DEPT_IDS = ['academy', 'performance', 'fmd', 'appearance', 'hr', 'access', 'it', 'service'];
 const DEPT_DEF = { training_coordinator: 'academy', performance_coach: 'performance', shift_lead: 'performance', scheduling_coordinator: 'fmd', hr_recruiter: 'hr', service_manager: 'service' };
-const SCOPED = ['totTasks', 'totCases', 'totAnnouncements', 'totProjects', 'totProjItems', 'totProjBoard', 'totComments'];   /* comments last: their visibility depends on the tickets, announcements and projects; projects before their items and board */
+const SCOPED = ['totTasks', 'totCases', 'totAnnouncements', 'totProjects', 'totProjItems', 'totProjBoard', 'totChannels', 'totMessages', 'totComments'];   /* v3.38: channels before their messages */   /* comments last: their visibility depends on the tickets, announcements and projects; projects before their items and board */
 const DEL_KEEP_DAYS = 180, AUDIT_MAX = 20000, JOURNAL_MAX = 8000;
 function low_(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
 /* who is asking: the admin key sees everything; everybody else is described by their position and department */
@@ -307,7 +313,7 @@ function ctx_(cur, em, admin) {
   if (admin) return c;
   var p = policy_(cur), u = (p.users || {})[em] || {}, depts = p.depts || {}, role = String(u.role || '');
   c.dOf = function (x) { x = String(x || ''); return DEPT_IDS.indexOf(x) >= 0 ? x : (depts[x] || DEPT_DEF[x] || x); };
-  c.name = low_(u.name); c.dept = c.dOf(role);
+  c.name = low_(u.name); c.dept = c.dOf(role); c.role = role;
   var A = p.access && typeof p.access === 'object' ? p.access : null;   /* v3.36: department boards opened (View only / Edit) or Hidden for this person or position */
   c.bl = function (d) { var k = 'bl:' + d; if (!(k in cache)) cache[k] = accLvl_(A, em, role, 'dw.' + d + '.board'); return cache[k]; };
   /* same people the tool lets open "All tasks" and every department (__dept.wide()). The last clause is legacy compatibility only: before v3.25 the admin
@@ -348,14 +354,16 @@ function cmVis_(x, c, pre) {
   if (x.kind === 'pitem') return pjRecLevel_('totProjItems', c.idx(pre, 'totProjItems')[String(x.ref)], c, c.idx(pre, 'totProjects')) >= 1;   /* v3.33 comments on one item: whoever can open that item */
   return false;   /* unknown kinds stay private to their author */
 }
-function recVis_(name, x, c, pre) { if (PROJ_KEYS.indexOf(name) >= 0) return pjRecLevel_(name, x, c, c.idx(pre, 'totProjects')) >= 1; return name === 'totTasks' ? taskVis_(x, c) : name === 'totCases' ? caseVis_(x, c, pre) : name === 'totAnnouncements' ? annVis_(x, c) : cmVis_(x, c, pre); }
+function recVis_(name, x, c, pre) { if (name === 'totChannels') return chVis_(x, c); if (name === 'totMessages') return msgVis_(x, c, pre); if (PROJ_KEYS.indexOf(name) >= 0) return pjRecLevel_(name, x, c, c.idx(pre, 'totProjects')) >= 1; return name === 'totTasks' ? taskVis_(x, c) : name === 'totCases' ? caseVis_(x, c, pre) : name === 'totAnnouncements' ? annVis_(x, c) : cmVis_(x, c, pre); }
 /* who may delete a record: the person who created it, or someone who sees everything (same rule as the tool's delete buttons) */
 function recOwner_(name, x, c) { if (c.all) return true; var e = name === 'totComments' ? x.email : name === 'totCases' ? x.byEmail : x.fromEmail, n = name === 'totComments' ? x.who : name === 'totCases' ? x.by : x.fromName;
   return e ? low_(e) === c.em : (!!c.name && low_(n) === c.name); }   /* records saved before e-mails were stored: the name from the access list */
-function scopedPull_(name, v, c, pre) { var a = jp_(v, null); if (!Array.isArray(a)) return c.all ? v : '[]'; return c.all ? v : JSON.stringify(a.filter(function (x) { return x && recVis_(name, x, c, pre); })); }
+function scopedPull_(name, v, c, pre) { var all = name === 'totChannels' || name === 'totMessages' ? c.adm : c.all;   /* v3.38: managers do not read other people's direct chats */
+  var a = jp_(v, null); if (!Array.isArray(a)) return all ? v : '[]'; return all ? v : JSON.stringify(a.filter(function (x) { return x && recVis_(name, x, c, pre); })); }
 /* merge a save record by record: records this person cannot see are kept untouched; a visible record missing from the save counts as deleted only if
    this person may delete it; new records are accepted only if this person can see them; deleted ids are remembered so they never come back */
 function scopedPush_(name, newV, oldV, c, pre, del) {
+  if (name === 'totChannels' || name === 'totMessages') return chatPush_(name, newV, oldV, c, pre, del);   /* v3.38 */
   if (PROJ_KEYS.indexOf(name) >= 0) return projPush_(name, newV, oldV, c, pre, del);   /* v3.32 */
   var n = jp_(newV, null), o = jp_(oldV, []), now = Date.now(); if (!Array.isArray(n)) return null; if (!Array.isArray(o)) o = [];
   var inN = {}, seen = {}, out = [], vis = function (x) { return recVis_(name, x, c, name === 'totCases' ? null : pre) && (name !== 'totTasks' || taskEd_(x, c)); };   /* v3.25: linked-ticket case visibility is read-only; v3.36: View-only boards */
@@ -366,6 +374,58 @@ function scopedPush_(name, newV, oldV, c, pre, del) {
     if (recOwner_(name, x, c)) { del[id] = now; return; }
     out.push(x); });
   n.forEach(function (x) { var id = x && x.id != null ? String(x.id) : null; if (id == null || seen[id] || del[id]) return; seen[id] = 1; if (vis(x)) out.push(x); });
+  return JSON.stringify(out);
+}
+/* ===== v3.38 COMMUNITY: channels and direct chats for staff (people with a position in the tool; never the employee page).
+   totChannels: { id, kind: 'ch' | 'dm', name, aud: { all, depts[], people[] } (channels), members[] (direct / group chats), mode 'open' | 'announce', byEmail, archived }
+   totMessages: { id, ch, kind: 'msg' | 'react', email, by, ts, text, parent (thread), ann (announcement), ref + emoji (reaction), del (removed) }
+   - Only managers (the position) and the admin key create, change or delete channels. Seniors and everyone else cannot.
+   - A direct or group chat is created by one of its members; its members never change afterwards. Nobody else reads it, managers included.
+   - A channel is read by its audience (everyone, chosen departments, chosen people), its creator and managers.
+   - Messages: written only under one's own e-mail, only in channels and chats one can read and that are not archived; in an announcement channel only
+     managers start new posts (anyone in it may reply and react). One's own messages can be edited or removed; managers may remove any message in a channel
+     (not in direct chats). Reactions are records of their own, added and removed only by their owner. ===== */
+/* each channel or chat keeps its newest CHAT_KEEP messages (and their replies' reactions); older ones are dropped so the shared file stays small */
+const CHAT_KEEP = 1500;
+function chatTrim_(a) { var by = {}; a.forEach(function (x) { if (x && x.kind !== 'react' && x.ch != null) (by[x.ch] = by[x.ch] || []).push(x); }); var drop = {};
+  Object.keys(by).forEach(function (k) { var l = by[k]; if (l.length <= CHAT_KEEP) return; l.sort(function (p, q) { return (+p.ts || 0) - (+q.ts || 0); }).slice(0, l.length - CHAT_KEEP).forEach(function (x) { drop[String(x.id)] = 1; }); });
+  if (!Object.keys(drop).length) return a; return a.filter(function (x) { return !(x && (drop[String(x.id)] || (x.kind === 'react' && drop[String(x.ref)]))); }); }
+function chMgr_(c) { return !!(c.adm || c.role === 'manager'); }
+function chVis_(x, c) { if (!x || typeof x !== 'object') return false; if (c.adm) return true;
+  if (x.kind === 'dm') return (Array.isArray(x.members) ? x.members : []).map(low_).indexOf(c.em) >= 0;
+  if (c.role === 'manager' || (c.em && low_(x.byEmail) === c.em)) return true;
+  var a = x.aud && typeof x.aud === 'object' ? x.aud : {}; if (a.all) return true;
+  if ((Array.isArray(a.people) ? a.people : []).map(low_).indexOf(c.em) >= 0) return true;
+  return !!c.dept && (Array.isArray(a.depts) ? a.depts : []).indexOf(c.dept) >= 0; }
+function msgVis_(x, c, pre) { if (!x || typeof x !== 'object') return false; if (c.adm) return true; if (pre == null) return false; return chVis_(c.idx(pre, 'totChannels')[String(x.ch)], c); }
+function chatPush_(name, newV, oldV, c, pre, del) {
+  var n = jp_(newV, null), o = jp_(oldV, []), now = Date.now(), C = name === 'totChannels'; if (!Array.isArray(n)) return null; if (!Array.isArray(o)) o = [];
+  var chs = {}, base = c.idx(pre, 'totChannels'); Object.keys(base).forEach(function (k) { chs[k] = base[k]; });
+  var inN = {}, seen = {}, out = [], mine = function (x) { return !!c.em && low_(x.email) === c.em; };
+  var chOf = function (x) { return chs[String(x && x.ch)]; }, canSee = function (x) { return C ? chVis_(x, c) : chVis_(chOf(x), c); };
+  var canPost = function (x) { var ch = chOf(x); if (!ch || !chVis_(ch, c) || ch.archived) return false; if (!mine(x) && !c.adm) return false;
+    if (x.kind === 'react') return !!x.ref; return !(ch.kind !== 'dm' && ch.mode === 'announce' && !x.parent && !chMgr_(c) && low_(ch.byEmail) !== c.em); };
+  n.forEach(function (x) { if (x && x.id != null) inN[String(x.id)] = x; });
+  o.forEach(function (x) { var id = x && x.id != null ? String(x.id) : null; if (id == null) { out.push(x); return; } seen[id] = 1;
+    if (!C && x && !chs[String(x.ch)]) { del[id] = now; return; }   /* messages of a deleted channel go with it */
+    if (!canSee(x)) { out.push(x); return; }
+    var y = inN[id];
+    if (C) { var mayEdit = x.kind === 'dm' ? (Array.isArray(x.members) ? x.members : []).map(low_).indexOf(c.em) >= 0 : chMgr_(c);
+      if (y === undefined) { if (x.kind === 'dm' ? low_(x.byEmail) === c.em || c.adm : chMgr_(c)) { del[id] = now; return; } out.push(x); return; }
+      if (!mayEdit || !y || typeof y !== 'object') { out.push(x); return; }
+      if (x.kind === 'dm') { y.members = x.members; y.kind = 'dm'; } else y.kind = 'ch'; y.byEmail = x.byEmail; y.id = x.id; chs[id] = y; out.push(y); return; }
+    var ch = chOf(x), mod = ch && ch.kind !== 'dm' && chMgr_(c);
+    if (y === undefined) { if (mine(x) || mod) { del[id] = now; return; } out.push(x); return; }
+    if (!y || typeof y !== 'object' || x.kind === 'react') { out.push(x); return; }
+    if (mine(x)) { if (ch && ch.archived) { out.push(x); return; } ['email', 'by', 'ch', 'ts', 'kind', 'parent'].forEach(function (f) { y[f] = x[f]; }); y.id = x.id; out.push(y); return; }
+    if (mod && y.del && !x.del) { var z = JSON.parse(JSON.stringify(x)); z.del = { by: String(y.del.by || '').slice(0, 80), ts: now }; z.text = ''; out.push(z); return; }   /* a manager removes a message */
+    out.push(x); });
+  n.forEach(function (x) { var id = x && x.id != null ? String(x.id) : null; if (id == null || seen[id] || del[id] || !x || typeof x !== 'object') return; seen[id] = 1;
+    if (C) { if (x.kind === 'dm') { var mm = (Array.isArray(x.members) ? x.members : []).map(low_).filter(Boolean); if (!(c.adm || (mm.indexOf(c.em) >= 0 && low_(x.byEmail) === c.em)) || mm.length < 2 || mm.length > 20) return; x.members = mm; }
+      else { if (!chMgr_(c)) return; x.kind = 'ch'; }
+      chs[id] = x; out.push(x); return; }
+    if (!canPost(x)) return; x.text = String(x.text || '').slice(0, 4000); out.push(x); });
+  if (!C) out = chatTrim_(out);
   return JSON.stringify(out);
 }
 /* ===== v3.32 projects: shared and personal projects, broken down into sub-projects (parent), with work items and a visual board =====

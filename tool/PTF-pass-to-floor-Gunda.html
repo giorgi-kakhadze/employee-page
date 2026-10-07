@@ -15,6 +15,7 @@
   v3.35: The full backup now includes the schedule (rotation, pay), tickets, cases, announcements, comments, shared results, photos / videos list, the access list, sites and removal requests (they were synced but left out of the file). The storage estimate counts against the real browser limit (about 5 million characters), so it no longer warns at half the real use.
   v3.36: Access to spaces and pages. Admin → 🔐 Access to spaces and pages sets every space, page and department board to Hidden, View only or Edit, per position and per person (person first). Spaces with nothing visible leave the top bar; View only shows a ribbon and does not save changes; new spaces, pages, tabs and custom spaces appear in the list by themselves. The server enforces the same levels.
   v3.37: One Access management section in the admin space: choose Access by role (tool parts per position, the old Detailed access) or Access by spaces and pages (Hidden / View only / Edit). The spaces list opens with a position already chosen, so it is never empty.
+  v3.38: 💬 Community: channels (only managers and the admin create them; for everyone, departments or chosen people; discussion or announcements) and private direct / group chats for staff, with threads, reactions, @mentions, pins, unread counts and bell alerts. Not on the employee page. The server enforces who reads and writes; managers do not read other people's chats.
   ============================================================
 -->
 <html lang="en">
@@ -31,7 +32,7 @@
    Sites: every location keeps its own data under its own prefix. The first site ("main") is the data you already had, stored exactly where it always was, so nothing is moved.
    Test mode: open this file with #test at the end of the address. Separate data, no network, red bar. Both now also cover the embedded tools (Workshop, ID). */
 (function () {
-  window.TOT_VERSION = '3.37';
+  window.TOT_VERSION = '3.38';
   try {
     var TP = 'TEST::', SP_ = 'SITE::';
     var NOCOPY = ['totSyncCfg', 'totSyncMeta', 'totSyncPrev', 'totMailerCfg', 'totMailerLast', 'totAdminHash', 'totAdminIdleMin'];
@@ -1126,6 +1127,10 @@ html:not(.is-admin) #edsClearBtn,html:not(.is-admin) button[onclick*="restorePre
     <button class="nav-tab" id="navProjects" role="tab" aria-selected="false" onclick="openSpace('projects')" style="display:none">
       <span class="tab-icon">&#128450;</span> Projects
     </button>
+    <!-- v3.38: channels and direct chats for staff -->
+    <button class="nav-tab" id="navCommunity" role="tab" aria-selected="false" onclick="openSpace('community')" style="display:none">
+      <span class="tab-icon">&#128172;</span> Community<span id="cmNavN" class="cmNavN" style="display:none"></span>
+    </button>
     <button class="nav-tab" id="navRecruiting" style="display:none" role="tab" aria-selected="false" onclick="switchView('recruiting')"><span class="tab-icon">&#129522;</span> Recruiting</button>
     <button class="nav-tab" id="navRequests" style="display:none" role="tab" aria-selected="false" onclick="switchView('requests')"><span class="tab-icon">&#128232;</span> Requests</button>
     <button class="nav-tab" id="navDept" style="display:none" role="tab" aria-selected="false" onclick="switchView('dept')"><span class="tab-icon">&#127970;</span> Departments</button>
@@ -1855,6 +1860,10 @@ const giorgiKnowledge = {
       phrases: ['notifications', 'notification', 'bell', 'digest', 'daily email', 'send update', 'email update', 'alerts'],
       resp: 'The **🔔 bell** shows what concerns you: tickets, announcements, project changes, approvals asked of you, comments, deadlines. In a project, **📣 Send update** e-mails a summary to the people involved; the server also sends a **daily digest** when something changed or is stuck. Mute it per project with 🔔 E-mails on.',
       sug: ['pf.approvals', 'pf.projects'] },
+    { id: 'pf.community', q: 'How do channels and chats work?',
+      phrases: ['community', 'channel', 'channels', 'chat', 'chats', 'message', 'messages', 'direct message', 'group chat', 'talk to', 'write to a colleague', 'teams channel', 'post an update', 'announcement channel'],
+      resp: '**💬 Community** (top bar): **Channels** and **Chats** for everyone who uses the tool (never the employee page). **Only managers and the admin create channels**: for everyone, chosen departments or chosen people, as a discussion or as **📣 announcements** (only managers start posts, others reply and react). **Chats**: press **+ New chat** to write privately to one colleague or a small group; only the people in the chat can read it. Reply in threads, react, @mention a name, pin important posts. New messages arrive within about 20 seconds while Community is open, and show in the 🔔 bell and as a red count on Community.',
+      actions: [{ label: 'Open Community', do: 'space:community' }], sug: ['pf.pageaccess', 'pf.updates'] },
     { id: 'pf.pageaccess', q: 'How do I hide a space or give view-only access?',
       phrases: ['hide space', 'hide a space', 'hide page', 'view only', 'view-only', 'read only', 'give access', 'take access', 'remove access', 'access to space', 'access to page', 'access to board', 'permission', 'permissions', 'restrict space', 'who sees which space', 'only academy'],
       resp: 'Admin space → **🔐 Access management**. Pick **🧩 Access by role** to tick the parts of each tool a position may use, or **🗂 Access by spaces and pages** to hide or open whole spaces. For spaces and pages, choose a **position** or a **person**, then set **All spaces**, each **space** and each **page or board** to **🚫 Hidden** (not seen at all), **👁 View only** (open, but nothing is saved) or **✏️ Edit**. **As before** keeps the position\'s normal rules. The most specific setting wins, and a person\'s settings come before their position\'s. A space with nothing visible leaves the top bar; Home always stays. New spaces, pages and custom spaces appear in the list by themselves, and the server enforces the same levels.',
@@ -2624,6 +2633,7 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
   <div class="view" id="empdataView" hidden></div>
   <div class="view" id="spaceHomeView" hidden></div>
   <div class="view" id="projectsView" hidden></div>
+  <div class="view" id="communityView" hidden></div>
   <div class="view" id="academyView" hidden>
     <div class="home-wrap" style="padding-top:24px">
       <h2 style="margin:0 0 14px">Academy</h2>
@@ -2800,7 +2810,7 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
   // Every localStorage key this app really uses (backup / restore / clear only ever touch these).
   const JSON_KEYS = {
     logbookDescriptions: 'object', logbookCustomGames: 'array', logbookSettings: 'object',
-    evalResults: 'array', traineeNotes: 'array', coachingActions: 'array', auditLog: 'array', totJournal: 'array', totTeams: 'array', totProjects: 'array', totProjItems: 'array', totProjBoard: 'array', totIncidents: 'array', totIncImports: 'array', totIncCfg: 'object', totUniqRules: 'object', totBonusCfg: 'object', totBonusReviews: 'array', totRemarks: 'array', totMyPay: 'object', customSpaces: 'array', totAppearance: 'object', wsCustomConfig: 'array', idBarcodeTestResults: 'array',
+    evalResults: 'array', traineeNotes: 'array', coachingActions: 'array', auditLog: 'array', totJournal: 'array', totTeams: 'array', totProjects: 'array', totProjItems: 'array', totProjBoard: 'array', totChannels: 'array', totMessages: 'array', totIncidents: 'array', totIncImports: 'array', totIncCfg: 'object', totUniqRules: 'object', totBonusCfg: 'object', totBonusReviews: 'array', totRemarks: 'array', totMyPay: 'object', customSpaces: 'array', totAppearance: 'object', wsCustomConfig: 'array', idBarcodeTestResults: 'array',
     gridData: 'object', wsExamSession: 'object', idCardSizeSettings: 'object',
     idCompanyLogoSettings: 'object', idCardBarcodeSettings: 'object', idCardFreeLayout: 'object',
     idPrintHistory: 'array', employeeHistory: 'array', employeeDataSource: 'array', totWorkbooks: 'object', totAccessGrants: 'object', totAccessAsks: 'array', totDeptCfg: 'object', totDeptDocs: 'array', totLifecycle: 'array', totGameCounts: 'array', totImportHistory: 'array', totIntegrations: 'object', totProcessTpl: 'object', totEvalKinds: 'array', totEvalCfgBackups: 'array', totEmpRequests: 'array', totAppearanceDept: 'object', totOnboardingV2: 'object', totOnboardingHier: 'object', totWorkshopFiles: 'object', totOnboardingFiles: 'object', totRecruitment: 'array', totRetrain: 'object',
@@ -2891,6 +2901,7 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
   const views   = { home: document.getElementById('homeView'), academy: document.getElementById('academyView'), exam: document.getElementById('examView'), id: document.getElementById('idView'), logbooks: document.getElementById('logbooksView'), onboarding: document.getElementById('onboardingView'), schedule: document.getElementById('scheduleView'), appearance: document.getElementById('appearanceView'), tasks: document.getElementById('tasksView'), recruiting: document.getElementById('recruitingView'), coach: document.getElementById('coachView'), dept: document.getElementById('deptView'), perm: document.getElementById('permView'), requests: document.getElementById('requestsView'), integrations: document.getElementById('integrationsView'), empdata: document.getElementById('empdataView') };
   views.spacehome = document.getElementById('spaceHomeView');   /* v3.28 department overview */
   views.projects = document.getElementById('projectsView');   /* v3.32 projects */
+  views.community = document.getElementById('communityView');   /* v3.38 community */
 
   function buildFrame(view, loadingId, html, onReady) {
     const iframe = document.createElement('iframe');
@@ -2916,7 +2927,7 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
   window.openWs = openWs; window.__wsMode = function () { return wsMode; };
   /* v3.25: departments-only top bar. spaceOf(view) is the one resolver from the open screen to its space (top-bar highlight, #spaceSub, Back button);
      spaceItems(space) lists that space's screens, each gated by its own rule, followed by the department-workspace tabs from the deptWsCore registry */
-  const SPACES = { academy: ['navAcademy', 'Academy'], performance: ['navPerformance', 'Performance'], fmd: ['navSchedule', 'FMD'], uniforms: ['navAppearance', 'Uniforms'], hr: ['navHr', 'HR'], office: ['navOffice', 'Office'], service: ['navService', 'Service Management'], projects: ['navProjects', 'Projects'] };
+  const SPACES = { academy: ['navAcademy', 'Academy'], performance: ['navPerformance', 'Performance'], fmd: ['navSchedule', 'FMD'], uniforms: ['navAppearance', 'Uniforms'], hr: ['navHr', 'HR'], office: ['navOffice', 'Office'], service: ['navService', 'Service Management'], projects: ['navProjects', 'Projects'], community: ['navCommunity', 'Community'] };
   window.__SPACES = SPACES;   /* v3.36: the access settings list every space (also ones added later) */
   function deptSpace(d) { return d === 'appearance' ? 'uniforms' : (d === 'access' || d === 'it') ? 'office' : (SPACES[d] ? d : ''); }
   function wsPerf() { if (wsMode === 'menu' || wsMode === 'files') return false; if (wsMode === 'retrain') return ['academy', 'fmd'].indexOf(window.__wsFrom) < 0; return wsMode === 'exam' || wsMode === 'results' || window.__wsFrom === 'performance'; }   /* v3.28: the Retraining register stays in the space it was opened from */
@@ -2925,6 +2936,7 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
     if (v === 'exam') return wsMode === 'retrain' && window.__wsFrom === 'fmd' ? 'fmd' : wsPerf() ? 'performance' : 'academy';
     if (v === 'coach') return 'performance';
     if (v === 'projects') return 'projects';
+    if (v === 'community') return 'community';
     if (['academy', 'onboarding', 'id', 'logbooks'].indexOf(v) >= 0) return 'academy';
     if (['schedule', 'empdata', 'requests'].indexOf(v) >= 0) return 'fmd';
     if (v === 'appearance') return 'uniforms';
@@ -2975,6 +2987,7 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
     else if (sp === 'uniforms') { add(ssRole('appearance'), '&#128085; Uniforms', sv('appearance'), cv === 'appearance', 'appearance'); dept('appearance'); }
     else if (sp === 'hr') { add(ssFn('__rcAllowed'), '&#129522; Recruiting', sv('recruiting'), cv === 'recruiting', 'recruiting'); dept('hr'); }
     else if (sp === 'service') { dept('service'); }
+    else if (sp === 'community') { if (window.Community) Community.navItems().forEach(function (x) { add(true, x.l, x.go, cv === 'community' && x.on, 'community'); }); return I; }   /* v3.38 */
     else if (sp === 'projects') { if (window.Projects) Projects.navItems().forEach(function (x) { add(true, x.l, x.go, cv === 'projects' && x.on, 'projects'); }); return I; }   /* v3.32: own overview and activity pages */   /* v3.29: Incidents, Jira import and Reports are tabs of the Service Management department */
     else if (sp === 'office') { [['access', '&#128273; Building access'], ['it', '&#128187; IT']].forEach(function (x) { if (!ssDeptTabs(x[0]).length) return; if (I.length) I.push({ sep: 1 }); I.push({ g: x[1] }); dept(x[0]); }); }
     /* v3.28: every space starts with its Overview and ends with its History (only when the person has something in the space) */
@@ -3467,6 +3480,7 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
     if (name === 'onboarding') { try { obMount(); } catch (eOb) {} }
     if (name === 'spacehome') { try { window.SpaceHomeMount(); } catch (eSh) {} }
     if (name === 'projects') { try { window.ProjectsMount(); } catch (ePj) {} }
+    if (name === 'community') { try { window.CommunityMount(); } catch (eCm) {} }
     if (name === 'academy') { try { window.SpaceHomeAcademy(); } catch (eSa) {} }
     if (name === 'logbooks') {
       try { mountExam(); } catch (e) {}
@@ -3505,6 +3519,7 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
       if (v === 'exam' && spaceOf('exam') === 'performance') o.label = 'Performance' + (BL_WS[wsMode] ? ' · ' + BL_WS[wsMode] : '');
       if (v === 'exam' && wsMode === 'retrain' && spaceOf('exam') !== 'performance') o.label = (spaceOf('exam') === 'fmd' ? 'FMD' : 'Academy') + ' · Retraining';
       if (v === 'projects') o.label = 'Projects';
+      if (v === 'community') o.label = 'Community';
       if (v === 'spacehome') { o.sp = window.__space || ''; o.label = ((SPACES[o.sp] || [])[1] || 'Department') + ' · Overview'; }
       if (v === 'dept' && window.__dw && __dw.cur) { const W = window.__dw, d = W.cur(), tb = W.tab(), sp = deptSpace(d), tl = (W.tabsFor(d).filter(function (t) { return t.id === tb; })[0] || {}).label || '';
         o.d = d; o.tab = tb; o.label = tb === 'overview' ? 'All departments' : (sp === 'office' ? 'Office · ' + __dept.label(d) : (__dept.label(d) || 'Department board')) + (tl ? ' · ' + tl.replace(/^[^A-Za-z0-9]+/, '') : ''); }
@@ -6719,7 +6734,7 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
 (function () {
   function R() { return ROLES[getTrainerRole()] || null; }
   function allowed(v) { var A = window.totAcc; return A ? A.view(v, function () { return allowed0(v); }) : allowed0(v); }   /* v3.36: Admin → Access to spaces and pages can hide or open a screen */
-  function allowed0(v) { /* v3.25 */ if (v === 'spacehome' || v === 'projects') return true; if (v === 'empdata') return !!(window.__emp && window.__emp.can()); if (v === 'perm') { try { return sessionStorage.getItem('totAdmin') === '1'; } catch (e) { return false; } } if (v === 'dept') return !!(window.__dwAllowed && window.__dwAllowed()); if (v === 'coach') return !!(window.__coachAllowed && window.__coachAllowed()); if (v === 'requests') return !!(window.__rqAllowed && window.__rqAllowed()); if (v === 'integrations') { try { return sessionStorage.getItem('totAdmin') === '1' && !sessionStorage.getItem('totViewAs'); } catch (e) { return false; } } if (v === 'recruiting') return !!(window.__rcAllowed && window.__rcAllowed()); if (v === 'academy') return ['onboarding', 'exam', 'id', 'logbooks'].some(function (x) { return allowed(x); }); var r = R(), ok = !r || r.views.indexOf(v) >= 0; if (ok && v !== 'home' && window.totSpaceAllows) { try { ok = window.totSpaceAllows(v) !== false; } catch (e) {} } return ok; }
+  function allowed0(v) { /* v3.25 */ if (v === 'spacehome' || v === 'projects' || v === 'community') return true; if (v === 'empdata') return !!(window.__emp && window.__emp.can()); if (v === 'perm') { try { return sessionStorage.getItem('totAdmin') === '1'; } catch (e) { return false; } } if (v === 'dept') return !!(window.__dwAllowed && window.__dwAllowed()); if (v === 'coach') return !!(window.__coachAllowed && window.__coachAllowed()); if (v === 'requests') return !!(window.__rqAllowed && window.__rqAllowed()); if (v === 'integrations') { try { return sessionStorage.getItem('totAdmin') === '1' && !sessionStorage.getItem('totViewAs'); } catch (e) { return false; } } if (v === 'recruiting') return !!(window.__rcAllowed && window.__rcAllowed()); if (v === 'academy') return ['onboarding', 'exam', 'id', 'logbooks'].some(function (x) { return allowed(x); }); var r = R(), ok = !r || r.views.indexOf(v) >= 0; if (ok && v !== 'home' && window.totSpaceAllows) { try { ok = window.totSpaceAllows(v) !== false; } catch (e) {} } return ok; }
   function isPro() { var r = R(); return !!(r && r.pro); }
   window.giorgiIsPro = isPro;
   var EMO = /[\u{1F000}-\u{1FAFF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu;
@@ -19332,14 +19347,14 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   try {
     var CK = 'totSyncCfg', MK = 'totSyncMeta';
     var UNION = ['evalResults', 'traineeNotes', 'coachingActions', 'auditLog', 'customSpaces', 'idPrintHistory', 'employeeHistory', 'totJournal'];
-    var LWW = ['totTeams', 'totProjects', 'totProjItems', 'totProjBoard', 'totBonusCfg', 'totBonusReviews', 'totRemarks', 'totMyPay', 'totUniqRules', 'totIncidents', 'totIncImports', 'totIncCfg', 'totAccessPolicy', 'totEmpRemovals', 'totTasks', 'totAnnouncements', 'totComments', 'totSites', 'totOnboardingHier', 'employeeDataSource', 'logbookDescriptions', 'logbookCustomGames', 'logbookSettings', 'totAppearance', 'totAppearanceDept', 'wsCustomConfig', 'idCardSizeSettings', 'idCompanyLogoSettings', 'idCardBarcodeSettings', 'idCardFreeLayout', 'idCompanyLogo', 'idCardFreeLayoutEnabled', 'totWorkshopFiles', 'totOnboardingFiles', 'totSchedule', 'totRetrain', 'totRecruitment', 'evalShare', 'evalVideos', 'evalPhotos', 'totMySchedules', 'totCases', 'totWorkbooks', 'totIntegrations', 'totEmpRequests', 'totProcessTpl', 'totEvalKinds', 'totEvalCfgBackups', 'totDeptCfg', 'totDeptDocs', 'totLifecycle', 'totGameCounts', 'totImportHistory', 'totAccessGrants', 'totAccessAsks'];
+    var LWW = ['totTeams', 'totProjects', 'totProjItems', 'totProjBoard', 'totChannels', 'totMessages', 'totBonusCfg', 'totBonusReviews', 'totRemarks', 'totMyPay', 'totUniqRules', 'totIncidents', 'totIncImports', 'totIncCfg', 'totAccessPolicy', 'totEmpRemovals', 'totTasks', 'totAnnouncements', 'totComments', 'totSites', 'totOnboardingHier', 'employeeDataSource', 'logbookDescriptions', 'logbookCustomGames', 'logbookSettings', 'totAppearance', 'totAppearanceDept', 'wsCustomConfig', 'idCardSizeSettings', 'idCompanyLogoSettings', 'idCardBarcodeSettings', 'idCardFreeLayout', 'idCompanyLogo', 'idCardFreeLayoutEnabled', 'totWorkshopFiles', 'totOnboardingFiles', 'totSchedule', 'totRetrain', 'totRecruitment', 'evalShare', 'evalVideos', 'evalPhotos', 'totMySchedules', 'totCases', 'totWorkbooks', 'totIntegrations', 'totEmpRequests', 'totProcessTpl', 'totEvalKinds', 'totEvalCfgBackups', 'totDeptCfg', 'totDeptDocs', 'totLifecycle', 'totGameCounts', 'totImportHistory', 'totAccessGrants', 'totAccessAsks'];
     var KEYS = UNION.concat(LWW);
     var TK = 'totTombstones', TB = {};
     /* v2.70: all sites share one Drive. Settings that belong to everyone (accounts, roles, site list) use their normal names; each other site's data is stored under  s~<site>~<name>  so sites never mix. The main site keeps the old names. */
     var SITE_ = window.__totSite || 'main', ADMKEYS = ['totAccessPolicy', 'totSites', 'totUniqRules'];
     function sk(k) { try { return SITE_ === 'main' || (window.totSiteApi && window.totSiteApi.isGlobal(k)) ? k : 's~' + SITE_ + '~' + k; } catch (e) { return k; } }
     function isAdm() { try { return sessionStorage.getItem('totAdmin') === '1'; } catch (e) { return false; } }
-    var FILES = ['totWorkshopFiles', 'totOnboardingFiles'], RECS = ['totTeams', 'totProjects', 'totProjItems', 'totProjBoard', 'totBonusReviews', 'totRemarks', 'totIncidents', 'totIncImports', 'evalPhotos', 'totAccessAsks', 'totDeptCfg', 'totDeptDocs', 'totLifecycle', 'totGameCounts', 'totImportHistory', 'totEmpRemovals', 'totTasks', 'totCases', 'totEmpRequests', 'totEvalCfgBackups', 'totAnnouncements', 'totComments', 'totRecruitment', 'employeeDataSource', 'logbookSettings', 'logbookDescriptions', 'logbookCustomGames', 'totAppearance', 'wsCustomConfig', 'idCardSizeSettings', 'idCompanyLogoSettings', 'idCardBarcodeSettings', 'idCardFreeLayout'];
+    var FILES = ['totWorkshopFiles', 'totOnboardingFiles'], RECS = ['totTeams', 'totProjects', 'totProjItems', 'totProjBoard', 'totChannels', 'totMessages', 'totBonusReviews', 'totRemarks', 'totIncidents', 'totIncImports', 'evalPhotos', 'totAccessAsks', 'totDeptCfg', 'totDeptDocs', 'totLifecycle', 'totGameCounts', 'totImportHistory', 'totEmpRemovals', 'totTasks', 'totCases', 'totEmpRequests', 'totEvalCfgBackups', 'totAnnouncements', 'totComments', 'totRecruitment', 'employeeDataSource', 'logbookSettings', 'logbookDescriptions', 'logbookCustomGames', 'totAppearance', 'wsCustomConfig', 'idCardSizeSettings', 'idCompanyLogoSettings', 'idCardBarcodeSettings', 'idCardFreeLayout'];
     function eid(e) { return e && e.id != null ? String(e.id) : e && e.workId ? 'w:' + e.workId : null; }
     function dead(k, id) { return !!(TB[k] && TB[k][id] > 0); }
     function idsFor(k, v) { if (v == null) return null; try { var a = JSON.parse(v);
@@ -19472,6 +19487,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     var hc = {};
     function hashC(k, v) { var c = hc[k]; if (c && c.s === v) return c.h; var h = hash(v); hc[k] = { s: v, h: h }; return h; }
     function dirty() { var meta = jget(MK, {}); return KEYS.some(function (k) { var v = localStorage.getItem(k); return v != null && (!meta[k] || meta[k].h !== hashC(k, v)); }); }
+    window.totSyncNow = function () { try { if (!busy && cfg.url && authBody()) sync(false); } catch (e) {} };   /* v3.38: Community asks for a pull while open */
     function start() { if (!cfg.url || !authBody()) { say('not set up'); return; } say('connecting…'); sync(false); setInterval(function () { if (!busy && dirty() && !timer) timer = setTimeout(function () { timer = null; sync(false); }, 8000); }, 5000); setInterval(function () { sync(false); }, 90000); document.addEventListener('visibilitychange', function () { if (!document.hidden) sync(false); }); }
     /* admin panel */
     var panel = document.querySelectorAll('.adOv')[1], box = panel && panel.querySelector('.adBox');
@@ -22627,12 +22643,12 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       var ov = document.createElement('div'); ov.className = 'tkOv'; ov.style.alignItems = 'flex-start'; var pf = 'all';
       function draw() { var l = compute().filter(function (i) { return pf === 'all' || i.cat === pf; }), all = compute(), cnt = function (c) { return all.filter(function (i) { return i.unseen && (c === 'all' || i.cat === c); }).length; }, chip = function (k, t) { return '<button data-pf="' + k + '" style="background:' + (pf === k ? 'var(--accent)' : 'var(--navy2)') + ';border:1px solid var(--border);color:' + (pf === k ? '#fff' : 'var(--muted)') + ';border-radius:18px;padding:5px 11px;font:inherit;font-size:12.5px;cursor:pointer">' + t + ' (' + cnt(k) + ')</button>'; }, dOn = localStorage.getItem('totNotifDesk') === '1' && window.Notification && Notification.permission === 'granted';
         ov.innerHTML = '<div class="tkBox" style="margin-top:50px"><div style="display:flex;align-items:center;gap:8px"><h3 style="margin:0;flex:1">🔔 Notifications</h3><button class="tkB s" id="nfAll">Mark all read</button><button class="tkB s" id="nfX">✕</button></div>' +
-          '<div class="tkTabs">' + chip('all', 'All') + chip('me', '📥 Assigned to me') + chip('board', '📋 My board') + (window.__notifExtra && window.__notifExtra.length ? chip('proj', '🗂 Projects') : '') + '</div><div class="tkM" style="margin:8px 0">' + (window.Notification ? (dOn ? '✔ Desktop alerts are on (while the tool is open in a tab).' : '<button class="tkB s" id="nfDesk">Turn on desktop alerts</button>') : 'Desktop alerts are not supported in this browser.') + '</div>' +
+          '<div class="tkTabs">' + chip('all', 'All') + chip('me', '📥 Assigned to me') + chip('board', '📋 My board') + (window.__notifExtra && window.__notifExtra.length ? chip('proj', '🗂 Projects') : '') + (window.Community ? chip('chat', '💬 Community') : '') + '</div><div class="tkM" style="margin:8px 0">' + (window.Notification ? (dOn ? '✔ Desktop alerts are on (while the tool is open in a tab).' : '<button class="tkB s" id="nfDesk">Turn on desktop alerts</button>') : 'Desktop alerts are not supported in this browser.') + '</div>' +
           (l.length ? l.map(function (i, k) { return '<div class="tkCard" data-k="' + k + '" style="cursor:pointer;' + (i.unseen ? 'border-left:4px solid var(--accent)' : 'opacity:.7') + '"><div style="font-size:13.5px">' + esc(i.text) + '</div><div class="tkM">' + fmt(i.ts) + (i.act ? ' · needs your acknowledgement' : '') + '</div></div>'; }).join('') : '<div class="tkEmpty">Nothing yet.</div>') + '</div>';
         ov.querySelector('#nfX').onclick = function () { ov.remove(); }; [].forEach.call(ov.querySelectorAll('[data-pf]'), function (b) { b.onclick = function () { pf = b.getAttribute('data-pf'); draw(); }; });
         ov.querySelector('#nfAll').onclick = function () { try { localStorage.setItem(seenKey(), String(Date.now())); } catch (e) {} badge(); draw(); };
         var d = ov.querySelector('#nfDesk'); if (d) d.onclick = function () { Notification.requestPermission().then(function (p) { if (p === 'granted') localStorage.setItem('totNotifDesk', '1'); draw(); }); };
-        [].forEach.call(ov.querySelectorAll('[data-k]'), function (c) { c.onclick = function () { var i = l[+c.getAttribute('data-k')]; markRead(function (x) { return x.k === i.k; }); badge(); ov.remove(); if (i.go[0] === 'proj') { if (window.Projects) Projects.open(i.go[1], i.go[2] === 'u' ? 'activity' : i.go[2] === 'a' ? 'approvals' : 'overview'); return; } switchView('tasks'); setTimeout(function () { window.TasksOpen(i.go[0], i.go[1], i.cat === 'me' ? 'me' : i.cat === 'board' ? 'board' : 'all'); }, 80); }; }); }
+        [].forEach.call(ov.querySelectorAll('[data-k]'), function (c) { c.onclick = function () { var i = l[+c.getAttribute('data-k')]; markRead(function (x) { return x.k === i.k; }); badge(); ov.remove(); if (i.go[0] === 'chat') { if (window.Community) Community.open(i.go[1], i.go[2]); return; } if (i.go[0] === 'proj') { if (window.Projects) Projects.open(i.go[1], i.go[2] === 'u' ? 'activity' : i.go[2] === 'a' ? 'approvals' : 'overview'); return; } switchView('tasks'); setTimeout(function () { window.TasksOpen(i.go[0], i.go[1], i.cat === 'me' ? 'me' : i.cat === 'board' ? 'board' : 'all'); }, 80); }; }); }
       ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); }); document.body.appendChild(ov); draw(); }
     document.getElementById('bellBtn').addEventListener('click', panel);
     function poll() { var l = compute(), fresh = l.filter(function (i) { return i.ts > lastN; }); badge();
@@ -27057,6 +27073,246 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   } catch (e) { console.warn('Settings disabled:', e); }
 })();
 </script>
+<script id="communitySpace">
+/* v3.38 💬 Community: channels and direct / group chats for staff (everyone with a position in the tool; the employee page never shows it).
+   - Channels (totChannels kind 'ch'): created, changed, archived and deleted only by managers and the admin. Audience: everyone, chosen departments or
+     chosen people (plus the creator and managers). Mode 'open' (anyone in it posts) or 'announce' (only managers start posts; everyone replies and reacts).
+   - Direct and group chats (kind 'dm'): anyone starts one with any colleague; only its members read it (managers included only if they are members).
+   - Messages (totMessages): posts with threads (parent), 📣 announcements, reactions (own records, kind 'react'), edit / remove your own, managers remove
+     and pin in channels. Unread counts per channel, in the top bar and in the bell (direct messages, @mentions, replies to you, announcements).
+   The server (Code.gs chatPush_ / chVis_) enforces the same rules. Messages travel with sync: the tool asks for new ones every 20 s while Community is open. */
+(function () {
+  try {
+    var el = document.getElementById('communityView'); if (!el) return;
+    var KC = 'totChannels', KM = 'totMessages', EMO = ['👍', '✅', '❤️', '😂', '🎉', '👀'];
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function lc(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
+    function jget(k, d) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
+    function jset(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { toast('Not saved — browser storage is full or blocked.', 'error'); return false; } }
+    function arr(k) { var a = jget(k, []); return Array.isArray(a) ? a : []; }
+    function uid(p) { return p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+    function toast(t, k) { try { showShellToast(t, k || 'success'); } catch (e) {} }
+    function adm() { try { return sessionStorage.getItem('totAdmin') === '1' && !sessionStorage.getItem('totViewAs'); } catch (e) { return false; } }
+    function fmt(ts) { var d = new Date(+ts), n = new Date(), t = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); return d.toDateString() === n.toDateString() ? t : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + ' ' + t; }
+    function me() { var e = '', n = '', r = ''; try { e = lc(localStorage.getItem('totTrainerEmail') || ''); } catch (x) {} try { if (!e) e = lc((jget('totAuth', {}) || {}).email); } catch (x) {}
+      try { n = getTrainerName() || ''; } catch (x) {} try { r = getTrainerRole() || ''; } catch (x) {} var a = adm(); return { e: e, n: n || (a ? 'Admin' : e || 'Me'), r: r, adm: a, mgr: a || r === 'manager' }; }
+    function D() { return window.__dept || null; }
+    function myDept(m) { try { return D() ? D().ofRole(m.r) || '' : ''; } catch (e) { return ''; } }
+    function dlabel(d) { try { return D() ? D().label(d) : d; } catch (e) { return d; } }
+    /* the staff directory: the admin has the whole access list; everyone else gets name + position of every colleague from the server (chatDir) */
+    function dir() { var p = jget('totAccessPolicy', {}) || {}, o = {}, add = function (src) { Object.keys(src || {}).forEach(function (k) { var x = src[k]; if (x && typeof x === 'object' && x.role) o[lc(k)] = { e: lc(k), n: String(x.name || k), r: String(x.role || '') }; }); };
+      add(p.chatDir); add(p.users); return o; }
+    function pname(e) { var d = dir()[lc(e)]; return d ? d.n : e; }
+    function rlabel(r) { return (ROLES[r] || {}).label || r || ''; }
+    function chans() { return arr(KC).filter(function (c) { return c && c.id != null; }); }
+    function msgs() { return arr(KM).filter(function (x) { return x && x.id != null; }); }
+    /* same rules as the server (chVis_) */
+    function vis(c, m) { m = m || me(); if (!c) return false; if (m.adm) return true; if (c.kind === 'dm') return (c.members || []).map(lc).indexOf(m.e) >= 0;
+      if (m.r === 'manager' || (m.e && lc(c.byEmail) === m.e)) return true; var a = c.aud || {}; if (a.all) return true;
+      if ((a.people || []).map(lc).indexOf(m.e) >= 0) return true; var d = myDept(m); return !!d && (a.depts || []).indexOf(d) >= 0; }
+    function canPostTop(c, m) { return !!c && !c.archived && (c.kind === 'dm' || c.mode !== 'announce' || m.mgr || lc(c.byEmail) === m.e); }
+    function ro() { try { return !!(window.totAcc && window.totAcc.ro()); } catch (e) { return false; } }
+    function pageOk(t) { try { return !window.totAcc || window.totAcc.gate('community.' + t, true); } catch (e) { return true; } }
+    function chName(c, m) { if (!c) return ''; if (c.kind !== 'dm') return c.name || 'Channel'; if (c.name) return c.name; m = m || me(); var o = (c.members || []).filter(function (e) { return lc(e) !== m.e; }).map(pname); return o.join(', ') || 'Just me'; }
+    function chIcon(c) { return c.kind === 'dm' ? ((c.members || []).length > 2 ? '👥' : '👤') : (c.icon || '#'); }
+    function audText(c) { if (c.kind === 'dm') return (c.members || []).map(pname).join(', '); var a = c.aud || {}, p = [];
+      if (a.all) return 'Everyone'; if ((a.depts || []).length) p.push(a.depts.map(dlabel).join(', ')); if ((a.people || []).length) p.push(a.people.length + ' people'); return p.join(' + ') || 'Only managers'; }
+    /* read markers: per person, per device */
+    function rk() { return 'totChatRead|' + (me().e || 'local'); }
+    function reads() { return jget(rk(), {}) || {}; }
+    function markRead(ch) { var r = reads(), last = 0; msgs().forEach(function (x) { if (x.ch === ch && +x.ts > last) last = +x.ts; }); if ((r[ch] || 0) >= last) return; r[ch] = last; try { localStorage.setItem(rk(), JSON.stringify(r)); } catch (e) {} }
+    function unread(ch, m, R) { var t = (R || reads())[ch] || 0; return msgs().filter(function (x) { return x.ch === ch && x.kind !== 'react' && !x.del && +x.ts > t && lc(x.email) !== m.e; }).length; }
+    var S = { tab: 'channels', ch: '', thread: '', q: '', edit: '', draft: {} }; try { var s0 = JSON.parse(sessionStorage.getItem('cmState') || 'null'); if (s0) { S.tab = s0.tab || S.tab; S.ch = s0.ch || ''; } } catch (e) {}
+    function keep() { try { sessionStorage.setItem('cmState', JSON.stringify({ tab: S.tab, ch: S.ch })); } catch (e) {} }
+    function myChans(kind) { var m = me(); return chans().filter(function (c) { return (kind === 'dm' ? c.kind === 'dm' : c.kind !== 'dm') && vis(c, m); }); }
+    function lastTs(ch) { var t = 0; msgs().forEach(function (x) { if (x.ch === ch && +x.ts > t) t = +x.ts; }); return t; }
+
+    var css = document.createElement('style');
+    css.textContent = '.cmW{display:flex;gap:14px;max-width:1300px;margin:0 auto;padding:12px;min-height:calc(100vh - 190px);box-sizing:border-box}' +
+      '.cmSide{flex:0 0 280px;display:flex;flex-direction:column;gap:6px;border:1px solid var(--border,#2a3150);border-radius:14px;padding:10px;background:var(--navy3,rgba(255,255,255,.02));max-height:calc(100vh - 200px);overflow:auto}' +
+      '.cmSide h4{margin:6px 4px 2px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;opacity:.6;display:flex;align-items:center;gap:6px}.cmSide h4 span{flex:1}' +
+      '.cmSide input{padding:8px 10px;border-radius:10px;border:1px solid var(--border,#2a3150);background:rgba(255,255,255,.04);color:inherit;font:inherit;font-size:13px}' +
+      '.cmIt{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:8px 10px;border:0;border-radius:10px;background:transparent;color:inherit;font:inherit;font-size:13.5px;cursor:pointer}.cmIt:hover{background:rgba(148,163,184,.12)}.cmIt.on{background:var(--accent,#3b82f6);color:#fff}' +
+      '.cmIt .ic{width:24px;text-align:center;opacity:.85}.cmIt .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cmIt.un .nm{font-weight:700}.cmIt small{display:block;font-size:11px;opacity:.6;font-weight:400}' +
+      '.cmN,.cmNavN{min-width:18px;padding:1px 6px;border-radius:999px;background:#ef4444;color:#fff;font-size:11px;font-weight:700;text-align:center}.cmNavN{margin-left:6px}' +
+      '.cmMain{flex:1;min-width:0;display:flex;flex-direction:column;border:1px solid var(--border,#2a3150);border-radius:14px;overflow:hidden;max-height:calc(100vh - 200px)}' +
+      '.cmHd{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border,#2a3150)}.cmHd h3{margin:0;font-size:17px}.cmHd .sub{flex-basis:100%;font-size:12px;opacity:.65}' +
+      '.cmB{padding:6px 11px;border-radius:9px;border:1px solid var(--border,#2a3150);background:transparent;color:inherit;font:inherit;font-size:12.5px;cursor:pointer}.cmB:hover{background:rgba(148,163,184,.12)}.cmB.p{background:var(--accent,#3b82f6);border-color:var(--accent,#3b82f6);color:#fff}.cmB.s{padding:2px 8px;font-size:11.5px}' +
+      '.cmPins{padding:8px 14px;border-bottom:1px solid var(--border,#2a3150);background:rgba(245,158,11,.08);font-size:12.5px}.cmPins div{margin:2px 0;cursor:pointer}' +
+      '.cmList{flex:1;overflow:auto;padding:10px 14px;display:flex;flex-direction:column;gap:4px}' +
+      '.cmMsg{padding:8px 10px;border-radius:12px;position:relative}.cmMsg:hover{background:rgba(148,163,184,.07)}.cmMsg.ann{background:rgba(59,130,246,.10);border-left:3px solid var(--accent,#3b82f6)}.cmMsg.hl{box-shadow:0 0 0 2px #f59e0b}' +
+      '.cmMsg .who{font-weight:700;font-size:13.5px}.cmMsg .when{font-size:11px;opacity:.55;margin-left:6px}.cmMsg .tx{margin-top:2px;font-size:14px;line-height:1.45;white-space:pre-wrap;word-break:break-word}.cmMsg .tx a{color:var(--accent,#60a5fa)}' +
+      '.cmMsg .mn{background:rgba(245,158,11,.22);border-radius:5px;padding:0 3px}.cmMsg .del{font-style:italic;opacity:.55}' +
+      '.cmAct{display:none;position:absolute;right:8px;top:6px;gap:4px}.cmMsg:hover .cmAct,.cmMsg:focus-within .cmAct{display:flex}' +
+      '.cmRx{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}.cmRx button{padding:1px 8px;border-radius:999px;border:1px solid var(--border,#2a3150);background:transparent;color:inherit;font-size:12.5px;cursor:pointer}.cmRx button.mine{border-color:var(--accent,#3b82f6);background:rgba(59,130,246,.18)}' +
+      '.cmTh{margin:6px 0 2px 18px;padding-left:10px;border-left:2px solid var(--border,#2a3150)}.cmDay{text-align:center;font-size:11px;opacity:.5;margin:8px 0 2px}' +
+      '.cmCp{border-top:1px solid var(--border,#2a3150);padding:10px 14px;display:flex;flex-direction:column;gap:6px}.cmCp textarea,.cmEd{width:100%;box-sizing:border-box;min-height:44px;max-height:180px;resize:vertical;padding:9px 11px;border-radius:10px;border:1px solid var(--border,#2a3150);background:rgba(255,255,255,.04);color:inherit;font:inherit;font-size:14px}' +
+      '.cmCp .row{padding-right:64px}.cmF input[type=checkbox],.cmF input[type=radio]{width:auto!important;min-width:0!important;display:inline-block!important;margin:0 6px 0 0!important;padding:0!important;vertical-align:middle;flex:none!important}.cmF label{display:inline-flex;align-items:center;gap:2px}.cmF .cmPick label{display:flex}.cmCp .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px}.cmCp .row span{flex:1;opacity:.6}' +
+      '.cmEmpty{margin:auto;text-align:center;opacity:.7;padding:30px}.cmPick{max-height:260px;overflow:auto;border:1px solid var(--border,#2a3150);border-radius:10px;padding:6px;margin:6px 0}.cmPick label{display:flex;gap:8px;align-items:center;padding:4px 6px;font-size:13px;cursor:pointer}' +
+      '@media (max-width:820px){.cmW{flex-direction:column;padding:8px}.cmSide{flex:none;max-height:none}.cmW.inCh .cmSide{display:none}.cmW:not(.inCh) .cmMain{display:none}.cmMain{max-height:none;min-height:70vh}.cmAct{display:flex;position:static;margin-top:4px}}';
+    document.head.appendChild(css);
+
+    /* text: escaped, links clickable, @mentions marked */
+    function fmtText(t, m) { var h = esc(t); h = h.replace(/\bhttps?:\/\/[^\s<]+/g, function (u) { return '<a href="' + u + '" target="_blank" rel="noopener noreferrer">' + u + '</a>'; });
+      return h.replace(/(^|\s)@([\p{L}][\p{L}\p{N}._-]*(?: [\p{Lu}][\p{L}-]*)?)/gu, function (a, sp, nm) { return sp + '<span class="mn">@' + nm + '</span>'; }); }
+    function mentions(t, m) { if (!t) return false; var s = ' ' + lc(t), n = lc(m.n), f = n.split(' ')[0]; return !!f && (s.indexOf('@' + n) >= 0 || s.indexOf('@' + f) >= 0); }
+
+    function sideHtml(m) {
+      var R = reads(), kind = S.tab === 'chats' ? 'dm' : 'ch', q = lc(S.q), list = myChans(kind).filter(function (c) { return !q || lc(chName(c, m)).indexOf(q) >= 0; });
+      list.sort(function (a, b) { return (a.archived ? 1 : 0) - (b.archived ? 1 : 0) || lastTs(b.id) - lastTs(a.id) || String(chName(a, m)).localeCompare(chName(b, m)); });
+      var h = '<input type="search" id="cmQ" placeholder="🔎 Find ' + (kind === 'dm' ? 'a chat' : 'a channel') + '…" value="' + esc(S.q) + '">';
+      h += '<h4><span>' + (kind === 'dm' ? '✉️ Direct & group chats' : '💬 Channels') + '</span>' + (kind === 'dm' ? (ro() ? '' : '<button class="cmB s" data-a="newdm">+ New chat</button>') : (m.mgr && !ro() ? '<button class="cmB s" data-a="newch">+ New channel</button>' : '')) + '</h4>';
+      if (!list.length) h += '<div style="font-size:12.5px;opacity:.65;padding:8px">' + (kind === 'dm' ? 'No chats yet. Press <b>+ New chat</b> to write to a colleague.' : m.mgr ? 'No channels yet. Press <b>+ New channel</b>.' : 'No channels for you yet. Managers create channels.') + '</div>';
+      list.forEach(function (c) { var n = unread(c.id, m, R); h += '<button class="cmIt' + (c.id === S.ch ? ' on' : '') + (n ? ' un' : '') + '" data-ch="' + esc(c.id) + '"><span class="ic">' + esc(chIcon(c)) + '</span><span class="nm">' + esc(chName(c, m)) + (c.archived ? ' <small>archived</small>' : c.kind !== 'dm' && c.mode === 'announce' ? ' <small>📣 announcements</small>' : '') + '</span>' + (n ? '<span class="cmN">' + n + '</span>' : '') + '</button>'; });
+      return h; }
+    function msgHtml(x, c, m, byRef, inThread) {
+      var mine = lc(x.email) === m.e || (!x.email && m.adm && x.by === m.n), rx = (byRef[x.id] || []), reps = inThread ? [] : msgs().filter(function (y) { return y.parent === x.id && y.kind !== 'react'; }).sort(function (a, b) { return a.ts - b.ts; });
+      var g = {}; rx.forEach(function (r) { (g[r.emoji] = g[r.emoji] || []).push(r); });
+      var modOk = m.mgr && c.kind !== 'dm', can = !ro() && !c.archived, h = '<div class="cmMsg' + (x.ann ? ' ann' : '') + '" data-m="' + esc(x.id) + '">';
+      h += '<div><span class="who">' + esc(x.by || pname(x.email)) + '</span>' + (x.ann ? ' <b style="color:var(--accent,#60a5fa);font-size:12px">📣 Announcement</b>' : '') + '<span class="when">' + fmt(x.ts) + (x.edited ? ' · edited' : '') + '</span></div>';
+      if (x.del) h += '<div class="tx del">' + (x.del.by ? 'Removed by ' + esc(x.del.by) : 'Message deleted') + '</div>';
+      else if (S.edit === x.id) h += '<textarea class="cmEd" id="cmEd">' + esc(x.text) + '</textarea><div style="display:flex;gap:6px;margin-top:4px"><button class="cmB p s" data-a="esave" data-id="' + esc(x.id) + '">Save</button><button class="cmB s" data-a="ecancel">Cancel</button></div>';
+      else h += '<div class="tx">' + fmtText(x.text, m) + '</div>';
+      if (!x.del) { h += '<div class="cmRx">' + Object.keys(g).map(function (e) { var mn = g[e].some(function (r) { return lc(r.email) === m.e; }); return '<button class="' + (mn ? 'mine' : '') + '" data-a="rx" data-id="' + esc(x.id) + '" data-e="' + e + '" title="' + esc(g[e].map(function (r) { return r.by; }).join(', ')) + '">' + e + ' ' + g[e].length + '</button>'; }).join('') + '</div>';
+        if (can) h += '<div class="cmAct">' + EMO.slice(0, 3).map(function (e) { return '<button class="cmB s" data-a="rx" data-id="' + esc(x.id) + '" data-e="' + e + '" title="React ' + e + '">' + e + '</button>'; }).join('') + '<button class="cmB s" data-a="more" data-id="' + esc(x.id) + '" title="More reactions">＋</button>' + (inThread ? '' : '<button class="cmB s" data-a="thread" data-id="' + esc(x.id) + '">↩ Reply</button>') +
+          (mine ? '<button class="cmB s" data-a="edit" data-id="' + esc(x.id) + '">✏️</button><button class="cmB s" data-a="del" data-id="' + esc(x.id) + '" title="Delete">🗑</button>' : modOk ? '<button class="cmB s" data-a="remove" data-id="' + esc(x.id) + '" title="Remove (manager)">🗑</button>' : '') +
+          (modOk && !inThread ? '<button class="cmB s" data-a="pin" data-id="' + esc(x.id) + '">' + ((c.pins || []).indexOf(x.id) >= 0 ? '📌 Unpin' : '📌 Pin') + '</button>' : '') + '</div>'; }
+      if (!inThread && (reps.length || S.thread === x.id)) {
+        if (S.thread === x.id) { h += '<div class="cmTh">' + reps.map(function (y) { return msgHtml(y, c, m, byRef, true); }).join('') + (can ? '<textarea id="cmRep" placeholder="Reply in thread… (Enter to send)" class="cmEd" style="min-height:38px;margin-top:4px"></textarea>' : '') + '<button class="cmB s" data-a="thread" data-id="">Close thread</button></div>'; }
+        else h += '<button class="cmB s" style="margin-top:4px" data-a="thread" data-id="' + esc(x.id) + '">💬 ' + reps.length + ' repl' + (reps.length === 1 ? 'y' : 'ies') + ' · last ' + fmt(reps[reps.length - 1].ts) + '</button>'; }
+      return h + '</div>'; }
+    function mainHtml(m) {
+      var c = chans().filter(function (x) { return x.id === S.ch; })[0];
+      if (!c || !vis(c, m) || (S.tab === 'chats') !== (c.kind === 'dm')) return '<div class="cmEmpty"><div style="font-size:40px">💬</div><h3>' + (S.tab === 'chats' ? 'Direct & group chats' : 'Channels') + '</h3><p>' + (S.tab === 'chats' ? 'Pick a chat on the left, or start a new one with any colleague.' : 'Pick a channel on the left. Managers create channels for departments, teams, projects and announcements.') + '</p></div>';
+      var all = msgs().filter(function (x) { return x.ch === c.id; }), byRef = {}, top = [];
+      all.forEach(function (x) { if (x.kind === 'react') { if (x.ref) (byRef[x.ref] = byRef[x.ref] || []).push(x); } else if (!x.parent) top.push(x); });
+      top.sort(function (a, b) { return a.ts - b.ts; });
+      var mgrHere = m.mgr && c.kind !== 'dm', h = '<div class="cmHd"><button class="cmB s cmBack" data-a="back" title="Back to the list">←</button><h3>' + esc(chIcon(c)) + ' ' + esc(chName(c, m)) + '</h3>' + (c.archived ? '<span class="cmB s" style="cursor:default">🗄 Archived</span>' : '') + '<span style="flex:1"></span>' +
+        (mgrHere && !ro() ? '<button class="cmB s" data-a="editch">⚙ Edit</button>' : '') + '<div class="sub">' + (c.kind === 'dm' ? '🔒 Private chat · ' : (c.mode === 'announce' ? '📣 Announcements · ' : '') + '👥 ') + esc(audText(c)) + (c.desc ? ' · ' + esc(c.desc) : '') + '</div></div>';
+      var pins = (c.pins || []).map(function (id) { return all.filter(function (x) { return x.id === id && !x.del; })[0]; }).filter(Boolean);
+      if (pins.length) h += '<div class="cmPins"><b>📌 Pinned</b>' + pins.map(function (x) { return '<div data-a="goto" data-id="' + esc(x.id) + '">' + esc(x.by) + ': ' + esc(String(x.text).slice(0, 120)) + '</div>'; }).join('') + '</div>';
+      h += '<div class="cmList" id="cmList">'; var day = '';
+      if (!top.length) h += '<div class="cmEmpty">No messages yet.' + (canPostTop(c, m) && !ro() ? ' Say hello 👋' : '') + '</div>';
+      top.forEach(function (x) { var d = new Date(+x.ts).toDateString(); if (d !== day) { day = d; h += '<div class="cmDay">' + new Date(+x.ts).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }) + '</div>'; } h += msgHtml(x, c, m, byRef, false); });
+      h += '</div>';
+      if (ro()) h += '<div class="cmCp"><div class="row"><span>👁 View only — you can read, not write.</span></div></div>';
+      else if (c.archived) h += '<div class="cmCp"><div class="row"><span>🗄 This channel is archived. It can be read, not written to.</span></div></div>';
+      else if (!canPostTop(c, m)) h += '<div class="cmCp"><div class="row"><span>📣 Only managers start posts here. You can reply in a thread and react.</span></div></div>';
+      else h += '<div class="cmCp"><textarea id="cmTx" placeholder="Write a message… (Enter to send, Shift+Enter for a new line, @Name to mention)"></textarea><div class="row"><span>' + (c.kind === 'dm' ? '🔒 Only the people in this chat see it.' : 'Everyone in ' + esc(chName(c, m)) + ' sees it.') + '</span>' + (mgrHere ? '<label><input type="checkbox" id="cmAnn"> 📣 Announcement</label>' : '') + '<button class="cmB p" data-a="send">Send</button></div></div>';
+      return h; }
+    function render() {
+      var m = me(); if (!pageOk(S.tab)) S.tab = S.tab === 'chats' ? 'channels' : 'chats';
+      var c0 = chans().filter(function (x) { return x.id === S.ch; })[0]; if (c0 && (c0.kind === 'dm') !== (S.tab === 'chats')) S.ch = '';
+      var list = document.getElementById('cmList'), atEnd = !list || list.scrollHeight - list.scrollTop - list.clientHeight < 60, st = list ? list.scrollTop : 0, fo = document.activeElement && document.activeElement.id;
+      var tx = document.getElementById('cmTx'); if (tx && S.ch) S.draft[S.ch] = tx.value; var rp = document.getElementById('cmRep'), rpv = rp ? rp.value : '', ed = document.getElementById('cmEd'), edv = ed ? ed.value : null;
+      if (S.ch && !document.hidden && vis(chans().filter(function (x) { return x.id === S.ch; })[0], m)) markRead(S.ch);   /* the open conversation counts as read before the counts are drawn */
+      el.innerHTML = '<div class="cmW' + (S.ch ? ' inCh' : '') + '"><aside class="cmSide">' + sideHtml(m) + '</aside><section class="cmMain">' + mainHtml(m) + '</section></div>';
+      var t2 = document.getElementById('cmTx'); if (t2) t2.value = S.draft[S.ch] || ''; var r2 = document.getElementById('cmRep'); if (r2) r2.value = rpv; var e2 = document.getElementById('cmEd'); if (e2 && edv != null) e2.value = edv;
+      var l2 = document.getElementById('cmList'); if (l2) l2.scrollTop = atEnd ? l2.scrollHeight : st;
+      if (fo) { var f = document.getElementById(fo); if (f) { f.focus(); if (f.setSelectionRange && f.value != null) try { f.setSelectionRange(f.value.length, f.value.length); } catch (e) {} } }
+      if (S.ch && !document.hidden) markRead(S.ch);
+      el.__sig = sig(); navBadge(); try { window.spaceSubRender(); } catch (e) {} }
+    function sig() { var a = localStorage.getItem(KC) || '', b = localStorage.getItem(KM) || '', p = localStorage.getItem('totAccessPolicy') || ''; return a.length + ':' + a.slice(-30) + '|' + b.length + ':' + b.slice(-30) + '|' + p.length; }
+
+    /* ---------- writing ---------- */
+    function after() { setTimeout(function () { try { if (window.totSyncNow) window.totSyncNow(); } catch (e) {} }, 400); }
+    function addMsg(x) { var a = arr(KM); a.push(x); if (jset(KM, a)) { after(); return true; } return false; }
+    function send(text, parent) { var m = me(), c = chans().filter(function (x) { return x.id === S.ch; })[0]; text = String(text || '').trim(); if (!c || !text) return false;
+      if (!parent && !canPostTop(c, m)) { toast('Only managers start posts in this channel.', 'error'); return false; }
+      var ann = !parent && c.kind !== 'dm' && m.mgr && !!(document.getElementById('cmAnn') || {}).checked;
+      var ok = addMsg({ id: uid('m-'), ch: c.id, kind: 'msg', email: m.e, by: m.n, ts: Date.now(), u: Date.now(), text: text.slice(0, 4000), parent: parent || undefined, ann: ann || undefined });
+      if (ok) { if (!parent) S.draft[c.id] = ''; try { playUiSound && playUiSound('nav'); } catch (e) {} } return ok; }
+    function upd(id, f) { var a = arr(KM), hit = false; a.forEach(function (x) { if (x && x.id === id) { f(x); x.u = Date.now(); hit = true; } }); if (hit && jset(KM, a)) after(); return hit; }
+    function react(id, e) { var m = me(), x = msgs().filter(function (y) { return y.id === id; })[0]; if (!x) return; var rid = 'rx-' + id + '-' + EMO.indexOf(e) + '-' + (m.e || 'admin'), a = arr(KM), had = a.some(function (y) { return y && y.id === rid; });
+      if (had) a = a.filter(function (y) { return !(y && y.id === rid); }); else a.push({ id: rid, ch: x.ch, kind: 'react', ref: id, emoji: e, email: m.e, by: m.n, ts: Date.now() });
+      if (jset(KM, a)) after(); }
+    function setCh(id, f) { var a = arr(KC); a.forEach(function (c) { if (c && c.id === id) { f(c); c.u = Date.now(); } }); if (jset(KC, a)) after(); }
+    function audit(act) { try { var a = jget('auditLog', []); if (!Array.isArray(a)) a = []; var m = me(); a.push({ id: uid('cm'), ts: Date.now(), who: m.n, role: m.adm ? 'admin' : m.r, email: m.e, cat: 'community', act: act }); jset('auditLog', a.slice(-5000)); } catch (e) {} }
+
+    /* ---------- forms: channel (managers / admin), chat (anyone) ---------- */
+    function modal(html) { var ov = document.createElement('div'); ov.className = 'tkOv'; ov.style.alignItems = 'flex-start'; ov.innerHTML = '<div class="tkBox cmF" style="margin-top:40px;max-width:560px">' + html + '</div>'; document.body.appendChild(ov); ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); }); return ov; }
+    function peoplePick(sel, m, ex) { var d = dir(); return '<input type="search" class="cmPq" placeholder="🔎 Find a person…" style="width:100%;box-sizing:border-box;padding:8px;border-radius:9px;border:1px solid var(--border,#2a3150);background:transparent;color:inherit;font:inherit"><div class="cmPick">' +
+      Object.keys(d).filter(function (e) { return e !== m.e && (!ex || ex.indexOf(e) < 0); }).sort(function (a, b) { return d[a].n.localeCompare(d[b].n); }).map(function (e) { return '<label data-q="' + esc(lc(d[e].n + ' ' + e + ' ' + rlabel(d[e].r))) + '"><input type="checkbox" value="' + esc(e) + '"' + ((sel || []).map(lc).indexOf(e) >= 0 ? ' checked' : '') + '> <span><b>' + esc(d[e].n) + '</b> <span style="opacity:.6;font-size:12px">' + esc(rlabel(d[e].r)) + ' · ' + esc(e) + '</span></span></label>'; }).join('') + '</div>'; }
+    function wirePick(ov) { var q = ov.querySelector('.cmPq'); if (q) q.oninput = function () { var v = lc(q.value); ov.querySelectorAll('.cmPick label').forEach(function (l) { l.style.display = !v || l.getAttribute('data-q').indexOf(v) >= 0 ? '' : 'none'; }); }; }
+    function chForm(c) { var m = me(); if (!m.mgr) { toast('Only managers create channels.', 'error'); return; } c = c || { aud: { all: true, depts: [], people: [] }, mode: 'open', icon: '#' }; var a = c.aud || {}, inS = 'width:100%;box-sizing:border-box;padding:8px;border-radius:9px;border:1px solid var(--border,#2a3150);background:transparent;color:inherit;font:inherit;margin:3px 0 8px';
+      var ov = modal('<h3 style="margin:0 0 10px">' + (c.id ? '⚙ Edit channel' : '💬 New channel') + '</h3>' +
+        '<label style="font-size:12px;opacity:.7">Name</label><input id="cfN" maxlength="60" style="' + inS + '" value="' + esc(c.name || '') + '" placeholder="e.g. Shift leads, Night shift, Open day project">' +
+        '<label style="font-size:12px;opacity:.7">Icon (one emoji) and description</label><div style="display:flex;gap:8px"><input id="cfI" maxlength="4" style="' + inS + ';width:70px;text-align:center" value="' + esc(c.icon || '#') + '"><input id="cfD" maxlength="200" style="' + inS + '" value="' + esc(c.desc || '') + '" placeholder="What is this channel for?"></div>' +
+        '<label style="font-size:12px;opacity:.7">Who is in it</label><div style="margin:4px 0 8px;font-size:13px"><label><input type="radio" name="cfA" value="all"' + (a.all ? ' checked' : '') + '> Everyone with the tool</label> &nbsp; <label><input type="radio" name="cfA" value="some"' + (a.all ? '' : ' checked') + '> Chosen departments and people</label></div>' +
+        '<div id="cfSome" style="' + (a.all ? 'display:none' : '') + '"><div style="font-size:12px;opacity:.7">Departments</div><div style="display:flex;flex-wrap:wrap;gap:4px 12px;margin:4px 0 8px;font-size:13px">' + (D() ? D().DEPTS : []).map(function (d) { return '<label><input type="checkbox" class="cfDp" value="' + d.id + '"' + ((a.depts || []).indexOf(d.id) >= 0 ? ' checked' : '') + '> ' + esc(d.label) + '</label>'; }).join('') + '</div><div style="font-size:12px;opacity:.7">People</div>' + peoplePick(a.people, m) + '</div>' +
+        '<label style="font-size:12px;opacity:.7">Who posts</label><select id="cfM" style="' + inS + '"><option value="open"' + (c.mode !== 'announce' ? ' selected' : '') + '>💬 Everyone in it (discussion)</option><option value="announce"' + (c.mode === 'announce' ? ' selected' : '') + '>📣 Only managers start posts (announcements; others reply and react)</option></select>' +
+        (c.id ? '<label style="font-size:13px;display:block;margin:4px 0 10px"><input type="checkbox" id="cfX"' + (c.archived ? ' checked' : '') + '> 🗄 Archived (read only, moves to the end of the list)</label>' : '') +
+        '<div class="adMsg" id="cfMsg" style="color:#ef4444"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="cmB p" id="cfS">' + (c.id ? 'Save' : 'Create channel') + '</button><button class="cmB" id="cfC">Cancel</button>' + (c.id ? '<span style="flex:1"></span><button class="cmB" id="cfDel" style="border-color:#ef4444;color:#ef4444">Delete channel</button>' : '') + '</div>');
+      wirePick(ov); ov.querySelectorAll('input[name=cfA]').forEach(function (r) { r.onchange = function () { ov.querySelector('#cfSome').style.display = ov.querySelector('input[name=cfA]:checked').value === 'all' ? 'none' : ''; }; });
+      ov.querySelector('#cfC').onclick = function () { ov.remove(); };
+      ov.querySelector('#cfS').onclick = function () { var nm = ov.querySelector('#cfN').value.replace(/[<>]/g, '').trim(); if (!nm) { ov.querySelector('#cfMsg').textContent = 'Give the channel a name.'; return; }
+        var all = ov.querySelector('input[name=cfA]:checked').value === 'all', dp = [].map.call(ov.querySelectorAll('.cfDp:checked'), function (x) { return x.value; }), pp = [].map.call(ov.querySelectorAll('.cmPick input:checked'), function (x) { return x.value; });
+        if (!all && !dp.length && !pp.length) { ov.querySelector('#cfMsg').textContent = 'Choose at least one department or person, or Everyone.'; return; }
+        var o = { name: nm.slice(0, 60), icon: (ov.querySelector('#cfI').value.trim() || '#').slice(0, 4), desc: ov.querySelector('#cfD').value.trim().slice(0, 200), aud: { all: all, depts: all ? [] : dp, people: all ? [] : pp }, mode: ov.querySelector('#cfM').value === 'announce' ? 'announce' : 'open' };
+        if (c.id) { var arc = !!(ov.querySelector('#cfX') || {}).checked; setCh(c.id, function (x) { Object.assign(x, o); x.archived = arc || undefined; }); audit('Channel “' + o.name + '” changed' + (arc ? ' (archived)' : '')); }
+        else { var id = uid('ch-'), a = arr(KC); a.push(Object.assign({ id: id, kind: 'ch', by: m.n, byEmail: m.e, created: Date.now(), u: Date.now(), pins: [] }, o)); if (!jset(KC, a)) return; after(); S.ch = id; S.tab = 'channels'; audit('Channel “' + o.name + '” created'); }
+        ov.remove(); keep(); render(); toast(c.id ? 'Channel saved.' : 'Channel created.'); };
+      var dl = ov.querySelector('#cfDel'); if (dl) dl.onclick = function () { if (!confirm('Delete the channel “' + c.name + '” and all its messages? This cannot be undone.')) return;
+        jset(KC, arr(KC).filter(function (x) { return !(x && x.id === c.id); })); jset(KM, arr(KM).filter(function (x) { return !(x && x.ch === c.id); })); after(); audit('Channel “' + c.name + '” deleted'); S.ch = ''; keep(); ov.remove(); render(); toast('Channel deleted.'); }; }
+    function dmForm() { var m = me(); if (!m.e && !m.adm) { toast('Sign in with your e-mail to use chats.', 'error'); return; }
+      var ov = modal('<h3 style="margin:0 0 6px">✉️ New chat</h3><div style="font-size:12.5px;opacity:.7;margin-bottom:6px">Pick one person for a direct chat, or several for a group chat. Only the people in the chat can read it.</div>' + peoplePick([], m) +
+        '<input id="dfN" maxlength="60" placeholder="Group name (optional, for 3 or more people)" style="width:100%;box-sizing:border-box;padding:8px;border-radius:9px;border:1px solid var(--border,#2a3150);background:transparent;color:inherit;font:inherit;margin:4px 0 8px"><div class="adMsg" id="dfMsg" style="color:#ef4444"></div><div style="display:flex;gap:8px"><button class="cmB p" id="dfS">Start chat</button><button class="cmB" id="dfC">Cancel</button></div>');
+      wirePick(ov); ov.querySelector('#dfC').onclick = function () { ov.remove(); };
+      ov.querySelector('#dfS').onclick = function () { var pp = [].map.call(ov.querySelectorAll('.cmPick input:checked'), function (x) { return lc(x.value); }); if (!pp.length) { ov.querySelector('#dfMsg').textContent = 'Pick at least one person.'; return; } if (pp.length > 19) { ov.querySelector('#dfMsg').textContent = 'A group chat has at most 20 people. Ask a manager for a channel.'; return; }
+        var mem = [m.e || 'admin'].concat(pp).sort(), key = mem.join('|'), ex = chans().filter(function (c) { return c.kind === 'dm' && (c.members || []).map(lc).sort().join('|') === key; })[0];
+        if (ex) S.ch = ex.id; else { var id = uid('dm-'), a = arr(KC); a.push({ id: id, kind: 'dm', members: mem, name: pp.length > 1 ? ov.querySelector('#dfN').value.replace(/[<>]/g, '').trim().slice(0, 60) || undefined : undefined, by: m.n, byEmail: m.e, created: Date.now(), u: Date.now() }); if (!jset(KC, a)) return; after(); S.ch = id; }
+        S.tab = 'chats'; keep(); ov.remove(); render(); var t = document.getElementById('cmTx'); if (t) t.focus(); }; }
+
+    /* ---------- events ---------- */
+    el.addEventListener('click', function (e) { var b = e.target.closest('[data-a],[data-ch]'); if (!b || !el.contains(b)) return; var a = b.getAttribute('data-a'), id = b.getAttribute('data-id'), m = me();
+      if (b.hasAttribute('data-ch')) { S.ch = b.getAttribute('data-ch'); S.thread = ''; S.edit = ''; keep(); render(); var t = document.getElementById('cmTx'); if (t && window.innerWidth > 820) t.focus(); return; }
+      if (a === 'newch') chForm(); else if (a === 'newdm') dmForm(); else if (a === 'editch') chForm(chans().filter(function (x) { return x.id === S.ch; })[0]);
+      else if (a === 'back') { S.ch = ''; keep(); render(); }
+      else if (a === 'send') { var t = document.getElementById('cmTx'); if (t && send(t.value)) { t.value = ''; S.draft[S.ch] = ''; render(); } }
+      else if (a === 'rx') react(id, b.getAttribute('data-e'));
+      else if (a === 'more') { var box = b.parentNode; if (box.querySelector('.cmMore')) return; var s = document.createElement('span'); s.className = 'cmMore'; s.style.display = 'flex'; s.style.gap = '4px'; s.innerHTML = EMO.slice(3).map(function (x) { return '<button class="cmB s" data-a="rx" data-id="' + esc(id) + '" data-e="' + x + '">' + x + '</button>'; }).join(''); box.insertBefore(s, b); b.remove(); return; }
+      else if (a === 'thread') { S.thread = id || ''; render(); var r = document.getElementById('cmRep'); if (r) r.focus(); return; }
+      else if (a === 'edit') { S.edit = id; render(); var ed = document.getElementById('cmEd'); if (ed) ed.focus(); return; }
+      else if (a === 'ecancel') { S.edit = ''; }
+      else if (a === 'esave') { var v = (document.getElementById('cmEd') || {}).value; v = String(v || '').trim(); if (v) upd(id, function (x) { x.text = v.slice(0, 4000); x.edited = Date.now(); }); S.edit = ''; }
+      else if (a === 'del') { if (!confirm('Delete your message?')) return; upd(id, function (x) { x.del = { ts: Date.now() }; x.text = ''; }); }
+      else if (a === 'remove') { if (!confirm('Remove this message for everyone?')) return; upd(id, function (x) { x.del = { by: m.n, ts: Date.now() }; x.text = ''; }); audit('Message removed in “' + chName(chans().filter(function (c) { return c.id === S.ch; })[0], m) + '”'); }
+      else if (a === 'pin') { setCh(S.ch, function (c) { c.pins = (c.pins || []).filter(function (p) { return p !== id; }).concat((c.pins || []).indexOf(id) >= 0 ? [] : [id]).slice(-10); }); }
+      else if (a === 'goto') { var mm = msgs().filter(function (x) { return x.id === id; })[0]; if (mm && mm.parent) S.thread = mm.parent; render(); hl(id); return; }
+      render(); });
+    el.addEventListener('keydown', function (e) { if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+      if (e.target.id === 'cmTx') { e.preventDefault(); if (send(e.target.value)) { e.target.value = ''; S.draft[S.ch] = ''; render(); } }
+      else if (e.target.id === 'cmRep') { e.preventDefault(); if (send(e.target.value, S.thread)) { e.target.value = ''; render(); var r = document.getElementById('cmRep'); if (r) r.focus(); } } });
+    el.addEventListener('input', function (e) { if (e.target.id === 'cmQ') { S.q = e.target.value; var p = e.target.selectionStart; render(); var q = document.getElementById('cmQ'); if (q) { q.focus(); try { q.setSelectionRange(p, p); } catch (x) {} } } else if (e.target.id === 'cmTx') S.draft[S.ch] = e.target.value; });
+    function hl(id) { setTimeout(function () { var n = el.querySelector('.cmMsg[data-m="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]'); if (n) { n.scrollIntoView({ block: 'center' }); n.classList.add('hl'); setTimeout(function () { n.classList.remove('hl'); }, 2500); } }, 60); }
+
+    /* ---------- refresh, unread badge, bell ---------- */
+    function totalUnread() { var m = me(), R = reads(), n = 0; chans().forEach(function (c) { if (vis(c, m) && pageOk(c.kind === 'dm' ? 'chats' : 'channels')) n += unread(c.id, m, R); }); return n; }
+    function navBadge() { var b = document.getElementById('cmNavN'); if (!b) return; var n = totalUnread(); b.textContent = n > 99 ? '99+' : n; b.style.display = n ? '' : 'none'; }
+    setInterval(function () { try { navBadge(); if (typeof currentView === 'undefined' || currentView !== 'community' || el.hidden) return;
+      var a = document.activeElement; if (document.querySelector('.tkOv') || S.edit || (a && el.contains(a) && a.id === 'cmQ')) return; if (sig() !== el.__sig) render(); else if (S.ch && !document.hidden) markRead(S.ch); } catch (e) {} }, 1500);
+    setInterval(function () { try { if (currentView === 'community' && !document.hidden && window.totSyncNow) window.totSyncNow(); } catch (e) {} }, 20000);
+    (window.__notifExtra = window.__notifExtra || []).push(function () { var m = me(), out = [], R = reads(), cut = Date.now() - 14 * 86400000, C = {}, mine = {};
+      chans().forEach(function (c) { if (vis(c, m) && pageOk(c.kind === 'dm' ? 'chats' : 'channels')) C[c.id] = c; });
+      msgs().forEach(function (x) { if (lc(x.email) === m.e) mine[x.id] = 1; });
+      msgs().forEach(function (x) { var c = C[x.ch]; if (!c || x.kind === 'react' || x.del || +x.ts < cut || lc(x.email) === m.e || +x.ts <= (R[x.ch] || 0)) return; var t = String(x.text || '').split('\n')[0].slice(0, 140), w = c.kind === 'dm' ? '' : ' in ' + chName(c, m);
+        if (c.kind === 'dm') out.push({ ts: +x.ts, text: '✉️ ' + x.by + (c.members && c.members.length > 2 ? ' in ' + chName(c, m) : '') + ': ' + t, go: ['chat', c.id, x.id], cat: 'chat' });
+        else if (mentions(x.text, m)) out.push({ ts: +x.ts, text: '@ ' + x.by + ' mentioned you' + w + ': ' + t, go: ['chat', c.id, x.id], cat: 'chat' });
+        else if (x.parent && mine[x.parent]) out.push({ ts: +x.ts, text: '↩ ' + x.by + ' replied to you' + w + ': ' + t, go: ['chat', c.id, x.id], cat: 'chat' });
+        else if (x.ann) out.push({ ts: +x.ts, text: '📣 ' + x.by + w + ': ' + t, go: ['chat', c.id, x.id], cat: 'chat' }); });
+      return out; });
+
+    window.Community = {
+      navItems: function () { var m = me(), R = reads(), n = function (k) { var s = 0; chans().forEach(function (c) { if ((c.kind === 'dm') === (k === 'dm') && vis(c, m)) s += unread(c.id, m, R); }); return s ? '<span class="ss-n">' + s + '</span>' : ''; };
+        return [['channels', '&#128172; Channels', 'ch'], ['chats', '&#9993;&#65039; Chats', 'dm']].map(function (x) { return { l: x[1] + n(x[2]), on: S.tab === x[0], go: function () { S.tab = x[0]; var c = chans().filter(function (y) { return y.id === S.ch; })[0]; if (c && (c.kind === 'dm') !== (x[0] === 'chats')) S.ch = ''; keep(); window.__space = 'community'; if (currentView !== 'community') switchView('community'); else render(); } }; }); },
+      open: function (ch, mid) { var c = chans().filter(function (x) { return x.id === ch; })[0]; if (!c) return; S.tab = c.kind === 'dm' ? 'chats' : 'channels'; S.ch = ch; S.edit = ''; var x = mid && msgs().filter(function (y) { return y.id === mid; })[0]; S.thread = x && x.parent ? x.parent : ''; keep(); window.__space = 'community'; if (currentView !== 'community') switchView('community'); else render(); if (mid) hl(mid); },
+      unread: totalUnread, send: send, state: function () { return { tab: S.tab, ch: S.ch, thread: S.thread }; }
+    };
+    window.CommunityMount = render;
+    navBadge();
+  } catch (e) { console.warn('Community disabled:', e); }
+})();
+</script>
 <script id="pageAccess">
 /* v3.36 Access to every space, page and board — per position and per person (Admin → 🔐 Access to spaces and pages).
    Stored in totAccessPolicy.access (admin-only write, enforced again by the server):
@@ -27104,7 +27360,8 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       'fmd.schedule': { v: ['schedule'], c: ['fmd_view'] }, 'fmd.employees': { v: ['empdata'] }, 'fmd.employee_requests': { v: ['requests'] }, 'fmd.retraining': { v: ['exam'], c: ['retrain'] },
       'uniforms.uniforms': { v: ['appearance'], c: ['appearance_view'], e: ['appearance_issue', 'appearance_manage'] }, 'hr.recruiting': { v: ['recruiting'] },
       'projects.my_work': { v: ['projects'] }, 'projects.all_projects': { v: ['projects'] }, 'projects.progress': { v: ['projects'] }, 'projects.teams_departments': { v: ['projects'] },
-      'projects.data_explorer': { v: ['projects'] }, 'projects.updates': { v: ['projects'] }
+      'projects.data_explorer': { v: ['projects'] }, 'projects.updates': { v: ['projects'] },
+      'community.channels': { v: ['community'] }, 'community.chats': { v: ['community'] }
     };
     function pidsWhere(f) { return Object.keys(P).filter(function (k) { return f(P[k]); }); }
     /* a screen opens when one of its pages is open; it closes when all its pages are Hidden; otherwise the old rule decides */

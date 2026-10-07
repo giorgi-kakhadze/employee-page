@@ -16,6 +16,8 @@ Checked against `docs/platform-requirements.txt` (35 sections), using the code i
 
 "v3.37" marks one Access management section (by role or by spaces and pages) in the admin space (see `docs/v3_37_notes.md`).
 
+"v3.38" marks 💬 Community: channels created by managers and private direct / group chats for staff (see `docs/v3_38_notes.md`).
+
 "v3.33" marks teams, restricted / shared items and files, branching tasks, workflow stages, approvals, file storage and the Progress page (see `docs/v3_33_notes.md`).
 
 "v3.32" marks Projects: shared and personal projects with access per project, sub-projects, work map, timeline tree, visual board, data explorer and updates to the people involved (see `docs/v3_32_notes.md`).

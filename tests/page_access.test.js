@@ -109,7 +109,7 @@ const TOP = { navAcademy: 'academy', navPerformance: 'performance', navSchedule:
   console.log('6. Nothing set = as before');
   const M = await H.open({ email: 'mgr@x.com', pw: 'pw-mgr@x.com' }); await M.setViewportSize({ width: 1440, height: 900 }); await M.sync();
   const mTop = await top(M); ok('the manager still sees every space', ['academy', 'performance', 'fmd', 'uniforms', 'hr', 'office', 'service', 'projects'].every(s => mTop.indexOf(s) >= 0), mTop.join(','));
-  ok('the version is up to date', await M.evaluate(() => window.TOT_VERSION) === '3.37');
+  ok('the version is up to date', await M.evaluate(() => window.TOT_VERSION) === '3.38');
   const gi = await M.evaluate(async () => { openGiorgiChat(); await new Promise(r => setTimeout(r, 200)); giorgiChat.ask('how do I hide a space or give view only access'); await new Promise(r => setTimeout(r, 1700)); const rows = [...document.querySelectorAll('#giorgiChat .gc-row')]; return rows[rows.length - 1].textContent; });
   ok('Giorgi explains where to set access', /Access management/.test(gi) && /spaces and pages/.test(gi), gi.slice(0, 80));
   await M.context().close();
