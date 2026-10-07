@@ -11,6 +11,7 @@
   v3.31: Pay per shift or per hour (actual hours: left early); bonus programs with levels per position (FMD → 🏅 Bonuses & month); month review for team managers (shifts, hours, salary so far, evaluations, mistakes, incidents, violations, disciplinary cases, remarks, games; bonus levels; final); remarks and cases shown to the employee or internal; pay pages published to the employee page (Home / Schedule / Rotation).
   v3.32: 🗂 Projects for everyone: shared and personal projects assigned to departments, teams or people, with access per project (owner, managers, assigned, viewers; enforced by the server), sub-projects each team owns, work map, timeline tree (blockers, help needed, waiting for specs, dependencies), items kanban, visual board (stickies, shapes, arrows, live cards), files & docs, discussion, Data explorer (filter any data by any field), Updates: bell, on-demand update and daily e-mail digest to the people involved only.
   v3.33: Projects round 2: 👥 Teams & departments (managers / seniors arrange teams; teams can be assigned), 🔒 restricted / 🔗 shared items and files, board drawing rights, branching sub-tasks and 👥 Distribute, comments on items, deadline warnings, workflow stages, ✔ approval flow (stage gates), file upload / download with access, 📊 Progress page for projects, teams and departments.
+  v3.34: Look & feel: the admin space opens as a wide window with a side menu and search on laptops (one column on phones); site and person pills in the action row; sub-bars wrap on wide screens; page, window, menu, card and button motion (Reduce animations switch in More); soft sound on windows when sounds are on; Giorgi knows the whole tool (departments, schedule, pay, service, projects, teams, approvals, admin).
   ============================================================
 -->
 <html lang="en">
@@ -27,7 +28,7 @@
    Sites: every location keeps its own data under its own prefix. The first site ("main") is the data you already had, stored exactly where it always was, so nothing is moved.
    Test mode: open this file with #test at the end of the address. Separate data, no network, red bar. Both now also cover the embedded tools (Workshop, ID). */
 (function () {
-  window.TOT_VERSION = '2.94';
+  window.TOT_VERSION = '3.34';
   try {
     var TP = 'TEST::', SP_ = 'SITE::';
     var NOCOPY = ['totSyncCfg', 'totSyncMeta', 'totSyncPrev', 'totMailerCfg', 'totMailerLast', 'totAdminHash', 'totAdminIdleMin'];
@@ -1455,7 +1456,17 @@ const AREAS = {
   layoutEditor: { label: 'the Layout Editor',       can: 'moving and resizing the name, Work ID, logo and barcodes' },
   cardSettings: { label: 'Card Settings',           can: 'card size, barcode strips, logo, and saving defaults' },
   logbooks:     { label: 'Logbooks',                can: 'selecting a game, editing the description, choosing employees, and printing' },
-  onboarding:   { label: 'Onboarding',              can: 'trainees, importing from Excel, the grid tools, and backups' }
+  onboarding:   { label: 'Onboarding',              can: 'trainees, importing from Excel, the grid tools, and backups' },
+  schedule:     { label: 'FMD — Schedule',          can: 'the monthly schedule, the table rotation, pay and sending schedules to employees' },
+  spacehome:    { label: 'a department Overview',   can: 'the department\'s screens, its numbers, the staff directory and the latest changes' },
+  dept:         { label: 'a department board',      can: 'tickets, work types, documents and the department dashboard' },
+  tasks:        { label: 'My tickets',              can: 'tickets assigned to you, your board, what you sent and announcements' },
+  projects:     { label: 'Projects',                can: 'projects, sub-projects and tasks, teams, approvals, files, the timeline, the board and progress' },
+  requests:     { label: 'Employee requests',       can: 'approving or declining swaps, leave and day-off requests' },
+  empdata:      { label: 'Employees',               can: 'importing, checking and editing the employee file' },
+  coach:        { label: 'the Coach board',         can: 'coaching follow-ups and evaluations' },
+  recruiting:   { label: 'Recruiting',              can: 'candidates and hiring steps' },
+  appearance:   { label: 'Uniforms',                can: 'uniform stock, issuing and returns' }
 };
 
 const AREA_CHIPS = {
@@ -1470,11 +1481,21 @@ const AREA_CHIPS = {
   layoutEditor: ['id.layout', 'id.default', 'emp.barcode', 'id.cardsettings'],
   cardSettings: ['id.cardsettings', 'id.default', 'id.layout', 'id.print'],
   logbooks:     ['lb.create', 'lb.desc', 'lb.employees', 'lb.print'],
-  onboarding:   ['onb.overview', 'onb.grid', 'onb.import', 'safety.backup']
+  onboarding:   ['onb.overview', 'onb.grid', 'onb.import', 'safety.backup'],
+  schedule:     ['pf.schedule', 'pf.pay', 'pf.requests', 'pf.emppage'],
+  spacehome:    ['pf.depts', 'pf.people', 'pf.history', 'pf.tickets'],
+  dept:         ['pf.tickets', 'pf.depts', 'pf.updates', 'pf.history'],
+  tasks:        ['pf.tickets', 'pf.updates', 'pf.depts', 'pf.projects'],
+  projects:     ['pf.projects', 'pf.branch', 'pf.approvals', 'pf.progress'],
+  requests:     ['pf.requests', 'pf.emppage', 'pf.schedule'],
+  empdata:      ['emp.import', 'pf.people', 'pf.history'],
+  coach:        ['feat.coach', 'pf.people'],
+  recruiting:   ['pf.depts', 'pf.tickets'],
+  appearance:   ['pf.depts', 'pf.history']
 };
 
 const CATEGORY_CHIPS = [
-  { id: 'tool.what', label: 'Pass-to-Floor Help' }, { id: 'emp.import', label: 'Employee Data' },
+  { id: 'tool.what', label: 'Pass-to-Floor Help' }, { id: 'pf.depts', label: 'Departments' }, { id: 'pf.projects', label: 'Projects' }, { id: 'pf.schedule', label: 'Schedule' }, { id: 'emp.import', label: 'Employee Data' },
   { id: 'id.create', label: 'ID Creation' },       { id: 'ws.overview', label: 'Workshop' },
   { id: 'lb.overview', label: 'Logbooks' },        { id: 'bk.backup', label: 'Backup' },
   { id: 'onb.overview', label: 'Onboarding' }, { id: 'files.overview', label: 'Workshop Registration' },
@@ -1527,7 +1548,7 @@ const giorgiKnowledge = {
     { id: 'meta.can', q: 'What can you do?',
       phrases: ['what can you do', 'what do you do', 'help', 'help me', 'i need help', 'need help', 'how does this work', 'i dont understand',
                 'dont understand', 'what should i ask', 'what can i ask', 'what to ask', 'options', 'menu of questions'],
-      resp: 'I can explain how Pass-to-Floor (PTF / Gunda) works, walk you through Onboarding, Workshop, ID Generator and Logbooks, help with backup and restore, and chat a bit. Everything I know is stored offline in this file, so I only answer what I actually know.',
+      resp: 'I know the whole tool: the departments and their screens, tickets and work types, onboarding, workshops and evaluations, the schedule, rotation and pay, employee requests, Service incidents, **Projects** (teams, sub-tasks, approvals, files, timeline, board, progress), backups, sync and the admin space. Ask me anything, or tap a topic below. I run offline and only answer what I actually know.',
       sug: [{ id: 'ctx.here', label: 'What can I do on this screen?' }, 'tool.what', 'tool.start', 'casual.joke'] },
     { id: 'ctx.here', q: 'What can I do in this section?', noRepeat: true,
       phrases: ['this screen', 'this page', 'this section', 'where am i', 'what can i do here', 'what do i do here', 'what is this', 'whats this',
@@ -1538,7 +1559,7 @@ const giorgiKnowledge = {
       } },
     { id: 'tool.what', q: 'What can I do with this tool?',
       phrases: ['what is the trainer tool', 'what is this tool', 'what does this tool do', 'about the tool', 'what can i do with this tool', 'main sections', 'what does it do', 'tool overview', 'trainer tool'],
-      resp: 'Pass-to-Floor (PTF), also called Gunda, covers several areas including:\n• **Home** – Employee Data Source\n• **Onboarding** – trainee groups, sheets, tests and checklists\n• **Workshop** – Workshop Registration, Workshop Checklist and Exam Checklist\n• **ID Generator** – printable barcode IDs\n• **Logbooks** – signature documents\nEverything is saved in this browser.',
+      resp: '**Pass-to-Floor (PTF · Gunda)** runs the whole path from hiring to the gaming floor:\n• **Academy** – onboarding groups, workshops, ID cards, logbooks, retraining\n• **Performance** – exam and workshop evaluations, results, coaching\n• **FMD** – staff directory, schedule, rotation, pay, bonuses, employee requests\n• **Uniforms**, **HR** (recruiting, lifecycle), **Office** (building access, IT), **Service** (incidents from Jira)\n• **🗂 Projects** – shared projects across departments with teams, approvals, files, timeline and board\nEmployees have their own phone page. Data syncs through the company Google Drive.',
       sug: ['tool.start', 'emp.import', 'tool.nav', 'bk.backup'] },
     { id: 'tool.start', q: 'How do I get started?',
       phrases: ['get started', 'getting started', 'where do i start', 'how to start', 'first time', 'quick start', 'new here', 'begin', 'start using'],
@@ -1547,7 +1568,7 @@ const giorgiKnowledge = {
       actions: [OPEN_EMP], sug: ['emp.import', 'exam.overview', 'id.create', 'lb.overview'], ctx: ['home'] },
     { id: 'tool.nav', q: 'How do I move between sections?',
       phrases: ['navigation', 'navigate', 'sections', 'tabs', 'where do i find', 'how do i get to', 'switch section', 'go to', 'main menu'],
-      resp: 'Use the tabs at the top: **Home**, **Onboarding**, **Workshop** (Workshop Registration, Workshop Checklist and Exam Checklist), **ID Generator** and **Logbooks**. The **?** Help button explains the screen you are on, **More** holds theme, restore, your name and Clear data, and the **🛡 pill in the top bar** (or Ctrl+K) opens the Safety Center.',
+      resp: 'The **top bar** has one button per department plus 🗂 Projects, ✅ My tickets, 🔔 notifications and 🔍 search. The **second bar** shows the screens of the department you are in, starting with 🏠 Overview and ending with 📜 History. **? Help** explains the current screen, **More** holds settings, theme and sound, and **Find person…** opens anyone\'s profile.',
       actions: [OPEN_EMP, OPEN_EX, OPEN_ID, OPEN_LB], sug: ['tool.helpbtn'] },
     { id: 'tool.helpbtn', q: 'What does the Help button do?',
       phrases: ['help button', 'help guide', 'user guide', 'shortcut', 'keyboard shortcut', 'hotkey', 'keys'],
@@ -1757,11 +1778,111 @@ const giorgiKnowledge = {
       resp: 'If the print window is blocked, allow pop-ups for this file in your browser, then try again.', sug: ['tool.print', 'lb.print'] }
   ],
 
+  /* ---------- v3.34 the whole platform: departments, tickets, schedule, pay, service, projects ---------- */
+  platform: [
+    { id: 'pf.depts', q: 'How are the departments organised?',
+      phrases: ['departments', 'department', 'spaces', 'top bar', 'which department', 'academy performance fmd', 'second bar', 'overview page'],
+      resp: 'The top bar has one button per **department**: Academy, Performance, FMD, Uniforms, HR, Office (Building access + IT) and Service, plus **🗂 Projects** for cross-department work. The bar under it lists the screens of the department you are in; every department starts on an **🏠 Overview** (numbers, screens, latest changes) and ends with **📜 History**. You only see the departments your position allows.',
+      actions: [{ label: 'Open Projects', do: 'space:projects' }], sug: ['pf.tickets', 'pf.projects', 'pf.history'] },
+    { id: 'pf.tickets', q: 'How do tickets and boards work?',
+      phrases: ['ticket', 'tickets', 'board', 'boards', 'my tickets', 'assign ticket', 'escalate', 'work type', 'work types', 'case'],
+      resp: 'Every department has a **ticket board** (like Jira). Create a ticket, assign it, comment, set a due date or escalate. **✅ My tickets** in the top bar shows what is assigned to you, your board and what you sent. A **work type** (e.g. Termination) creates linked tickets on several boards at once and groups them in one case.',
+      sug: ['pf.depts', 'pf.updates'] },
+    { id: 'pf.schedule', q: 'How do the schedule and rotation work?',
+      phrases: ['schedule', 'rotation', 'roster', 'shifts', 'send schedule', 'tables rotation', 'generate rotation', 'attendance'],
+      resp: '**FMD → Schedule**: the monthly schedule (morning, afternoon, night, days off, leave), the **rotation** of tables per half hour (Generate whole shift), the roster with teams and sets, attendance and pay. **Send schedule / Send rotation** releases them to the employees\' phone page. Ctrl+click selects cells, Delete clears, drag moves shifts.',
+      actions: [{ label: 'Open FMD', do: 'space:fmd' }], sug: ['pf.pay', 'pf.requests', 'pf.emppage'] },
+    { id: 'pf.requests', q: 'Where are employee requests?',
+      phrases: ['employee requests', 'swap request', 'vacation request', 'sick leave', 'day off request', 'give away shift', 'approve request'],
+      resp: '**FMD → Employee requests** lists what employees send from their phone page: swap or give away a shift, annual leave, sick leave, a day off, a question about pay. Approve or decline with a note — the employee sees the answer on their page.',
+      actions: [{ label: 'Open FMD', do: 'space:fmd' }], sug: ['pf.emppage', 'pf.schedule'] },
+    { id: 'pf.pay', q: 'How do pay, bonuses and the month review work?',
+      phrases: ['pay', 'salary', 'bonus', 'bonuses', 'month review', 'hourly', 'per hour', 'pay statement', 'bonus level'],
+      resp: 'Pay is set in **FMD → Schedule → Pay**: per shift or **per hour** (hours left early are counted). **🏅 Bonuses & month** holds the bonus programs with levels per position and the **month review** for team managers (shifts, hours, evaluations, mistakes, incidents, remarks → bonus level → Final). Employees see their pay statement once the month is final.',
+      actions: [{ label: 'Open FMD', do: 'space:fmd' }], sug: ['pf.schedule', 'pf.emppage'] },
+    { id: 'pf.people', q: 'How do I find a person and their history?',
+      phrases: ['find person', 'profile', 'staff directory', 'person history', 'employee profile', 'who is working today', 'work id'],
+      resp: 'Use **Find person…** in the top bar or the **FMD Overview staff directory** (search by name, nickname, Work ID, badge, position, team). The profile shows details, the next 7 days, where the person is in the rotation right now, evaluations, incidents, remarks, the month review and every change made to their data.',
+      sug: ['pf.history', 'pf.schedule'] },
+    { id: 'pf.service', q: 'How does Service Management work?',
+      phrases: ['service management', 'incidents', 'incident', 'jira import', 'jira csv', 'procedural mistake', 'reports'],
+      resp: '**🚨 Service** collects game-presenter **incidents** (procedural mistakes, cases): log them by hand or **import the CSV exported from Jira** (re-imports update by Jira key). **Reports** group them by presenter, type, game, shift and week. Employees see their own incidents on their phone page.',
+      actions: [{ label: 'Open Service', do: 'space:service' }], sug: ['pf.depts', 'pf.people'] },
+    { id: 'pf.projects', q: 'What is Projects?',
+      phrases: ['projects', 'project', 'new project', 'cross department project', 'my work', 'personal project', 'shared project'],
+      resp: '**🗂 Projects** is for work across departments, and for your own to-dos. Create a project, **assign** it to departments, teams or people, and they break it into their own connected **sub-projects**. Each project has an overview, a work map, items (kanban), a timeline, a visual board, files, approvals, access and a discussion. **My work** shows what needs you: blocked, waiting, overdue, approvals.',
+      actions: [{ label: 'Open Projects', do: 'space:projects' }], sug: ['pf.access', 'pf.branch', 'pf.timeline', 'pf.approvals'] },
+    { id: 'pf.access', q: 'Who can see and change a project?',
+      phrases: ['project access', 'who can see', 'restrict', 'restricted', 'share item', 'share file', 'viewer', 'viewers', 'managers of project', 'permissions project', 'private project'],
+      resp: 'Per project: the **owner** and **managers** change everything (also access); people, departments or teams **assigned** work on it; **viewers** only read. Visibility: only those people, the same as the parent project, or everyone. One item or file can be **🔒 restricted** to some people or **🔗 shared** with people outside the project (item → Access). The board can be drawn on by workers, only managers, or everyone. The server enforces all of it.',
+      sug: ['pf.teams', 'pf.files', 'pf.projects'] },
+    { id: 'pf.teams', q: 'How do teams work?',
+      phrases: ['teams', 'team', 'create team', 'team members', 'distribute people', 'teams and departments', 'department members'],
+      resp: '**Projects → 👥 Teams & departments**: managers and seniors create **teams** inside departments (name, lead, members). A team member counts for the team and its department, so you can assign a project, share a file or distribute a task to a whole team. A person\'s department comes from their position, set by the admin.',
+      actions: [{ label: 'Open Projects', do: 'space:projects' }], sug: ['pf.branch', 'pf.progress'] },
+    { id: 'pf.branch', q: 'How do sub-tasks and distribution work?',
+      phrases: ['sub task', 'subtask', 'sub-task', 'branch', 'distribute task', 'split task', 'break down task', 'sub project', 'sub-project', 'break down'],
+      resp: 'Open a task → **⑂ + Sub-task** to branch it (to any depth), or **👥 Distribute** to create one sub-task per person (tick people, or a whole team). Each person sees their own part, and the task shows "1/3 sub-tasks". Bigger parts of a project become **sub-projects** (+ Sub-project) owned by the team that does them.',
+      sug: ['pf.timeline', 'pf.approvals'] },
+    { id: 'pf.timeline', q: 'Where do I see blockers and the timeline?',
+      phrases: ['timeline', 'gantt', 'work map', 'blocker', 'blocked', 'waiting for specs', 'needs help', 'dependencies', 'depends on', 'deadline'],
+      resp: '**🗺 Work map** shows the whole tree with owners and what holds things up: ⛔ blocked (and why), 🙋 needs help, ⏳ waiting for (specs…) with days, ⛓ blocked by another item, ⏰ overdue, 📅 due within 2 days. **📅 Timeline** puts it on a calendar: striped red = blocked, amber = waiting, red arrows = unfinished dependencies, plus the total days spent waiting.',
+      sug: ['pf.board', 'pf.updates'] },
+    { id: 'pf.approvals', q: 'How does the approval flow work?',
+      phrases: ['approval', 'approvals', 'approve', 'ask for approval', 'approver', 'reject', 'request changes', 'stage gate', 'workflow', 'stages'],
+      resp: 'On an item or file press **✔ Ask for approval**, pick the approvers and the rule (all must approve / one is enough). Approvers see it on **My work** and in the 🔔 bell and choose ✅ Approve, ↩ Request changes or ⛔ Reject. Projects also move through **workflow stages**; a stage marked "!" can only be entered after its approval.',
+      sug: ['pf.projects', 'pf.updates'] },
+    { id: 'pf.files', q: 'How do I store files and documents?',
+      phrases: ['upload', 'upload file', 'files', 'attachment', 'attachments', 'document', 'documents', 'info page', 'download file'],
+      resp: 'Project → **📎 Files & docs**: **⬆ Upload file** (up to 25 MB, stored privately in the tool\'s Google Drive through the server), **📄 Info page** (text kept in the tool) or **🔗 Link**. Each one can be restricted or shared like any item; downloads are checked by the server.',
+      sug: ['pf.access', 'pf.sync'] },
+    { id: 'pf.board', q: 'What is the visual board?',
+      phrases: ['visual board', 'whiteboard', 'figma', 'sticky note', 'sticky notes', 'canvas', 'draw'],
+      resp: 'Every project has a **🎨 Board**: sticky notes, shapes, text, frames and arrows, plus **live cards** of items and sub-projects (＋ Cards, ▦ Arrange by status). Drag to move, the blue corner resizes, double-click edits, the wheel zooms, ⬇ downloads an SVG. It saves as you go and is shared with the project.',
+      sug: ['pf.timeline', 'pf.projects'] },
+    { id: 'pf.explorer', q: 'How do I filter data by any field?',
+      phrases: ['data explorer', 'filter', 'filter by field', 'export csv', 'search all data', 'find records'],
+      resp: '**Projects → 🔍 Data explorer** lets you search projects, project items, tickets, documents, announcements, incidents, cases and teams by **any field** (also own fields like Budget): pick a field, an operator and a value, choose columns, export CSV. It only contains what you are allowed to see.',
+      sug: ['pf.progress'] },
+    { id: 'pf.progress', q: 'Where do I see progress per team or department?',
+      phrases: ['progress', 'progress page', 'workload', 'team progress', 'department progress', 'dashboard', 'kpi'],
+      resp: '**Projects → 📊 Progress**: per **project** (stage, progress bar, open, overdue, blocked, waiting, approvals), per **team** and per **department** (open tasks, done in 30 days, overdue, blocked, plus a workload bar for every person).',
+      actions: [{ label: 'Open Projects', do: 'space:projects' }], sug: ['pf.teams', 'pf.explorer'] },
+    { id: 'pf.updates', q: 'How do notifications and updates work?',
+      phrases: ['notifications', 'notification', 'bell', 'digest', 'daily email', 'send update', 'email update', 'alerts'],
+      resp: 'The **🔔 bell** shows what concerns you: tickets, announcements, project changes, approvals asked of you, comments, deadlines. In a project, **📣 Send update** e-mails a summary to the people involved; the server also sends a **daily digest** when something changed or is stuck. Mute it per project with 🔔 E-mails on.',
+      sug: ['pf.approvals', 'pf.projects'] },
+    { id: 'pf.sync', q: 'How does sync and privacy work?',
+      phrases: ['sync', 'drive sync', 'google drive', 'server', 'who sees what', 'privacy', 'shared data', 'offline'],
+      resp: 'The tool keeps a copy of the data on each computer and syncs with the company **Google Drive** through a small Apps Script server every few seconds (the sync badge shows the state). The **server decides who receives what**: each person only gets the data of their department, position and projects.',
+      sug: ['bk.backup', 'pf.admin'] },
+    { id: 'pf.admin', q: 'Where is the admin space?',
+      phrases: ['admin', 'admin space', 'admin panel', 'ctrl g', 'accounts', 'create account', 'access requests', 'positions access', 'sites'],
+      resp: 'The admin opens the **admin space with Ctrl+G** (admin password). On a laptop it has a menu on the left: name & password, position passwords, custom spaces, appearance, Drive sync, access requests, accounts, space access, the admin console, sites, detailed access, removal requests, unique names and backup. **👁 View as** previews the tool as any position or person.',
+      sug: ['pf.sync', 'pf.viewas'] },
+    { id: 'pf.viewas', q: 'What does View as do?',
+      phrases: ['view as', 'preview as', 'see as', 'impersonate', 'preview position'],
+      resp: '**👁 View as** (admin only) shows the tool as another position or person sees it — the admin stays signed in, nothing is changed. Tap the orange pill at the bottom to exit.',
+      sug: ['pf.admin'] },
+    { id: 'pf.emppage', q: 'What do employees see on their phone?',
+      phrases: ['employee page', 'phone page', 'employee self service', 'employees see', 'my page', 'sign in with google'],
+      resp: 'Employees sign in with Google on the **employee page** and see only their own data: **Home** (information, salary, evaluations, mistakes, feedback, games), **Schedule** (shifts, hours, requests) and **Rotation** (their tables).',
+      sug: ['pf.requests', 'pf.pay'] },
+    { id: 'pf.history', q: 'Where do I see who changed what?',
+      phrases: ['history', 'change history', 'who changed', 'audit', 'journal', 'log of changes'],
+      resp: 'Every change is recorded with who and when: **📜 History** at the end of each department\'s menu, the **History** tab of a person\'s profile, and **💬 Activity** in a project.',
+      sug: ['pf.people', 'pf.depts'] },
+    { id: 'pf.sound', q: 'Can I turn on sounds and change the animations?',
+      phrases: ['sound', 'sounds', 'sound effects', 'animations', 'animation', 'motion', 'reduce motion', 'mute'],
+      resp: '**More → Sound**: success, warning, navigation and button sounds (all off by default, quiet tones). Animations are short and respect the system setting "reduce motion"; you can switch them off in **More → ✨ Motion & sound**.',
+      sug: ['tool.look'] }
+  ],
+
   /* ---------- Casual conversation ---------- */
   v16: [
     { id: 'tool.new', q: 'What is new in this version?',
       phrases: ['what is new', 'whats new', 'new features', 'new version', 'update', 'updated', 'changes', 'v1.6', 'v2.0', '2.0', 'what changed'],
-      resp: 'Version 2.2 (No Fun edition, builds on 2.1) works **fully offline** and brings:\n1. **Positions** – choose Shift lead, Performance coach, Training coordinator, Senior or Manager and see the matching sections.\n2. **Backup and Clear history for each section** (Employee Data, Onboarding, Workshop, ID Creation, Logbooks) from the bar at the bottom left.\n3. **Smaller safety copies** when restoring, and Onboarding / Workshop files now reload cleanly after a restore.\n4. Everything from 2.1 still present: Onboarding hierarchy and search, Workshop Registration, Safety Center (Ctrl+K), fixed paste alignment, Excel-like status bar. Fun mode is not part of this edition.',
+      resp: '**Latest (v3.34)**: a cleaner, wider look — smooth page and window animations, a laptop-size **admin space with a side menu**, refined sounds (off by default) and me, updated to know the whole tool.\n**v3.33**: Projects got teams, restricted / shared items and files, sub-tasks and Distribute, workflow stages, approvals, file uploads and a Progress page.\n**v3.32**: 🗂 Projects (sub-projects, work map, timeline, board, Data explorer, updates).\n**v3.29–3.31**: Service Management, unique names, pay by the hour, bonuses and the month review.',
       sug: ['onb.overview', 'ws.overview', 'safety.center', 'safety.offline'] },
     { id: 'onb.overview', q: 'How does Onboarding work?',
       phrases: ['onboarding', 'trainee', 'trainees', 'new hires', 'training group', 'game presenters', 'shufflers', 'trainer folder', 'information sheet', 'checklist sheet'],
@@ -2218,6 +2339,9 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
   function runAction(a) {
     clearChips();
     const d = a.do || '';
+    if (d.indexOf('space:') === 0) {   /* v3.34 open a department or Projects */
+      addUser(a.label); try { window.openSpace(d.slice(6)); } catch (e) {}
+      setTimeout(function () { addRow('bot', fmt('Done — ' + a.label.replace(/^Open /, '') + ' is open.')); react('success'); }, 120); return; }
     if (d.indexOf('view:') === 0) {
       const name = d.slice(5);
       addUser(a.label);
@@ -26909,6 +27033,128 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       box.insertBefore(d, cl); }
     adminPanel(); setTimeout(adminPanel, 1500);
   } catch (e) { console.warn('Settings disabled:', e); }
+})();
+</script>
+<script id="uiPolish">
+/* v3.34 Look & feel: one consistent finish on top of every screen.
+   - Admin space: on laptops and larger it opens as a wide window with a side menu (one section at a time, search); on phones it stays one column.
+   - Header: the site and person pills sit in the action row, so the department bar never runs off the screen; the department sub-bar wraps on wide screens.
+   - Motion: page changes slide in, windows fade and pop, cards lift, buttons press; everything respects "reduce motion" and a switch in More.
+   - Sound: windows opening use the soft click sound (only when the person turned sounds on). */
+(function () {
+  try {
+    var KM = 'totReduceMotion';
+    function motionOff() { try { return localStorage.getItem(KM) === '1'; } catch (e) { return false; } }
+    function applyMotion() { document.documentElement.classList.toggle('ui-still', motionOff()); }
+    applyMotion();
+    var css = document.createElement('style'); css.id = 'uiPolishCss';
+    css.textContent = [
+      ':root{--ui-ease:cubic-bezier(.2,.8,.2,1);--ui-shadow:0 24px 64px rgba(0,0,0,.45);--ui-ring:0 0 0 3px rgba(59,130,246,.35)}',
+      /* page transitions */
+      '@keyframes uiPageIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}@keyframes uiFade{from{opacity:0}to{opacity:1}}@keyframes uiPop{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}@keyframes uiSlideL{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}',
+      '.view:not([hidden]){animation:uiPageIn .34s var(--ui-ease) both}',
+      '#spaceSub.show{animation:uiFade .25s ease both}#spaceSub button{transition:background-color .18s,color .18s,border-color .18s,box-shadow .18s,transform .08s}',
+      '#spaceSub button.on{box-shadow:0 4px 14px rgba(59,130,246,.35)}',
+      /* overlays and windows */
+      '.tkOv,.adOv.open,.pjOv{animation:uiFade .2s ease both;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}',
+      '.tkOv>.tkBox,.adOv.open>.adBox,.adOv.open>.adNav{animation:uiPop .3s var(--ui-ease) both}',
+      '.tkBox,.adBox{box-shadow:var(--ui-shadow)}',
+      '.more-menu.open,#psMenu.open,#spMenu.open{animation:uiPop .18s var(--ui-ease) both}',
+      /* buttons, inputs, cards */
+      'button,.nav-tab,.pjB,.shMini,.tkB{transition:background-color .16s,border-color .16s,color .16s,box-shadow .16s,transform .08s}',
+      'button:not(:disabled):active{transform:scale(.97)}',
+      'input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none;box-shadow:var(--ui-ring);border-color:#3b82f6!important}',
+      'button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:2px solid #3b82f6;outline-offset:2px}',
+      '.pjCard,.shCard,.tool-card,.pjItem,.tkCard,.pjTeam,.pjDept,.pjAppr{transition:transform .18s var(--ui-ease),box-shadow .18s,border-color .18s}',
+      '.pjCard:hover,.shCard:hover,.tool-card:hover,.pjTeam:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,.28)}',
+      '.pjItem:hover{box-shadow:0 6px 18px rgba(0,0,0,.22)}',
+      /* thin, quiet scrollbars */
+      '*{scrollbar-width:thin;scrollbar-color:rgba(148,163,184,.35) transparent}',
+      '::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(148,163,184,.3);border-radius:10px;border:2px solid transparent;background-clip:padding-box}::-webkit-scrollbar-thumb:hover{background-color:rgba(148,163,184,.5)}',
+      /* header: pills in the action row, department bar never clipped */
+      '.top-bar-actions{flex-wrap:wrap;row-gap:6px}.top-bar-actions #sitePill,.top-bar-actions #psPill{margin-left:0!important}',
+      '@media(min-width:1024px){#spaceSub.show{flex-wrap:wrap!important;overflow:visible!important;row-gap:6px}}',
+      /* admin space: wide window with a side menu */
+      '.adNav{display:none}',
+      '.adOv.adWide{padding:2vh 2vw}',
+      '.adOv.adWide>.adNav{display:flex;flex-direction:column;width:270px;flex:0 0 270px;height:min(880px,94vh);box-sizing:border-box;padding:18px 12px;background:var(--navy3,#10152a);color:var(--text,#e8ecf8);border:1px solid var(--border,#2a3150);border-right:0;border-radius:18px 0 0 18px;overflow:auto;box-shadow:var(--ui-shadow);align-self:center}',
+      '.adOv.adWide>.adBox{max-width:none!important;width:min(1040px,calc(96vw - 270px))!important;height:min(880px,94vh)!important;max-height:none!important;margin:0!important;align-self:center;overflow:auto;box-sizing:border-box;padding:26px 34px 34px!important;border-radius:0 18px 18px 0!important;font-size:14px}',
+      '.adOv.adWide .adBox>[data-ads]:not(.adOn){display:none!important}',
+      '.adOv.adWide .adBox>[data-ads="title"],.adOv.adWide .adBox>#adClose{display:none!important}',
+      '.adOv.adWide .adBox>details{border:0!important;margin:0!important;padding:0!important}',
+      '.adOv.adWide .adBox>details>summary{list-style:none;pointer-events:none;font-size:20px!important;font-weight:700!important;margin:0 0 14px!important;cursor:default!important}.adOv.adWide .adBox>details>summary::-webkit-details-marker{display:none}',
+      '.adOv.adWide .adBox input:not([type=checkbox]):not([type=radio]):not([type=color]),.adOv.adWide .adBox select,.adOv.adWide .adBox textarea{max-width:680px}',
+      '.adOv.adWide .adBox table{width:100%}',
+      '.adHdr{display:none}.adOv.adWide .adHdr{display:flex;align-items:center;gap:10px;margin:0 0 18px;padding-bottom:12px;border-bottom:1px solid var(--border,#2a3150)}.adHdr b{font-size:22px}.adHdr small{opacity:.6}',
+      '.adNav h4{margin:2px 8px 4px;font-size:15px}.adNav p{margin:0 8px 12px;font-size:11.5px;opacity:.6}',
+      '.adNav input{margin:0 4px 10px;padding:8px 11px;border-radius:10px;border:1px solid var(--border,#2a3150);background:rgba(255,255,255,.05);color:inherit;font:inherit;font-size:13px}',
+      '.adNav .adNi{display:flex;align-items:center;gap:8px;text-align:left;width:100%;padding:9px 11px;margin:1px 0;border:0;border-radius:10px;background:transparent;color:inherit;font:inherit;font-size:13.5px;cursor:pointer;opacity:.85}',
+      '.adNav .adNi:hover{background:rgba(148,163,184,.12);opacity:1}.adNav .adNi.on{background:var(--accent,#3b82f6);color:#fff;opacity:1;box-shadow:0 6px 16px rgba(59,130,246,.35)}',
+      '.adNav .adSp{flex:1}.adNav .adCl{margin-top:10px;padding:9px;border-radius:10px;border:1px solid var(--border,#2a3150);background:transparent;color:inherit;cursor:pointer;font:inherit;font-size:13.5px}.adNav .adCl:hover{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.5)}',
+      '.adOv.adWide .adBox>.adOn{animation:uiSlideL .25s var(--ui-ease) both}',
+      /* phones: page content keeps a 14px margin from the screen edge */
+      '@media(max-width:760px){.pjWrap,.shWrap{padding-left:14px!important;padding-right:14px!important;box-sizing:border-box}.pjHead h2,.shHead h2{font-size:20px}.pjStats{grid-template-columns:repeat(2,minmax(0,1fr))}}',
+      /* phones: the admin space uses the whole width */
+      '@media(max-width:899px){.adOv .adBox{max-width:640px!important;max-height:92vh;overflow:auto}}',
+      /* motion off */
+      'html.ui-still *,html.ui-still *::before,html.ui-still *::after{animation:none!important;transition:none!important}',
+      '@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.001s!important;transition-duration:.001s!important}}'
+    ].join('\n');
+    document.head.appendChild(css);
+
+    /* ---------- header: move the site and person pills into the action row ---------- */
+    function pills() { var bar = document.querySelector('.top-bar-actions'); if (!bar) return; ['psPill', 'sitePill'].forEach(function (id) { var p = document.getElementById(id); if (p && p.parentNode !== bar) bar.insertBefore(p, bar.firstChild); }); }
+    [0, 400, 1500, 4000].forEach(function (t) { setTimeout(function () { try { pills(); } catch (e) {} }, t); });
+
+    /* ---------- admin space ---------- */
+    var NAMES = [[/position password/i, '🔑 Position passwords'], [/custom spaces/i, '🧩 Custom spaces'], [/unique nicknames/i, '🪪 Unique nicknames and names'], [/backup & settings/i, '💾 Backup & settings']];
+    function ae(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    function panel() { return [].filter.call(document.querySelectorAll('.adOv'), function (o) { return o.querySelector('#adClose'); })[0]; }
+    function titleOf(el) { if (el.tagName === 'DETAILS') { var s = el.querySelector('summary'); return (s ? s.textContent : '').replace(/\s+/g, ' ').trim().slice(0, 48); }
+      var t = (el.textContent || '').replace(/\s+/g, ' ').trim(); for (var i = 0; i < NAMES.length; i++) if (NAMES[i][0].test(t.slice(0, 80))) return NAMES[i][1];
+      var h = el.querySelector && el.querySelector('b,strong,h3,h4'); var x = (h && h.textContent.trim()) || t; return x.replace(/\(.*$/, '').trim().slice(0, 44) || 'Section'; }
+    var busy = false, cur = ''; try { cur = sessionStorage.getItem('adSec') || ''; } catch (e) {}
+    function build() { var o = panel(); if (!o || busy) return; busy = true;
+      try { var box = o.querySelector('.adBox'), wide = window.innerWidth >= 900; o.classList.toggle('adWide', wide);
+        var nav = o.querySelector('.adNav'); if (!nav) { nav = document.createElement('div'); nav.className = 'adNav'; o.insertBefore(nav, box); nav.addEventListener('click', function (e) { var b = e.target.closest('.adNi'); if (b) { cur = b.getAttribute('data-k'); try { sessionStorage.setItem('adSec', cur); } catch (x) {} show(); var bx = panel().querySelector('.adBox'); bx.scrollTop = 0; } else if (e.target.closest('.adCl')) { var c = document.getElementById('adClose'); if (c) c.click(); } }); nav.addEventListener('input', function (e) { if (e.target.tagName === 'INPUT') filter(e.target.value); }); }
+        var hdr = box.querySelector(':scope > .adHdr'); if (!hdr) { hdr = document.createElement('div'); hdr.className = 'adHdr'; box.insertBefore(hdr, box.firstChild); }
+        var secs = [], s0 = { k: 'general', t: '⚙ Name & admin password', els: [] }, past = false; secs.push(s0);
+        [].forEach.call(box.children, function (el) { if (el === hdr) return; if (el.id === 'adClose') { el.setAttribute('data-ads', 'close'); return; }
+          if (!secs.titleSet && el.tagName === 'B' && !past && !s0.els.length) { el.setAttribute('data-ads', 'title'); secs.titleSet = 1; return; }
+          if (!past) { s0.els.push(el); if (el.tagName === 'BR') past = true; return; }
+          if (el.tagName === 'BR' || el.tagName === 'HR') { secs[secs.length - 1].els.push(el); return; }
+          var t = titleOf(el), k = (el.id || t).replace(/[^\w]+/g, '').slice(0, 30) || ('s' + secs.length); secs.push({ k: k, t: t, els: [el] }); });
+        secs.forEach(function (s) { s.els.forEach(function (el) { el.setAttribute('data-ads', s.k); }); });
+        o.__secs = secs; if (!secs.some(function (s) { return s.k === cur; })) cur = secs[0].k;
+        var q = nav.querySelector('input') ? nav.querySelector('input').value : '';
+        nav.innerHTML = '<h4>🛠 Admin space</h4><p>All access · changes apply to everyone</p><input type="search" placeholder="🔎 Find a setting…" value="' + q.replace(/"/g, '&quot;') + '">' + secs.map(function (s) { return '<button type="button" class="adNi" data-k="' + s.k + '">' + ae(s.t) + '</button>'; }).join('') + '<span class="adSp"></span><button type="button" class="adCl">✕ Close admin space</button>';
+        if (q) filter(q); show();
+      } finally { busy = false; } }
+    function filter(q) { var o = panel(); if (!o) return; q = String(q || '').toLowerCase().trim(); var first = null;
+      (o.__secs || []).forEach(function (s) { var hit = !q || (s.t + ' ' + s.els.map(function (e) { return e.textContent || ''; }).join(' ')).toLowerCase().indexOf(q) >= 0, b = o.querySelector('.adNi[data-k="' + s.k + '"]'); if (b) b.style.display = hit ? '' : 'none'; if (hit && !first) first = s.k; });
+      if (q && first && !(o.__secs || []).some(function (s) { return s.k === cur && o.querySelector('.adNi[data-k="' + s.k + '"]').style.display !== 'none'; })) { cur = first; show(); } }
+    function show() { var o = panel(); if (!o) return; var box = o.querySelector('.adBox'), s = (o.__secs || []).filter(function (x) { return x.k === cur; })[0];
+      [].forEach.call(box.children, function (el) { var k = el.getAttribute('data-ads'); el.classList.toggle('adOn', !!k && k === cur); if (k === cur && el.tagName === 'DETAILS') el.open = true; });
+      [].forEach.call(o.querySelectorAll('.adNi'), function (b) { b.classList.toggle('on', b.getAttribute('data-k') === cur); });
+      var hdr = box.querySelector(':scope > .adHdr'); if (hdr && s) hdr.innerHTML = '<b>' + ae(s.t) + '</b>' + (s.els[0] && s.els[0].tagName === 'DETAILS' ? '' : ''); var only = s && s.els.length === 1 && s.els[0].tagName === 'DETAILS'; if (hdr) hdr.style.display = only ? 'none' : ''; }
+    var mo = null, tm = null;
+    function watch() { var o = panel(); if (!o || o.__watched) return; o.__watched = true;
+      new MutationObserver(function () { if (o.classList.contains('open')) { build(); try { if (window.playUiSound) playUiSound('click'); } catch (e) {} } }).observe(o, { attributes: true, attributeFilter: ['class'] });
+      new MutationObserver(function (m) { if (busy) return; if (m.some(function (r) { return [].some.call(r.addedNodes, function (n) { return n.nodeType === 1 && !n.classList.contains('adHdr'); }); })) { clearTimeout(tm); tm = setTimeout(build, 60); } }).observe(o.querySelector('.adBox'), { childList: true });
+      if (o.classList.contains('open')) build(); }
+    var tries = 0, iv = setInterval(function () { watch(); if (panel() && panel().__watched || ++tries > 40) clearInterval(iv); }, 500);
+    window.addEventListener('resize', function () { var o = panel(); if (o && o.classList.contains('open')) { clearTimeout(tm); tm = setTimeout(build, 120); } });
+    window.__adLayout = build;
+
+    /* ---------- soft sound when a window opens (only if the person enabled click sounds) ---------- */
+    new MutationObserver(function (m) { m.forEach(function (r) { [].forEach.call(r.addedNodes, function (n) { if (n.nodeType === 1 && n.classList && n.classList.contains('tkOv')) { try { if (window.playUiSound) playUiSound('click'); } catch (e) {} } }); }); }).observe(document.body, { childList: true });
+
+    /* ---------- More menu: Motion switch next to the sound settings ---------- */
+    function motionUi() { var sp = document.getElementById('soundPrefsPanel'); if (!sp || document.getElementById('uiMotion')) return;
+      var l = document.createElement('label'); l.style.marginTop = '6px'; l.innerHTML = '<input type="checkbox" id="uiMotion"> ✨ Reduce animations'; sp.appendChild(l);
+      var c = l.querySelector('input'); c.checked = motionOff(); c.onchange = function () { try { localStorage.setItem(KM, c.checked ? '1' : '0'); } catch (e) {} applyMotion(); }; }
+    motionUi(); setTimeout(motionUi, 1500);
+  } catch (e) { console.warn('UI polish disabled:', e); }
 })();
 </script>
 </body>

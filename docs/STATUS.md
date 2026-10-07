@@ -10,6 +10,8 @@ Checked against `docs/platform-requirements.txt` (35 sections), using the code i
 
 "v3.26" marks onboarding templates sent to departments as live tickets (see `docs/v3_26_notes.md`).
 
+"v3.34" marks the look & feel round: wide admin space with a side menu, motion, header fit, Giorgi knowing the whole tool (see `docs/v3_34_notes.md`).
+
 "v3.33" marks teams, restricted / shared items and files, branching tasks, workflow stages, approvals, file storage and the Progress page (see `docs/v3_33_notes.md`).
 
 "v3.32" marks Projects: shared and personal projects with access per project, sub-projects, work map, timeline tree, visual board, data explorer and updates to the people involved (see `docs/v3_32_notes.md`).

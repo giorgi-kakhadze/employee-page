@@ -18,6 +18,7 @@ node tests/unique_names.test.js
 node tests/bonus_pay.test.js
 node tests/projects.test.js
 node tests/projects_teams.test.js
+node tests/ui_polish.test.js
 ```
 
 - `sync_privacy.test.js`: what each person receives (tickets, cases, comments, announcements, audit log), writes from people who see only part of the list, deleting, forged pushes, two people saving at once, HR case progress.
@@ -35,5 +36,6 @@ node tests/projects_teams.test.js
 - `bonus_pay.test.js`: pay per hour with actual hours (left early); bonus programs with levels per position; the month review (numbers, levels, hours, remarks shown or internal, final); the profile Month tab; pay statements; the server rules for bonus, review, pay and remark data; 'me' returns only the employee's own statement, shown remarks, incidents and evaluation comments; new request types; the employee page with Home / Schedule / Rotation, read-only.
 - `projects.test.js`: projects per person (assigned departments and people, viewers, private and open projects); sub-projects; what the server refuses (viewer edits, access changes by assigned people, forged owners, deleting without rights); item assignees; the board and project discussion; bell notifications only for the people involved; the daily digest and on-demand e-mail updates; the pages (My work, All projects, Data explorer filters by any field including own fields, work map, timeline, board, items, access, Updates); creating through the forms; deleting a project with its items.
 - `projects_teams.test.js`: teams (only managers write; members get team and team-department projects); restricted and shared items; board drawing rights; approvals (server-computed status, own decision only, no wiping); workflow stage gates; sub-tasks and distribution; comments on items (not leaked from restricted items); deadline warnings; file upload / download with access checks and the Files tab; Progress page (projects, teams, departments) and the Teams page; digest with team members and deadlines.
+- `ui_polish.test.js`: the admin space on a laptop (side menu, one section, search, close) and on a phone (one column); header pills and nothing clipped; the version; the Reduce animations switch; Giorgi's answers about approvals, teams, the rotation and the whole tool, and his Open Projects button.
 
 Each prints one line per check and exits with code 1 if any check fails.
