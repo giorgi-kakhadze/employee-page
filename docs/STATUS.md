@@ -10,6 +10,8 @@ Checked against `docs/platform-requirements.txt` (35 sections), using the code i
 
 "v3.26" marks onboarding templates sent to departments as live tickets (see `docs/v3_26_notes.md`).
 
+"v3.28" marks department overviews, the FMD staff directory, the change journal (history per department and per person), Settings, and evaluation media and types (see `docs/v3_28_notes.md`).
+
 Legend: **Done** = works in the tool today · **Partial** = some of it works, the rest is listed · **Missing** = not built · **Not connected** = the screens and rules exist, but no live connection, on purpose (no fake integrations).
 
 "v3.22" marks what this round added.
@@ -36,7 +38,7 @@ Legend: **Done** = works in the tool today · **Partial** = some of it works, th
 | 16 | Unified employee record | Partial | One employee list (`employeeDataSource`) and the person 360 view link evaluations, retraining, cases, tasks, lifecycle. Not all modules link by work ID yet (some still match by name). |
 | 17 | Employee lifecycle | Partial | Stages: Onboarding, Probation, Active, Transfer, Leaving, Retired, Terminated, plus an event log. Not yet: Candidate → Hired as linked stages, Training / Qualified, Archived. |
 | 18 | Notifications | Partial (v3.22) | In-tool bell and desktop alerts: assigned, reassigned, comments, status changes, waiting-for-you, announcements. **v3.22:** overdue tickets, escalations (to Management, the sender and the assignee). Email / Teams / Power Automate: *Not connected* (two existing Apps Script emails aside). |
-| 19 | Audit trail | Partial (v3.23) | Audit log of who / what / when across modules. **v3.23:** the server only accepts entries in the sender's own name (forged entries are dropped). Previous and new values are recorded for some actions (status moves, priority, re-evaluation scores), not for every field. |
+| 19 | Audit trail | Partial (v3.28) | **v3.28:** change journal: who changed what and when, per department (📜 History in every space) and per person (profile History tab), including shifts, rotation, profile fields, evaluations, retraining and uniforms; add-only on the server, and each person reads only the entries about data they may see. Audit log of who / what / when across modules. **v3.23:** the server only accepts entries in the sender's own name (forged entries are dropped). Previous and new values are recorded for some actions (status moves, priority, re-evaluation scores), not for every field. |
 | 20 | Files and documents | Partial | Department document links, workshop/onboarding files, ticket links (v3.22). No ticket file uploads. |
 | 21 | Department templates | Done (v3.22) | Ticket templates per department, process templates. **v3.22:** saved workbook templates. |
 | 22 | Cross-department process templates | Done (v3.25) | Admin edits the steps (department, title, due days). Progress is shown per case. "Responsible role" and "completion requirement" per step are not separate fields. **v3.25:** edited per department in the ⚡ Work types tab. |

@@ -11,6 +11,8 @@ node tests/nav_spaces.test.js
 node tests/work_types.test.js
 node tests/onboarding_share.test.js
 node tests/schedule_grid.test.js
+node tests/evaluation.test.js
+node tests/overview_history.test.js
 ```
 
 - `sync_privacy.test.js`: what each person receives (tickets, cases, comments, announcements, audit log), writes from people who see only part of the list, deleting, forged pushes, two people saving at once, HR case progress.
@@ -21,5 +23,7 @@ node tests/schedule_grid.test.js
 
 - `onboarding_share.test.js`: onboarding templates sent as live tickets. A trainer creates a group through the screens and sends Fingerprints (to Building access), Live exam (to Performance) and Uniforms (to Uniforms); one ticket each, no duplicates, the live-exam due date and times; the access team sees the table with the drop-out row in red, ticks a row, adds a note, corrects a Biostar ID and comments; the correction is written back into the onboarding and the trainer's comment reaches the ticket; the ticket record itself is never rewritten; Performance does not receive the Fingerprints table.
 - `schedule_grid.test.js`: FMD schedule and rotation grids: breaks count as working hours; Ctrl+click and whole-person selection; Delete clears the selection; drag shifts to another day or person (comments move along), swap by dropping one on another, move a block; show only selected people.
+- `evaluation.test.js`: evaluation kinds (Exam, Beginner, Regular…) and Average / Close-up scoring (main criteria only, procedural deductions shown but not counted); a photo attached while evaluating one by one is stored with the result and shown in Results; a video is uploaded to (simulated) Drive and linked to the result; grid photos; the type editor keeps the method and main criteria; saving inside the evaluation frame is recorded in the change journal.
+- `overview_history.test.js`: Settings instead of Print/Backup (who sees it, full backup only for the admin and managers); every department opens on its Overview, with History at the end of its second bar; the tools moved out of More; Retraining stays in Academy, Performance or FMD; the FMD staff directory (search by Work ID, barcode, badge, screen name; position, team, status and working-today filters; opening a profile); the profile's next 7 days and rotation right now; shift and profile changes recorded with who and when, shown in the profile History and FMD → History; the server journal is add-only and each person reads only what they may; sync does not record changes twice or resend the journal.
 
 Each prints one line per check and exits with code 1 if any check fails.

@@ -22,6 +22,8 @@
  * v3.25: Management is a position, not a department: 'management' left the department list and managers/seniors are no longer mapped to a department
  *   (they still see everything; a position the admin mapped to the old Management department keeps that too). Uniforms, Building access and IT
  *   can read (not edit or delete) the case record of every case that created a ticket for them. FMD (scheduling coordinators) receives game counts and their import history.
+ * v3.28: change journal 'totJournal' (add-only like the audit log, max 8000 entries): a person receives their own entries, their department's, and the
+ *   entries about data they may read themselves. Photos attached to evaluations ('evalPhotos') follow the evaluation rights.
  * Data lives in your Google Drive folder "Tool Data": tool-data.json (shared data) and access.json (who may use the tool).
  */
 const ADMIN_SECRET = 'CHANGE-ME-ADMIN-KEY';
@@ -190,7 +192,7 @@ function whoIs_(cur, em) { var p = policy_(cur), u = (p.users || {})[em]; if (!u
   return { role: String(u.role), sites: Array.isArray(u.sites) ? u.sites.map(String) : ['main'] }; }
 /* v3.21 ADMIN-ONLY MODE: every screen except Home is locked for non-admins until the admin grants it (tool: Permissions page, key totAccessGrants).
    Switch: totAccessGrants.on === false turns it off; otherwise it is on. Keys not listed here (audit log, employee list, policy, ...) are not gated. */
-const GATE_VIEW = { evalResults: 'exam', traineeNotes: 'exam', coachingActions: 'exam', evalShare: 'exam', evalVideos: 'exam', totWorkshopFiles: 'exam', totRetrain: 'exam', wsCustomConfig: 'exam', totEvalKinds: 'exam',
+const GATE_VIEW = { evalResults: 'exam', traineeNotes: 'exam', coachingActions: 'exam', evalShare: 'exam', evalVideos: 'exam', evalPhotos: 'exam', totWorkshopFiles: 'exam', totRetrain: 'exam', wsCustomConfig: 'exam', totEvalKinds: 'exam',
   totOnboardingHier: 'onboarding', totOnboardingV2: 'onboarding', totOnboardingFiles: 'onboarding', totSchedule: 'schedule', totMySchedules: 'schedule', totAppearance: 'appearance', totAppearanceDept: 'appearance',
   totTasks: 'tasks', totCases: 'tasks', totComments: 'tasks', totAnnouncements: 'tasks', totRecruitment: 'recruiting', totWorkbooks: 'recruiting', totEmpRequests: 'requests',
   totGameCounts: 'dept', totImportHistory: 'dept', totLifecycle: 'dept', totDeptDocs: 'dept', totDeptCfg: 'dept', idPrintHistory: 'id', logbookDescriptions: 'logbooks', logbookCustomGames: 'logbooks', logbookSettings: 'logbooks' };
@@ -208,6 +210,7 @@ const DEFAULT_VIEWS = { shift_lead: ['exam', 'id', 'schedule'], performance_coac
 const KEY_CAPS = { totWorkshopFiles: { read: ['ws_register'], write: ['ws_register'] }, totOnboardingFiles: { read: ['onboarding'], write: ['onboarding'] },
   evalResults: { read: ['results_view', 'exam_check', 'ws_checklist'], write: ['exam_check', 'ws_checklist', 'results_edit'] }, evalShare: { read: ['results_send', 'results_view'], write: ['results_send'] },
   evalVideos: { read: ['videos_view', 'videos_upload'], write: ['videos_upload'] },
+  evalPhotos: { read: ['results_view', 'exam_check', 'ws_checklist', 'videos_view', 'videos_upload'], write: ['exam_check', 'ws_checklist', 'results_edit', 'videos_upload'] },   /* v3.28: photos attached while evaluating */
   totAppearanceDept: { read: ['appearance_view', 'appearance_issue', 'appearance_manage'], write: ['appearance_issue', 'appearance_manage'] } };   /* v2.5: uniforms inventory and transactions */
 function capsFor_(cur, role) { var p = policy_(cur), r = (p.roles || {})[role], c = r && r.caps; if (c && typeof c === 'object') return c;
   var views = r && Array.isArray(r.views) ? r.views : (DEFAULT_VIEWS[role] || ['onboarding', 'exam', 'id', 'logbooks', 'schedule', 'appearance']), o = {}; Object.keys(CAP_VIEW).forEach(function (k) { o[k] = views.indexOf(CAP_VIEW[k]) >= 0; }); o.videos_view = role === 'manager'; return o; }
@@ -227,7 +230,7 @@ function keepPay_(newV, oldV) { try { var n = JSON.parse(newV); if (!n || typeof
 const DEPT_IDS = ['academy', 'performance', 'fmd', 'appearance', 'hr', 'access', 'it'];
 const DEPT_DEF = { training_coordinator: 'academy', performance_coach: 'performance', shift_lead: 'performance', scheduling_coordinator: 'fmd', hr_recruiter: 'hr' };
 const SCOPED = ['totTasks', 'totCases', 'totAnnouncements', 'totComments'];   /* comments last: their visibility depends on the tickets and announcements */
-const DEL_KEEP_DAYS = 180, AUDIT_MAX = 20000;
+const DEL_KEEP_DAYS = 180, AUDIT_MAX = 20000, JOURNAL_MAX = 8000;
 function low_(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
 /* who is asking: the admin key sees everything; everybody else is described by their position and department */
 function ctx_(cur, em, admin) {
@@ -293,11 +296,15 @@ function delMap_(cur, k) { cur.del = cur.del || {}; var m = cur.del[k] = cur.del
 function auditMine_(x, c) { var e = low_(x && x.email); return e ? e === c.em : (!!c.name && low_(x && x.who) === c.name); }
 function auditId_(x) { return x && x.id != null ? String(x.id) : x && typeof x === 'object' ? String(x.ts) + '|' + x.who + '|' + x.act : JSON.stringify(x); }
 function auditPull_(v, c) { var a = jp_(v, null); return Array.isArray(a) ? JSON.stringify(a.filter(function (x) { return auditMine_(x, c); })) : '[]'; }
-function auditPush_(newV, oldV, c) {
+/* v3.28 change journal: add-only like the audit log. A person receives their own entries, their department's, and the entries about data they can open
+   themselves (src = the data key the change was made in, checked with the same rules as reading that key). */
+function journalPull_(v, c, okSrc) { var a = jp_(v, null); if (!Array.isArray(a)) return '[]'; if (c.all) return v;
+  return JSON.stringify(a.filter(function (x) { return x && typeof x === 'object' && (low_(x.email) === c.em || (x.dep && x.dep === c.dept) || (x.src && okSrc(String(x.src)))); })); }
+function auditPush_(newV, oldV, c, max) {
   var n = jp_(newV, null), o = jp_(oldV, []); if (!Array.isArray(n)) return null; if (!Array.isArray(o)) o = [];
   var seen = {}; o.forEach(function (x) { seen[auditId_(x)] = 1; });
   n.forEach(function (x) { if (!x || typeof x !== 'object' || seen[auditId_(x)]) return; var e = low_(x.email); if (e && e !== c.em) return; if (!e) x.email = c.em; seen[auditId_(x)] = 1; o.push(x); });
-  if (o.length > AUDIT_MAX) { o.sort(function (a, b) { return (+(a && a.ts) || 0) - (+(b && b.ts) || 0); }); o = o.slice(-AUDIT_MAX); }
+  max = max || AUDIT_MAX; if (o.length > max) { o.sort(function (a, b) { return (+(a && a.ts) || 0) - (+(b && b.ts) || 0); }); o = o.slice(-max); }
   return JSON.stringify(o);
 }
 
@@ -398,6 +405,7 @@ function doPost(e) {
         var pre = k.slice(0, k.length - p.name.length);
         if (SCOPED.indexOf(p.name) >= 0) { res.keys[k] = { v: scopedPull_(p.name, en.v, cx, pre), t: en.t }; return; }   /* v3.23 */
         if (p.name === 'auditLog') { res.keys[k] = { v: auditPull_(en.v, cx), t: en.t }; return; }
+        if (p.name === 'totJournal') { res.keys[k] = { v: journalPull_(en.v, cx, function (src) { return src !== 'totJournal' && src !== 'auditLog' && ADMIN_ONLY_WRITE.indexOf(src) < 0 && roleOk_(src, me.role) && capOk_(src, me, 'read') && gateOk_(cur, em, src); }), t: en.t }; return; }   /* v3.28 */
         res.keys[k] = (p.name === 'totSchedule' && PAY_ROLES.indexOf(me.role) < 0) ? stripPay_(en) : en;
       });
       return out_(res);
@@ -410,6 +418,7 @@ function doPost(e) {
         if (!p || !n || typeof n.v !== 'string' || n.v.length > 4500000) { denied.push(k); return; }
         if (!admin && (ADMIN_ONLY_WRITE.indexOf(k) >= 0 || ADMIN_ONLY_WRITE.indexOf(p.name) >= 0 || me.sites.indexOf(p.site) < 0 || !roleOk_(p.name, me.role) || !capOk_(p.name, me, 'write') || !gateOk_(cur, em, p.name))) { denied.push(k); return; }
         var o = cur.keys[k], t = Math.min(+n.t || now, now + 60000), pre = k.slice(0, k.length - p.name.length);
+        if (!admin && p.name === 'totJournal') { var jv = auditPush_(n.v, o && o.v, cx, JOURNAL_MAX); if (jv == null) { denied.push(k); return; } cur.keys[k] = { v: jv, t: Math.max(now, (+(o && o.t) || 0) + 1) }; changed = true; return; }   /* v3.28 add-only */
         if (!admin && p.name === 'auditLog') { var av = auditPush_(n.v, o && o.v, cx); if (av == null) { denied.push(k); return; } cur.keys[k] = { v: av, t: Math.max(now, (+(o && o.t) || 0) + 1) }; changed = true; return; }   /* v3.23 add-only, never a conflict */
         if (o && n.bt != null && (+o.t || 0) > (+n.bt || 0)) { conflicts.push(k); return; }   /* somebody saved after this device last read it */
         if (o && n.bt == null && t < (+o.t || 0)) return;                                    /* old clients: newest time wins */

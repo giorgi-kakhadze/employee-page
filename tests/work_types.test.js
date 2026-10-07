@@ -123,8 +123,10 @@ const cases = () => { const k = gas.data().keys.totCases; return k ? JSON.parse(
   ok('a made-up ticket with someone else\'s case id does not reveal that case', !(keyOf(pull('lead@x.com'), 'totCases') || []).some(c => c.id === 'c1'));
   const gr = gas.data(); gr.keys.totAccessGrants = { v: JSON.stringify({ v: 1, on: true, byEmail: { 'mgr@x.com': { views: { dept: { at: 1 }, tasks: { at: 1 } } } } }), t: Date.now() }; gas.setData(gr);
   const mg = await H.open({ email: 'mgr@x.com', pw: 'pw-mgr@x.com' }); await mg.sync(); await mg.waitForTimeout(800);
-  const land = await mg.evaluate(() => { document.querySelectorAll('#gateOv,.tkOv').forEach(x => x.remove()); openSpace('performance'); return { v: currentView, d: window.__dw && __dw.cur() }; });
-  ok('admin-only mode, manager granted only department boards: Performance opens its board instead of bouncing Home', land.v === 'dept' && land.d === 'performance', JSON.stringify(land));
+  const land = await mg.evaluate(() => { document.querySelectorAll('#gateOv,.tkOv').forEach(x => x.remove()); openSpace('performance'); return { v: currentView, sp: spaceOf() }; });
+  ok('admin-only mode, manager granted only department boards: Performance opens its Overview instead of bouncing Home', land.v === 'spacehome' && land.sp === 'performance', JSON.stringify(land));
+  const brd = await mg.evaluate(() => { const c = Array.from(document.querySelectorAll('#spaceHomeView .shCard')).filter(b => /Board/.test(b.textContent))[0]; if (c) c.click(); return { v: currentView, d: window.__dw && __dw.cur() }; });
+  ok('…and its Board card opens the board', brd.v === 'dept' && brd.d === 'performance', JSON.stringify(brd));
   const lk = await mg.evaluate(() => Array.from(document.querySelectorAll('#spaceSub button')).filter(b => b.querySelector('.gtLk')).map(b => b.textContent.trim().slice(0, 20)));
   ok('…and the locked screens in that space show a lock', lk.some(t => /Exam Evaluation/.test(t)), lk.join(' | '));
   gr.keys.totAccessGrants = { v: JSON.stringify({ v: 1, on: false, byEmail: {} }), t: Date.now() }; gas.setData(gr);

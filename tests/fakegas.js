@@ -4,7 +4,7 @@ const fs = require('fs'), crypto = require('crypto');
 module.exports = function (codePath, opts) {
   opts = opts || {};
   const files = {};            // name -> string
-  const cache = {}, props = {};
+  const cache = {}, props = {}, uploads = []; let upN = 0;
   function file(name) { return { getName: () => name, getBlob: () => ({ getDataAsString: () => files[name] }), setContent: (s) => { files[name] = s; }, getId: () => 'id-' + name, setTrashed() { delete files[name]; }, getMimeType: () => 'application/json' }; }
   const folder = { getId: () => 'folder', getFilesByName: (n) => { let done = !(n in files); return { hasNext: () => !done, next: () => { done = true; return file(n); } }; }, createFile: (n, c) => { files[n] = c; return file(n); },
     getFiles: () => { const ks = Object.keys(files); let i = 0; return { hasNext: () => i < ks.length, next: () => file(ks[i++]) }; } };
@@ -17,12 +17,14 @@ module.exports = function (codePath, opts) {
       formatDate: (d, tz, p) => { const s = new Date(d).toISOString(); return p === 'yyyy-MM' ? s.slice(0, 7) : s.slice(0, 10); }, base64Decode: (s) => Buffer.from(s, 'base64'), base64Encode: (b) => Buffer.from(b).toString('base64') },
     Session: { getScriptTimeZone: () => 'UTC', getEffectiveUser: () => ({ getEmail: () => 'owner@x.com' }) },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (s) => ({ setMimeType() { return this; }, getContent: () => s }) },
-    MailApp: { sendEmail() {} }, UrlFetchApp: { fetch() { throw new Error('no network in tests'); } }, ScriptApp: {}
+    MailApp: { sendEmail() {} }, ScriptApp: { getOAuthToken: () => 'test-token' },
+    /* v3.28: Drive's resumable video upload, enough for the tool's chunked uploads: start → Location, PUT chunks → 308 until the last → 200 { id } */
+    UrlFetchApp: { fetch(url, o) { o = o || {}; if (/uploadType=resumable/.test(url)) return { getHeaders: () => ({ Location: 'https://upload.test/' + (++upN) }), getResponseCode: () => 200 }; if (o.method === 'put') { const m = /bytes (\d+)-(\d+)\/(\d+)/.exec((o.headers || {})['Content-Range'] || ''), last = m && +m[2] + 1 >= +m[3]; uploads.push({ url, range: m && m[0] }); return { getResponseCode: () => last ? 200 : 308, getContentText: () => JSON.stringify({ id: 'drive-file-' + upN }) }; } throw new Error('no network in tests'); } }
   };
   let src = fs.readFileSync(codePath, 'utf8').replace("const ADMIN_SECRET = 'CHANGE-ME-ADMIN-KEY'", "const ADMIN_SECRET = 'ADMKEY'");
   const api = new Function(...Object.keys(G), src + '; return { doPost: doPost, sh_: sh_ };')(...Object.values(G));
   return {
-    files,
+    files, uploads,
     post(body) { return JSON.parse(api.doPost({ postData: { contents: typeof body === 'string' ? body : JSON.stringify(body) } }).getContent()); },
     data() { return JSON.parse(files['tool-data.json'] || '{"keys":{}}'); },
     setData(d) { files['tool-data.json'] = JSON.stringify(d); },
