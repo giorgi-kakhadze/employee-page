@@ -42,6 +42,10 @@
  *   its members (managers included only as members); messages are written only under one's own e-mail, in channels and chats one reads, not archived; in an
  *   announcement channel only managers start posts; managers remove messages in channels; each channel keeps its newest 1500 messages. Each person also gets
  *   a staff directory (name and position) to start chats.
+ * v3.39: hardening from the mass test: employee page matches records by work ID (a shared name matches nobody) and refuses terminated / retired employees; request
+ *   validation; authorship of tickets, cases, announcements and comments is kept and cannot be forged; key names that are Object.prototype members are refused; a bad body
+ *   always gets a JSON answer; project mail goes only to people in the access list; totIntegrations is admin-only to read; Community: server dates, replies need a post in
+ *   the same channel, archived channels are read only, 60 messages per save; access requests throttled (30 / 10 min); at most MAX_KEYS keys.
  * Data lives in your Google Drive folder "Tool Data": tool-data.json (shared data) and access.json (who may use the tool).
  */
 const ADMIN_SECRET = 'CHANGE-ME-ADMIN-KEY';

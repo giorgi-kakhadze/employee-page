@@ -21,6 +21,9 @@ node tests/projects_teams.test.js
 node tests/ui_polish.test.js
 node tests/page_access.test.js
 node tests/community.test.js
+node tests/hardening.test.js
+node tests/employee_page.test.js
+node tests/large_data.test.js
 ```
 
 - `sync_privacy.test.js`: what each person receives (tickets, cases, comments, announcements, audit log), writes from people who see only part of the list, deleting, forged pushes, two people saving at once, HR case progress.
@@ -43,3 +46,6 @@ node tests/community.test.js
 - `community.test.js`: 💬 Community. A manager creates a department channel and an announcement channel and posts an announcement through the screens; a senior has no New channel button and the server refuses a channel made by a senior or a renamed / widened channel; HR does not receive a channel for Performance or its messages; a shift lead cannot start a post in the announcement channel but replies in the thread, reacts and posts in his channel; forged posts, posts under someone else's name and edits of someone else's message are refused; a direct chat started from New chat reaches only its two members (not the manager or the coach), nobody can add themselves to it, it shows in the bell and opens from there, and the answer reaches the other side; @mentions reach the manager; a manager removes a message and archives a channel, after which nobody writes in it; Access management hides Chats for one person and Community for another (server sends nothing); the employee page has no Community.
 
 Each prints one line per check and exits with code 1 if any check fails.
+- `hardening.test.js`: server fixes from the mass test. Same-name employees never see each other's retraining rows or remarks (a record with a work ID belongs to that ID; a shared name matches nobody; a unique name still matches records without an ID); terminated and retired employees get no data and cannot send requests; request types like "constructor", impossible dates (2027-02-30), sick leave months ahead, empty swap / pay-question, same-shift swap + give-away, duplicate checks; notes keep their text and are cut on whole characters; a shift lead cannot rewrite, take over or delete the manager's announcement or forge / change comments; keys named like Object.prototype members and malformed bodies never break the server (even when the admin wrote them); an address typed into a project is never e-mailed; Community: flooding with future dates or 1,500 messages, bogus reply ids, deleting in an archived channel; integration URLs are not sent to staff; access requests are throttled.
+- `employee_page.test.js`: the employee page on a phone: long nickname and e-mail do not scroll sideways; today's ended shift is not "next" and not offered for a swap; a partial pay object does not break; an odd request type shows "Request"; a half-written request survives refreshes and tab changes and clears after sending; a failed Refresh shows a message; a terminated employee sees a clear message.
+- `large_data.test.js`: the sync pill stays on screen at 1100 / 1280 / 1440 px; Escape closes a dialog; with the 1,000-employee demo backup the Coach board, FMD Overview and the month review open within generous limits.

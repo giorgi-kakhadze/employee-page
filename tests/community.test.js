@@ -103,7 +103,7 @@ const push = (email, k, a) => gas.post({ action: 'push', email, pwHash: 'pw-' + 
   ok('Chats hidden for one person: only Channels left', hsub.join(',') === 'community.channels', hsub.join(','));
   ok('Community hidden: the server sends no channels or messages', !pull('coach@x.com').totChannels && !pull('coach@x.com').totMessages);
   ok('the employee page has no Community', !/totChannels|Community/.test(require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8')));
-  ok('the version is up to date', await M.evaluate(() => window.TOT_VERSION) === '3.38');
+  ok('the version is up to date', await M.evaluate(() => window.TOT_VERSION) === '3.39');
 
   ok('no page errors', H.errs.length === 0, H.errs.slice(0, 3).join(' | '));
   await H.close();

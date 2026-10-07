@@ -16,6 +16,7 @@
   v3.36: Access to spaces and pages. Admin → 🔐 Access to spaces and pages sets every space, page and department board to Hidden, View only or Edit, per position and per person (person first). Spaces with nothing visible leave the top bar; View only shows a ribbon and does not save changes; new spaces, pages, tabs and custom spaces appear in the list by themselves. The server enforces the same levels.
   v3.37: One Access management section in the admin space: choose Access by role (tool parts per position, the old Detailed access) or Access by spaces and pages (Hidden / View only / Edit). The spaces list opens with a position already chosen, so it is never empty.
   v3.38: 💬 Community: channels (only managers and the admin create them; for everyone, departments or chosen people; discussion or announcements) and private direct / group chats for staff, with threads, reactions, @mentions, pins, unread counts and bell alerts. Not on the employee page. The server enforces who reads and writes; managers do not read other people's chats.
+  v3.39: Mass test and fixes. Server: employees with the same name no longer see each other's records; terminated and retired employees are refused; request checks (real dates, sick leave window, duplicates, swap / give-away conflicts); authorship cannot be rewritten or forged; key names like constructor cannot break the server; mail only to people in the access list; integration URLs stay with the admin; Community limits. Employee page: long names wrap, failed refresh is visible, drafts survive, ended shifts are not next. Tool: Coach board, FMD Overview and the month review are fast with 1,000 people; Escape closes dialogs; the sync pill stays on screen.
   ============================================================
 -->
 <html lang="en">
@@ -32,7 +33,7 @@
    Sites: every location keeps its own data under its own prefix. The first site ("main") is the data you already had, stored exactly where it always was, so nothing is moved.
    Test mode: open this file with #test at the end of the address. Separate data, no network, red bar. Both now also cover the embedded tools (Workshop, ID). */
 (function () {
-  window.TOT_VERSION = '3.38';
+  window.TOT_VERSION = '3.39';
   try {
     var TP = 'TEST::', SP_ = 'SITE::';
     var NOCOPY = ['totSyncCfg', 'totSyncMeta', 'totSyncPrev', 'totMailerCfg', 'totMailerLast', 'totAdminHash', 'totAdminIdleMin'];
@@ -22016,7 +22017,8 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     function queueSync() { clearTimeout(obT); obT = setTimeout(function () { try { syncFinished(); } catch (e) { console.warn('Finished-trainee sync failed:', e); } }, 900); }
     try { var _si = Storage.prototype.setItem; Storage.prototype.setItem = function (k) { var r = _si.apply(this, arguments); try { if (this === window.localStorage && k === 'totOnboardingHier') queueSync(); } catch (e) {} return r; }; } catch (e) {}
     setTimeout(queueSync, 1200);
-    window.PersonHub = { list: people, today: function (p) { return dayInfo(p, sched(), isoOf(new Date())); }, posOf: function (p) { return empPos(p); }, teamOf: function (p) { var e = p.emp || {}, x = e.ext || {}; return x.team || (p.ros ? teamNm(sched(), p.ros.t) : '') || ''; }, history: function (p) { return histFor(p); }, syncFinished: syncFinished, find: find, open: function (n) { var p = lookup(n); if (!p) return false; return openP(p); }, openBy: function (w) { var p = lookup(w); if (!p) return false; return openP(p); } };
+    var SCR = { t: 0, o: null }; function schedRO() { var n = Date.now(); if (SCR.o && n - SCR.t < 1000) return SCR.o; SCR.o = sched(); SCR.t = n; return SCR.o; }   /* v3.39: read-only copy, parsed once per second (FMD Overview took 4 s with 1,000 people) */
+    window.PersonHub = { list: people, today: function (p) { return dayInfo(p, schedRO(), isoOf(new Date())); }, posOf: function (p) { return empPos(p); }, teamOf: function (p) { var e = p.emp || {}, x = e.ext || {}; return x.team || (p.ros ? teamNm(schedRO(), p.ros.t) : '') || ''; }, history: function (p) { return histFor(p); }, syncFinished: syncFinished, find: find, open: function (n) { var p = lookup(n); if (!p) return false; return openP(p); }, openBy: function (w) { var p = lookup(w); if (!p) return false; return openP(p); } };
   } catch (e) { console.warn('Person hub disabled:', e); }
 })();
 </script>
@@ -23248,7 +23250,8 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 (function () {
   try {
     var cache = { raw: null, map: null };
-    function loadMap() {
+    function loadMap() { var n = Date.now(); if (cache.map && n - (cache.t || 0) < 1000) return cache.map; var m = loadMap0(); cache.t = n; return m; }   /* v3.39: one read of the schedule per second, not one per evaluation (the Coach board took 25 s with 1,000 people) */
+    function loadMap0() {
       var raw = null; try { raw = localStorage.getItem('totSchedule'); } catch (e) {}
       if (raw === cache.raw && cache.map) return cache.map;
       var map = {}; /* nameLower|YYYY-MM-DD -> 1 */
@@ -24645,9 +24648,11 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   function curMonth() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
   function monthOf(r) { var m = /^(\d{4})-(\d{2})/.exec(String(r.isoDate || '')); if (m) return m[1] + '-' + m[2]; if (r.ts) { var d = new Date(+r.ts); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); } return ''; }
   function people() { var a = jget('employeeDataSource', []); a = Array.isArray(a) ? a : []; return a.filter(function (e) { return e && e.fullName && !/terminat|resign|dismiss|left|former/i.test(String(e.status || '')); }); }
+  var EV = { t: 0, a: null };
+  function evalList() { var n = Date.now(); if (EV.a && n - EV.t < 1000) return EV.a; var all = jget('evalResults', []); all = Array.isArray(all) ? all : []; EV.a = all.filter(function (r) { return r && !(window.totIsProspectEval && window.totIsProspectEval(r)); }); EV.t = n; return EV.a; }   /* v3.39: parsed and checked once per second, not once per person */
   function evalsFor(p, month) {
-    var w = nz(p.workId), n = nz(p.fullName), all = jget('evalResults', []); all = Array.isArray(all) ? all : [];
-    return all.filter(function (r) { return r && !(window.totIsProspectEval && window.totIsProspectEval(r)) && (!month || monthOf(r) === month) && ((w && nz(r.workId) === w) || (!nz(r.workId) && nz(r.name) === n) || (!w && nz(r.name) === n)); }).sort(function (a, b) { return (+b.ts || +b.id || 0) - (+a.ts || +a.id || 0); });
+    var w = nz(p.workId), n = nz(p.fullName), all = evalList();
+    return all.filter(function (r) { return r && (!month || monthOf(r) === month) && ((w && nz(r.workId) === w) || (!nz(r.workId) && nz(r.name) === n) || (!w && nz(r.name) === n)); }).sort(function (a, b) { return (+b.ts || +b.id || 0) - (+a.ts || +a.id || 0); });
   }
   function key(p) { return nz(p.workId) || ('n:' + nz(p.fullName)); }
   function css() {
@@ -25956,8 +25961,9 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   window.__incStats = function () { if (!canRead()) return []; var l = arr(KI), m = ymd(new Date()).slice(0, 7), mo = l.filter(function (x) { return String(x.date).slice(0, 7) === m; }), by = {};
     mo.forEach(function (x) { var k = lc(x.empId || x.name); by[k] = (by[k] || 0) + 1; }); var last = arr(KH).filter(function (h) { return !h.undone; }).pop();
     return [['Incidents this month', mo.length], ['Open incidents', l.filter(function (x) { return !closed(x); }).length], ['Presenters this month', Object.keys(by).length], ['With 3+ this month', Object.keys(by).filter(function (k) { return by[k] >= 3; }).length], ['Last Jira import', last ? new Date(last.ts).toLocaleDateString() : '—']]; };
+  var IC = { t: 0, a: null }; function arrI() { var n = Date.now(); if (IC.a && n - IC.t < 1000) return IC.a; IC.a = arr(KI); IC.t = n; return IC.a; }   /* v3.39 */
   window.__incFor = function (names, ids) { if (!canRead()) return null; var N = {}, D = {}; (names || []).forEach(function (n) { n = lc(n); if (n) N[n] = 1; }); (ids || []).forEach(function (n) { n = lc(n); if (n) D[n] = 1; });
-    return arr(KI).filter(function (x) { return x && ((x.empId && D[lc(x.empId)]) || N[lc(x.name)] || (x.nick && N[lc(x.nick)])); }).sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); }); };
+    return arrI().filter(function (x) { return x && ((x.empId && D[lc(x.empId)]) || N[lc(x.name)] || (x.nick && N[lc(x.nick)])); }).sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); }); };
   window.__incOpen = function (key) { var x = arr(KI).filter(function (y) { return y.key === key; })[0]; if (x) openInc(x); };
 
   var css = document.createElement('style');
@@ -26086,6 +26092,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   function canRemarkRead() { return adm() || REM_ROLES.indexOf(role()) >= 0; }
   function canRemark() { return !ro() && canRemarkRead(); }
   function arr(k) { var a = jget(k, []); return Array.isArray(a) ? a : []; }
+  var RC = {}; function arrR(k) { var n = Date.now(), c = RC[k]; if (c && n - c.t < 1000) return c.a; var a = arr(k); RC[k] = { t: n, a: a }; return a; }   /* v3.39: read-only lists, parsed once per second (the month review took 5 s with 1,000 people) */
   function cfg() { var c = jget(KC, {}); if (!c || typeof c !== 'object' || Array.isArray(c)) c = {}; c.programs = Array.isArray(c.programs) ? c.programs : []; return c; }
   function lc(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().toLowerCase(); }
   function p2(n) { return ('0' + n).slice(-2); }
@@ -26123,13 +26130,19 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   /* ---------- what happened in the month ---------- */
   function inMonth(ts, d, ym) { if (d && /^\d{4}-\d{2}/.test(d)) return String(d).slice(0, 7) === ym; if (!ts) return false; return ymd(new Date(+ts)).slice(0, 7) === ym; }
   function mine(pr, nm, id) { var n = lc(nm), w = lc(id); return (w && pr.wid && w === lc(pr.wid)) || (n && (n === pr.key || n === lc(pr.rn) || (pr.nick && n === lc(pr.nick)))); }
-  function evals(pr, ym) { return arr('evalResults').filter(function (r) { return r && mine(pr, r.name, r.workId) && inMonth(r.ts, '', ym); }).sort(function (a, b) { return (+b.ts || 0) - (+a.ts || 0); }); }
+  /* v3.39: each list is indexed by name and by ID once, so 1,000 employees do not each scan every row */
+  var IX = {};
+  function cands(k, pr, nf, wf) { var a = arrR(k), c = IX[k]; if (!c || c.a !== a) { c = IX[k] = { a: a, id: {}, nm: {} }; a.forEach(function (r) { if (!r) return; var w = lc(r[wf]), n = lc(r[nf]); if (w) (c.id[w] = c.id[w] || []).push(r); if (n) (c.nm[n] = c.nm[n] || []).push(r); }); }
+    var seen = [], out = [], add = function (l) { (l || []).forEach(function (r) { if (seen.indexOf(r) < 0) { seen.push(r); out.push(r); } }); };
+    if (pr.wid) add(c.id[lc(pr.wid)]); [pr.key, lc(pr.rn), pr.nick ? lc(pr.nick) : ''].forEach(function (n) { if (n) add(c.nm[n]); }); return out; }
+  function evals(pr, ym) { return cands('evalResults', pr, 'name', 'workId').filter(function (r) { return r && inMonth(r.ts, '', ym); }).sort(function (a, b) { return (+b.ts || 0) - (+a.ts || 0); }); }
   function lostOf(r) { var sc = r.scores || {}, cr = r.criteria || [], mx = 3; cr.forEach(function (c) { if (typeof sc[c.id] === 'number' && sc[c.id] > mx) mx = sc[c.id]; });
     return cr.filter(function (c) { return typeof sc[c.id] === 'number' && sc[c.id] < mx; }).map(function (c) { return { name: c.name, lost: mx - sc[c.id], score: sc[c.id], max: mx, note: (r.notes || {})[c.id] || '' }; }); }
-  function remarks(pr, ym) { return arr(KM).filter(function (x) { return x && mine(pr, x.name, x.workId) && (!ym || String(x.date).slice(0, 7) === ym); }).sort(function (a, b) { return String(b.date).localeCompare(String(a.date)) || (+b.ts || 0) - (+a.ts || 0); }); }
+  function remarks(pr, ym) { return cands(KM, pr, 'name', 'workId').filter(function (x) { return x && (!ym || String(x.date).slice(0, 7) === ym); }).sort(function (a, b) { return String(b.date).localeCompare(String(a.date)) || (+b.ts || 0) - (+a.ts || 0); }); }
   function incidents(pr, ym) { var l = window.__incFor ? window.__incFor([pr.name, pr.rn, pr.nick], [pr.wid]) : null; return l ? l.filter(function (x) { return String(x.date).slice(0, 7) === ym; }) : null; }
-  function games(pr, ym) { var t = 0, by = {}; arr('totGameCounts').forEach(function (g) { if (!g || String(g.period).slice(0, 7) !== ym || !mine(pr, g.name, g.empId)) return; t += +g.count || 0; by[g.game] = (by[g.game] || 0) + (+g.count || 0); }); return { total: t, by: by }; }
-  function retrain(pr, ym) { var out = []; ((jget('totRetrain', {}) || {}).sessions || []).forEach(function (s) { (s && s.rows || []).forEach(function (r) { if (r && mine(pr, r.name, r.wid) && String(r.date || '').slice(0, 7) === ym) out.push(r); }); }); return out; }
+  function games(pr, ym) { var t = 0, by = {}; cands('totGameCounts', pr, 'name', 'empId').forEach(function (g) { if (!g || String(g.period).slice(0, 7) !== ym) return; t += +g.count || 0; by[g.game] = (by[g.game] || 0) + (+g.count || 0); }); return { total: t, by: by }; }
+  var RTC = { t: 0, o: null }; function retrainAll() { var n = Date.now(); if (RTC.o && n - RTC.t < 1000) return RTC.o; RTC.o = jget('totRetrain', {}) || {}; RTC.t = n; return RTC.o; }
+  function retrain(pr, ym) { var out = []; (retrainAll().sessions || []).forEach(function (s) { (s && s.rows || []).forEach(function (r) { if (r && mine(pr, r.name, r.wid) && String(r.date || '').slice(0, 7) === ym) out.push(r); }); }); return out; }
   var RK = { positive: ['👍', 'Positive feedback'], remark: ['📝', 'Remark'], violation: ['⚠', 'Violation'], disciplinary: ['⛔', 'Disciplinary case'], note: ['🗒', 'Note'] };
   function stats(pr, ym) {
     var days = [], today = ymd(new Date()); try { if (window.totPay) days = totPay.days(pr.rn, ym); } catch (e) {}
@@ -27313,6 +27326,15 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   } catch (e) { console.warn('Community disabled:', e); }
 })();
 </script>
+<script id="escClose">
+/* v3.39 Escape closes the topmost open dialog (the overlays built by the tool: New ticket, View as, forms…), except the lock prompt */
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape' || e.defaultPrevented) return;
+  var open = [].filter.call(document.querySelectorAll('.tkOv'), function (o) { return o.id !== 'gateOv' && o.isConnected && getComputedStyle(o).display !== 'none' && getComputedStyle(o).visibility !== 'hidden'; });
+  if (!open.length) return; var top = open[open.length - 1]; e.preventDefault();
+  if (typeof top.close === 'function') top.close(); else top.remove();
+});
+</script>
 <script id="pageAccess">
 /* v3.36 Access to every space, page and board — per position and per person (Admin → 🔐 Access to spaces and pages).
    Stored in totAccessPolicy.access (admin-only write, enforced again by the server):
@@ -27556,7 +27578,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     document.head.appendChild(css);
 
     /* ---------- header: move the site and person pills into the action row ---------- */
-    function pills() { var bar = document.querySelector('.top-bar-actions'); if (!bar) return; ['psPill', 'sitePill'].forEach(function (id) { var p = document.getElementById(id); if (p && p.parentNode !== bar) bar.insertBefore(p, bar.firstChild); }); }
+    function pills() { var bar = document.querySelector('.top-bar-actions'); if (!bar) return; ['tdBadge', 'psPill', 'sitePill'].forEach(function (id) {   /* v3.39: the sync pill too (it was clipped at the end of the scrolling tab row on laptops) */ var p = document.getElementById(id); if (p && p.parentNode !== bar) bar.insertBefore(p, bar.firstChild); }); }
     [0, 400, 1500, 4000].forEach(function (t) { setTimeout(function () { try { pills(); } catch (e) {} }, t); });
 
     /* ---------- admin space ---------- */
