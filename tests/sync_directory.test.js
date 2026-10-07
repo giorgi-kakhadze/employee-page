@@ -11,7 +11,8 @@ function setPolicy(f) { const d = gas.data(), p = JSON.parse(d.keys.totAccessPol
   ok('coach: own department only (coach + shift lead), no HR, FMD or manager', emails(c) === 'coach@x.com,lead@x.com', emails(c));
   ok('coach: shift lead entry is name and position only', JSON.stringify(c.users['lead@x.com']) === JSON.stringify({ name: 'Levan Lead', role: 'shift_lead' }), JSON.stringify(c.users['lead@x.com']));
   ok('coach: own entry unchanged (sites kept)', JSON.stringify(c.users['coach@x.com']) === JSON.stringify(seeded['coach@x.com']), JSON.stringify(c.users['coach@x.com']));
-  ok('coach: same top-level shape as before', Object.keys(c).sort().join() === 'depts,roles,upd,users', Object.keys(c).sort().join());
+  ok('coach: same top-level shape as before, plus the v3.38 chat directory', Object.keys(c).sort().join() === 'chatDir,depts,roles,upd,users', Object.keys(c).sort().join());
+  ok('coach: chat directory holds every colleague with a position, name and position only', Object.keys(c.chatDir).length === Object.keys(seeded).length && Object.keys(c.chatDir).every(k => Object.keys(c.chatDir[k]).sort().join() === 'name,role'), JSON.stringify(c.chatDir['hr@x.com']));
   ok('shift lead: sees the coach', emails(pol('lead@x.com')) === 'coach@x.com,lead@x.com', emails(pol('lead@x.com')));
   ok('HR: nobody else in HR, so only own entry', emails(pol('hr@x.com')) === 'hr@x.com', emails(pol('hr@x.com')));
   const m = pol('mgr@x.com');
