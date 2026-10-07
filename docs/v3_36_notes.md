@@ -89,3 +89,4 @@ Go to **Admin space → 🔐 Access to spaces and pages**.
 - **Deploy the new `Code.gs` as a new version.**
 - **The settings are stored in `totAccessPolicy.access`,** which only the admin key can write. Full backups include them.
 - **The older "Detailed access by role" ticks still work** and count as "As before".
+- **Giorgi knows it:** ask "how do I hide a space or give view-only access".
