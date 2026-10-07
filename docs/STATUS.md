@@ -8,6 +8,8 @@ Checked against `docs/platform-requirements.txt` (35 sections), using the code i
 
 "v3.25" marks the departments-only navigation, work types and Management as a position (see `docs/v3_25_notes.md`).
 
+"v3.26" marks onboarding templates sent to departments as live tickets (see `docs/v3_26_notes.md`).
+
 Legend: **Done** = works in the tool today · **Partial** = some of it works, the rest is listed · **Missing** = not built · **Not connected** = the screens and rules exist, but no live connection, on purpose (no fake integrations).
 
 "v3.22" marks what this round added.
@@ -22,7 +24,7 @@ Legend: **Done** = works in the tool today · **Partial** = some of it works, th
 | 4 | Department workspaces | Done (v3.25) | 7 departments in the top bar: Academy, Performance, FMD, Uniforms, HR, and Office (Building access + IT). Each has its own space with its screens, ticket board, dashboard, documents, work types and setup in a second bar. **v3.25:** the separate Departments screen is gone. Management is a position (managers and seniors see every department), not a department. Adding a department still needs a small code edit (`DEPTS` list). |
 | 5 | Jira-like tickets | Done (v3.22) | Ticket ID, title, description, creator, dates, department, assignee, priority, status, due date, related employee and ID, comments, history, reassignment, reasons for wait/delay/cancel, reopen counter. **v3.22:** four priority levels (low / normal / high / urgent), escalation with a required reason, links to files on a ticket, completion date. File *uploads* on tickets: not built (links only). |
 | 6 | Department boards | Done (v3.22) | Own columns per department (admin-editable), drag and drop, search. **v3.22:** filters by assignee, priority, escalated, overdue; sort by priority, due date, age, last update. |
-| 7 | Inter-department workflow | Done (v3.25) | Termination, onboarding and transfer cases create one linked ticket per department with progress (e.g. 4/6). **v3.25:** work types on every board. Choosing one in New ticket also creates the linked tickets for the other departments, and the admin can add custom work types per department. |
+| 7 | Inter-department workflow | Done (v3.25) | Termination, onboarding and transfer cases create one linked ticket per department with progress (e.g. 4/6). **v3.25:** work types on every board. Choosing one in New ticket also creates the linked tickets for the other departments, and the admin can add custom work types per department. **v3.26:** Onboarding → Templates sends Fingerprints, Live exam and Uniforms as one live ticket each to Building access, Performance and Uniforms. The table updates with the onboarding, and department corrections flow back. |
 | 8 | Comments and exceptions | Done (v3.22) | Comments, Waiting/Delayed/Cancelled with reasons, all visible on the case. **v3.22:** Escalate button and links (e.g. a photo of the uniform form). |
 | 9 | Re-evaluation workflow | Done | Request → Performance board → accept, start on coach board, return for clarification, link the new result, complete. |
 | 10 | Employee self-service | Done (v3.22) | **v3.22** employee page: My profile, My evaluations, My procedural mistakes, My retraining, My games, My schedule and rotation, My requests (send and cancel). Only the person's own data is sent by the server. |
