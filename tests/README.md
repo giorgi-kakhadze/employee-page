@@ -10,6 +10,7 @@ node tests/sync_directory.test.js
 node tests/nav_spaces.test.js
 node tests/work_types.test.js
 node tests/onboarding_share.test.js
+node tests/schedule_grid.test.js
 ```
 
 - `sync_privacy.test.js`: what each person receives (tickets, cases, comments, announcements, audit log), writes from people who see only part of the list, deleting, forged pushes, two people saving at once, HR case progress.
@@ -19,5 +20,6 @@ node tests/onboarding_share.test.js
 - `work_types.test.js`: work type rules. A Termination ticket on the HR board creates linked Uniforms, Building access, FMD and IT tickets and one case on the server; a General ticket stays one ticket; a position mapped to Uniforms receives its linked ticket and the case title; only the admin can write the rules (totProcessTpl); a custom work type added by the admin on the FMD board reaches the FMD device and fans out as configured; game counts reach the scheduling coordinator; a work type sent to another department still creates the board department's step and no duplicate; a linked department can read a case but not edit or delete it; a made-up ticket with someone else's case id does not reveal that case; in admin-only mode a department button opens a screen the person was granted and shows locks on the others.
 
 - `onboarding_share.test.js`: onboarding templates sent as live tickets. A trainer creates a group through the screens and sends Fingerprints (to Building access), Live exam (to Performance) and Uniforms (to Uniforms); one ticket each, no duplicates, the live-exam due date and times; the access team sees the table with the drop-out row in red, ticks a row, adds a note, corrects a Biostar ID and comments; the correction is written back into the onboarding and the trainer's comment reaches the ticket; the ticket record itself is never rewritten; Performance does not receive the Fingerprints table.
+- `schedule_grid.test.js`: FMD schedule and rotation grids: breaks count as working hours; Ctrl+click and whole-person selection; Delete clears the selection; drag shifts to another day or person (comments move along), swap by dropping one on another, move a block; show only selected people.
 
 Each prints one line per check and exits with code 1 if any check fails.
