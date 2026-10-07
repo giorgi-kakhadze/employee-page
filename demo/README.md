@@ -3,10 +3,10 @@
 A complete **made-up** company to try the tool with. Every name, e-mail (@example.com), phone number and figure is fake.
 
 ## What is inside
-- **1,000 employees**: VIP, Premium, regular and beginner game presenters, shufflers and pit supervisors.
+- **1,073 people in the employee list**: 1,000 employees plus 73 recent hires from the onboarding groups (work IDs N20001 and up): VIP, Premium, regular and beginner game presenters, shufflers and pit supervisors.
   - They are spread over 8 teams and 3 shifts.
   - Statuses: employed, probation, retired and terminated.
-  - Each has a work ID (E10001–E11000), a badge, the games they know, a phone, an e-mail and a team manager.
+  - Each has a work ID (E10001–E11000 for the 1,000; N20001 and up for recent hires), a badge, the games they know, a phone, an e-mail and a team manager.
 - **26 staff in the access list**: 5 managers (operations), 5 shift leads, 5 training coordinators, 2 seniors, 3 performance coaches, 2 scheduling coordinators (FMD), 2 HR recruiters and 2 service managers.
 - **Schedule:** last, this and next month, with vacations and sick days.
 - **Rotation:** yesterday, today and tomorrow — 40 people and 32 tables per shift, without conflicts.
