@@ -15,6 +15,7 @@ node tests/evaluation.test.js
 node tests/overview_history.test.js
 node tests/service_mgmt.test.js
 node tests/unique_names.test.js
+node tests/bonus_pay.test.js
 ```
 
 - `sync_privacy.test.js`: what each person receives (tickets, cases, comments, announcements, audit log), writes from people who see only part of the list, deleting, forged pushes, two people saving at once, HR case progress.
@@ -29,5 +30,6 @@ node tests/unique_names.test.js
 - `overview_history.test.js`: Settings instead of Print/Backup (who sees it, full backup only for the admin and managers); every department opens on its Overview, with History at the end of its second bar; the tools moved out of More; Retraining stays in Academy, Performance or FMD; the FMD staff directory (search by Work ID, barcode, badge, screen name; position, team, status and working-today filters; opening a profile); the profile's next 7 days and rotation right now; shift and profile changes recorded with who and when, shown in the profile History and FMD → History; the server journal is add-only and each person reads only what they may; sync does not record changes twice or resend the journal.
 - `service_mgmt.test.js`: the Service Management department (🚨 Service, position Service manager): its Overview and second bar; the Jira CSV import (date formats, column guessing from Jira headers, Check, employee matching by Work ID / name / screen name, re-import updates by Jira key and keeps the follow-up note, undo); logging an incident by hand; reports and CSV; the journal; who receives incidents on the server (coaches read only, HR and shift leads nothing, a position mapped to the department yes); the person 360 view.
 - `unique_names.test.js`: one nickname / one full name per person in Onboarding (typing, paste, import) and the employee file; repeated names get a number ("Georgi Kakadze 1"); the same person moving groups is not a duplicate; only the admin can switch the rules off (admin space, Settings), and the server refuses the setting from anyone else; the duplicate finder.
+- `bonus_pay.test.js`: pay per hour with actual hours (left early); bonus programs with levels per position; the month review (numbers, levels, hours, remarks shown or internal, final); the profile Month tab; pay statements; the server rules for bonus, review, pay and remark data; 'me' returns only the employee's own statement, shown remarks, incidents and evaluation comments; new request types; the employee page with Home / Schedule / Rotation, read-only.
 
 Each prints one line per check and exits with code 1 if any check fails.

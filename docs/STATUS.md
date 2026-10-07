@@ -10,6 +10,8 @@ Checked against `docs/platform-requirements.txt` (35 sections), using the code i
 
 "v3.26" marks onboarding templates sent to departments as live tickets (see `docs/v3_26_notes.md`).
 
+"v3.31" marks bonus programs, the month review, pay by the hour and the employee page with Home / Schedule / Rotation (see `docs/v3_31_notes.md`).
+
 "v3.30" marks one nickname / one full name per person, with admin-only switches (see `docs/v3_30_notes.md`).
 
 "v3.29" marks the Service Management department: incidents imported from Jira CSV exports, reports (see `docs/v3_29_notes.md`).

@@ -19,9 +19,14 @@ module.exports = function (codePath, opts) {
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (s) => ({ setMimeType() { return this; }, getContent: () => s }) },
     MailApp: { sendEmail() {} }, ScriptApp: { getOAuthToken: () => 'test-token' },
     /* v3.28: Drive's resumable video upload, enough for the tool's chunked uploads: start → Location, PUT chunks → 308 until the last → 200 { id } */
-    UrlFetchApp: { fetch(url, o) { o = o || {}; if (/uploadType=resumable/.test(url)) return { getHeaders: () => ({ Location: 'https://upload.test/' + (++upN) }), getResponseCode: () => 200 }; if (o.method === 'put') { const m = /bytes (\d+)-(\d+)\/(\d+)/.exec((o.headers || {})['Content-Range'] || ''), last = m && +m[2] + 1 >= +m[3]; uploads.push({ url, range: m && m[0] }); return { getResponseCode: () => last ? 200 : 308, getContentText: () => JSON.stringify({ id: 'drive-file-' + upN }) }; } throw new Error('no network in tests'); } }
+    UrlFetchApp: { fetch(url, o) { o = o || {};
+      /* v3.31: Google sign-in check for the employee page: a test token 'gtok:<email>' is a valid sign-in for that e-mail */
+      if (/oauth2\.googleapis\.com\/tokeninfo/.test(url)) { const t = decodeURIComponent(String(url).split('id_token=')[1] || ''), em = /^gtok:(.+)$/.exec(t); return { getResponseCode: () => em ? 200 : 400, getContentText: () => JSON.stringify(em ? { aud: CID, email: em[1], email_verified: 'true', exp: String(Math.floor(Date.now() / 1000) + 3600), name: em[1] } : {}) }; }
+      if (/uploadType=resumable/.test(url)) return { getHeaders: () => ({ Location: 'https://upload.test/' + (++upN) }), getResponseCode: () => 200 }; if (o.method === 'put') { const m = /bytes (\d+)-(\d+)\/(\d+)/.exec((o.headers || {})['Content-Range'] || ''), last = m && +m[2] + 1 >= +m[3]; uploads.push({ url, range: m && m[0] }); return { getResponseCode: () => last ? 200 : 308, getContentText: () => JSON.stringify({ id: 'drive-file-' + upN }) }; } throw new Error('no network in tests'); } }
   };
+  let CID = '';
   let src = fs.readFileSync(codePath, 'utf8').replace("const ADMIN_SECRET = 'CHANGE-ME-ADMIN-KEY'", "const ADMIN_SECRET = 'ADMKEY'");
+  CID = (/const GOOGLE_CLIENT_ID = '([^']*)'/.exec(src) || [])[1] || '';
   const api = new Function(...Object.keys(G), src + '; return { doPost: doPost, sh_: sh_ };')(...Object.values(G));
   return {
     files, uploads,

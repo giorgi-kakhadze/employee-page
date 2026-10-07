@@ -31,7 +31,9 @@ nav button.on{background:var(--ac);border-color:var(--ac);color:#fff}
 dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;margin:0}dt{color:var(--mut)}dd{margin:0}
 .banner{background:#fff4e0;color:#7a4a00;border:1px solid #f0c27a;border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:.9rem}
 @media(prefers-color-scheme:dark){.banner{background:#3a2a10;color:#f5d39b;border-color:#6b4d1d}}
-table{border-collapse:collapse;width:100%;font-size:.9rem}td,th{padding:6px 8px;border-bottom:1px solid var(--bd);text-align:left}th{color:var(--mut);font-weight:600}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+nav.main3{position:sticky;top:0;z-index:5;background:var(--bg);display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:8px 0}nav.main3 button{padding:10px 8px;font-size:1rem;font-weight:600;border-radius:12px}
+.tile.hl{border-color:var(--ac)}.tile.warnT b{color:var(--bad)}.tile.okT b{color:var(--ok)}.click{cursor:pointer}h2{scroll-margin-top:70px}td,th{padding:6px 8px;border-bottom:1px solid var(--bd);text-align:left}th{color:var(--mut);font-weight:600}
 </style></head><body><main>
 <div id="login"><h1>My work page</h1><p class="mut">Sign in with the Google account your trainer has on file.</p>
 <div id="gbtn" style="display:inline-block"></div><div id="err" class="err"></div></div>
@@ -43,7 +45,7 @@ var CLIENT_ID = '121975980339-fu9nd124kov2g6j94qiofOrkjkhbkee6.apps.googleuserco
 var SERVER_URL = 'PASTE-YOUR-APPS-SCRIPT-WEB-APP-URL-HERE';   /* ends in /exec */
 /* ==================== */
 /* Employee self-service. Everything shown here comes from the Apps Script action "me", which checks the Google sign-in and returns ONLY this person's own data
-   (profile, shared evaluations, retraining, game counts, schedule, rotation, own requests). Nothing about other people is ever sent to this page. */
+   (profile, shared evaluations with comments, retraining, game counts, schedule, rotation, own requests, v3.31: own pay statements, bonuses, incidents and the remarks staff chose to show). Nothing about other people is ever sent to this page. */
 var tok = null, D = null, tab = 'home', refreshT = null, DEMO = /[?&]demo\b/.test(location.search);
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function $(id){return document.getElementById(id)}
@@ -73,7 +75,7 @@ function load(silent){
 
 /* ---------- helpers ---------- */
 var SH={morning:'Morning',afternoon:'Afternoon',night:'Night'},OFF={rest:'Day off',vacation:'Vacation',sick:'Sick leave',unpaid:'Unpaid leave'};
-var RT={swap:'Swap a shift',giveaway:'Give away a shift',annual:'Annual leave',sick:'Sick leave'},RS={pending:'Waiting for a decision',approved:'Approved',rejected:'Declined',cancelled:'Cancelled'};
+var RT={swap:'Swap a shift',giveaway:'Give away a shift',annual:'Vacation / annual leave',sick:'Sick leave',dayoff:'Day off',payq:'Question about my pay'},RS={pending:'Waiting for a decision',approved:'Approved',rejected:'Declined',cancelled:'Cancelled'};
 function hh(n){n=((n%24)+24)%24;return String(Math.floor(n)).padStart(2,'0')+':'+(n%1?'30':'00')}
 function cellTxt(v){v=String(v||'').trim();if(!v)return '-';if(/^\d+$/.test(v))return 'Table '+v;if(/^(b|brk|break)$/i.test(v))return 'Break';if(/^(off|x|-)$/i.test(v))return 'Off';return v}
 function dLabel(d,long){var dt=new Date(d+'T12:00:00');return isNaN(dt)?esc(d):dt.toLocaleDateString(undefined,{weekday:long?'long':'short',day:'numeric',month:'short'})}
@@ -88,85 +90,94 @@ function mistakes(){
 }
 function workDays(){return ((D.schedule&&D.schedule.days)||[]).filter(function(y){return SH[y.s]&&y.d>=today()})}
 
-/* ---------- pages ---------- */
-var TABS=[['home','Overview'],['profile','My profile'],['evals','My evaluations'],['mistakes','My mistakes'],['retrain','My retraining'],['games','My games'],['schedule','My schedule'],['requests','My requests']];
+/* ---------- pages (v3.31: three buttons: Home, Schedule, Rotation. Everything here is read-only; the only thing an employee can do is send requests) ---------- */
+var TABS=[['home','&#127968; Home'],['schedule','&#128197; Schedule'],['rotation','&#128260; Rotation']],openEv=null,openPay=false;
+var RK={positive:['&#128077;','Positive feedback','work'],remark:['&#128221;','Remark','leave'],violation:['&#9888;','Violation','bad'],disciplinary:['&#9940;','Disciplinary case','bad'],note:['&#128466;','Note','off']};
+function money(v,c){return (Math.round((+v||0)*100)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+' '+esc(c||'')}
+function monthName(ym){var dt=new Date(ym+'-01T12:00:00');return isNaN(dt)?esc(ym):dt.toLocaleDateString(undefined,{month:'long',year:'numeric'})}
+function payNow(){var p=D.pay||[],y=today().slice(0,7);return p.filter(function(x){return x.ym===y})[0]||null}
+function payLast(){var p=D.pay||[],y=today().slice(0,7);return p.filter(function(x){return x.ym<y})[0]||null}
 function show(){
-  $('login').hidden=true;var a=$('app');a.hidden=false;
+  $('login').hidden=true;var a=$('app');a.hidden=false;if(!TABS.some(function(t){return t[0]===tab}))tab='home';
   var h=(DEMO?'<div class="banner"><b>Demo data.</b> This page is not connected to the server. Nothing you do here is sent anywhere.</div>':'')+
     '<div class="row"><div><h1>Hello, '+esc((D.profile&&D.profile.nickname)||D.name||D.email)+'</h1><div class="mut">'+esc(D.email)+'</div></div><span><button onclick="load()">&#8635; Refresh</button> <button onclick="location.reload()">Sign out</button></span></div>'+
-    '<nav>'+TABS.map(function(t){return '<button data-t="'+t[0]+'" class="'+(t[0]===tab?'on':'')+'">'+t[1]+'</button>'}).join('')+'</nav><div id="pg"></div>';
+    '<nav class="main3">'+TABS.map(function(t){return '<button data-t="'+t[0]+'" class="'+(t[0]===tab?'on':'')+'">'+t[1]+'</button>'}).join('')+'</nav><div id="pg"></div>';
   a.innerHTML=h;
-  a.querySelector('nav').onclick=function(e){var b=e.target.closest('button');if(b){tab=b.getAttribute('data-t');show()}};
-  var on=a.querySelector('nav .on');if(on){var nv=on.parentNode;nv.scrollLeft=on.offsetLeft-nv.offsetLeft-16}
-  var P={home:pHome,profile:pProfile,evals:pEvals,mistakes:pMistakes,retrain:pRetrain,games:pGames,schedule:pSchedule,requests:pRequests};
+  a.querySelector('nav').onclick=function(e){var b=e.target.closest('button');if(b){tab=b.getAttribute('data-t');show();window.scrollTo(0,0)}};
+  var P={home:pHome,schedule:pSchedule,rotation:pRotation};
   $('pg').innerHTML=(P[tab]||pHome)();
-  if(tab==='requests')wireRequests();
-  [].forEach.call(document.querySelectorAll('[data-go]'),function(x){x.onclick=function(){tab=x.getAttribute('data-go');show();window.scrollTo(0,0)}});
+  if(tab==='schedule')wireRequests();
+  [].forEach.call(document.querySelectorAll('[data-go]'),function(x){x.onclick=function(){var g=x.getAttribute('data-go');if(g.charAt(0)==='#'){var el=document.querySelector(g);if(el)el.scrollIntoView({behavior:'smooth'});return}tab=g;show();window.scrollTo(0,0)}});
+  [].forEach.call(document.querySelectorAll('[data-ev]'),function(x){x.onclick=function(){var i=+x.getAttribute('data-ev');openEv=openEv===i?null:i;show();var el=document.getElementById('ev'+i);if(el)el.scrollIntoView({block:'nearest'})}});
+  var ps=document.getElementById('payShifts');if(ps)ps.onclick=function(){openPay=!openPay;show();var el=document.getElementById('paycard');if(el)el.scrollIntoView({block:'start'})};
   if(!refreshT&&!DEMO)refreshT=setInterval(function(){if(!document.querySelector('#rqForm:focus-within'))load(true)},60000);
 }
-function tile(go,n,l){return '<button class="tile" data-go="'+go+'"><b>'+n+'</b><span>'+l+'</span></button>'}
+function tile(go,n,l,cls){return '<button class="tile'+(cls?' '+cls:'')+'" data-go="'+go+'"><b>'+n+'</b><span>'+l+'</span></button>'}
 function pHome(){
-  var ev=D.evaluations||[],last=ev[0],wd=workDays(),next=wd[0],rt=(D.retraining||[]).filter(function(r){return r.status==='Scheduled'}),rq=(D.requests||[]).filter(function(r){return r.status==='pending'}),mi=mistakes();
-  var h='<h2>At a glance</h2><div class="tiles">'+
-    tile('evals',last?(last.total==null?'-':esc(last.total)+'%'):'-',last?'Last result: '+esc(last.game||'Evaluation'):'No results shared yet')+
-    tile('schedule',next?dLabel(next.d):'-',next?'Next shift: '+SH[next.s]+(next.f!=null?' '+hh(next.f):''):'No upcoming shift sent')+
-    tile('retrain',rt.length,'Retraining scheduled')+
-    tile('mistakes',mi.length,'Criteria with points lost')+
-    tile('requests',rq.length,'Requests waiting')+'</div>';
-  var todo=[];
-  if(rt.length)todo.push('You have <b>'+rt.length+'</b> retraining session'+(rt.length>1?'s':'')+' scheduled (next: '+esc(rt[rt.length-1].date)+').');
-  var dec=(D.requests||[]).filter(function(r){return r.status!=='pending'&&r.decidedAt&&r.decidedAt>Date.now()-7*864e5});
-  dec.forEach(function(r){todo.push('Your request "'+esc(RT[r.type]||r.type)+'" for '+esc(r.from)+' was <b>'+esc((RS[r.status]||r.status).toLowerCase())+'</b>'+(r.decisionNote?': '+esc(r.decisionNote):'')+'.')});
-  if(mi[0])todo.push('Most frequent point loss: <b>'+esc(mi[0].name)+'</b> ('+esc(mi[0].game)+', '+mi[0].n+'×).');
-  h+='<h2>For you</h2>'+(todo.length?'<div class="card">'+todo.map(function(t){return '<div class="day"><span>'+t+'</span></div>'}).join('')+'</div>':'<div class="card mut">Nothing needs your attention.</div>');
-  return h;
-}
-function pProfile(){
-  var p=D.profile||{},F=[['Name',p.name],['Nickname',p.nickname],['Employee ID',p.workId],['Position',p.position],['Team',p.team],['Shift',p.shift],['Manager',p.manager],['Start date',p.startDate],['Status',p.status],['Phone',p.phone],['Email',p.email||D.email]];
-  return '<h2>My profile</h2><div class="card"><dl>'+F.map(function(f){return '<dt>'+f[0]+'</dt><dd>'+(f[1]?esc(f[1]):'<span class="mut">not on file</span>')+'</dd>'}).join('')+'</dl>'+
-    ((p.games||[]).length?'<label>Games I am trained on</label>'+p.games.map(function(g){return '<span class="tag">'+esc(g)+'</span>'}).join(''):'')+
-    '</div><div class="mut">Something wrong? Tell your manager or HR. You cannot change these details here.</div>';
-}
-function pEvals(){
-  var ev=D.evaluations||[],h='<h2>My evaluations</h2>';
-  if(!ev.length)return h+'<div class="card mut">No results have been shared with you yet.</div>';
-  ev.forEach(function(e){
-    var lost=lostOf(e),cr=e.criteria.filter(function(c){return c.score!=null}).sort(function(x,y){return x.score-y.score}),mx=Math.max.apply(null,[1].concat(e.criteria.map(function(c){return c.score||0})));
-    h+='<div class="card"><div class="row"><div><b>'+esc(e.game||'Evaluation')+'</b>'+(e.kind?' <span class="tag">'+esc(e.kind)+'</span>':'')+'<div class="mut">'+esc(e.date)+(e.edited?' · corrected '+when(e.edited):'')+'</div></div><div class="big">'+(e.total==null?'-':esc(e.total))+'%</div></div>';
-    h+='<div class="mut" style="margin-top:6px">'+(lost.length?lost.length+' criteria with points deducted':'Full score on every criterion')+'</div>';
-    cr.forEach(function(c){var full=c.score>=mx;h+='<div class="day"><span>'+esc(c.name)+'</span><span class="'+(full?'work':'leave')+'">'+(full?'&#10003; Full score':'&minus;'+(mx-c.score)+' ('+c.score+'/'+mx+')')+'</span></div>'});
-    if(e.improve&&e.improve.length)h+='<div style="margin-top:8px"><span class="mut">Focus on: </span>'+e.improve.map(function(x){return '<span class="tag">'+esc(x)+'</span>'}).join(' ')+'</div>';
-    if(e.feedback)h+='<div class="fb">'+esc(e.feedback)+'</div>';
+  var p=D.profile||{},ev=D.evaluations||[],last=ev[0],wd=workDays(),next=wd[0],mi=mistakes(),inc=D.incidents||[],rm=D.remarks||[],pn=payNow(),pl=payLast(),y=today().slice(0,7);
+  var incM=inc.filter(function(x){return x.date.slice(0,7)===y}).length,bad=rm.filter(function(x){return x.kind==='violation'||x.kind==='disciplinary'}).length,good=rm.filter(function(x){return x.kind==='positive'}).length;
+  var gm=(D.gameCounts||[]).filter(function(g){return g.period.slice(0,7)===y}).reduce(function(s,g){return s+g.count},0);
+  var h='<div class="tiles">'+
+    tile('#paycard',pn?money(pn.totals.total,pn.cur):pl?money(pl.totals.total,pl.cur):'-',pn?'Earned so far in '+monthName(pn.ym).split(' ')[0]:pl?'Salary for '+monthName(pl.ym):'Salary not published yet','hl')+
+    tile('#paycard',pn?pn.totals.shifts+' · '+pn.totals.hours+' h':'-','Shifts · hours this month')+
+    tile('#evals',last?(last.total==null?'-':esc(last.total)+'%'):'-',last?'Last evaluation: '+esc(last.game||''):'No evaluation shared yet')+
+    tile('#mistakes',mi.length+incM,'Mistakes (points lost + incidents this month)')+
+    tile('#remarks',bad,'Violations & disciplinary',bad?'warnT':'')+
+    tile('#remarks',good,'Positive feedback',good?'okT':'')+
+    tile('#games',gm?gm.toLocaleString():'-','Games this month')+
+    tile('schedule',next?dLabel(next.d):'-',next?'Next shift: '+SH[next.s]+(next.f!=null?' '+hh(next.f):''):'No upcoming shift sent')+'</div>';
+  /* personal information */
+  h+='<h2>My information</h2><div class="card"><dl>'+[['Name',p.name],['Nickname',p.nickname],['Employee ID',p.workId],['Position',p.position],['Team',p.team],['Team manager',p.manager],['Shift',p.shift],['Start date',p.startDate],['Status',p.status],['Phone',p.phone],['Email',p.email||D.email]].map(function(f){return '<dt>'+f[0]+'</dt><dd>'+(f[1]?esc(f[1]):'<span class="mut">not on file</span>')+'</dd>'}).join('')+'</dl>'+((p.games||[]).length?'<label>Games I am trained on</label>'+p.games.map(function(g){return '<span class="tag">'+esc(g)+'</span>'}).join(''):'')+'<div class="mut" style="margin-top:8px">Something wrong? Tell your manager or HR, or send a request from Schedule.</div></div>';
+  /* salary */
+  h+='<h2 id="paycard">My salary</h2>';
+  if(!pn&&!pl)h+='<div class="card mut">Your salary has not been published yet. It appears here after your manager\'s tool updates the pay pages.</div>';
+  [pn,pl].forEach(function(st,ix){if(!st)return;var T=st.totals,cur=ix===0;
+    h+='<div class="card"><div class="row"><div><b>'+monthName(st.ym)+'</b> <span class="tag">'+(st.final?'Final':cur?'So far (up to '+dLabel(st.upTo)+')':'Not final yet')+'</span><div class="mut">'+T.shifts+' shift'+(T.shifts===1?'':'s')+' · '+T.hours+' hours'+(st.unit==='hour'?' · paid per hour':' · paid per shift')+'</div></div><div class="big">'+money(T.total,st.cur)+'</div></div>'+
+      '<div class="day"><span>Shifts</span><span>'+money(T.earned,st.cur)+'</span></div>'+(T.leave?'<div class="day"><span>Paid leave</span><span>'+money(T.leave,st.cur)+'</span></div>':'')+
+      (st.bonus||[]).map(function(b){return '<div class="day"><span>&#127941; '+esc(b.name)+' <span class="tag">Level '+b.level+' of '+b.of+'</span></span><span class="work">+'+money(b.amount,st.cur)+'</span></div>'}).join('')+
+      (st.extra||[]).map(function(b){return '<div class="day"><span>&#127873; '+esc(b.name)+' <span class="mut">'+esc(b.date)+'</span></span><span class="work">+'+money(b.amount,st.cur)+'</span></div>'}).join('')+
+      (cur&&!st.final?'<div class="mut" style="margin-top:6px">'+(T.plannedShifts?'Still planned this month: '+T.plannedShifts+' shift'+(T.plannedShifts===1?'':'s')+' ('+T.plannedHours+' h, about '+money(T.planned,st.cur)+'). ':'')+'Bonuses are shown when your manager closes the month.</div>':'')+
+      (cur?'<div style="margin-top:8px"><button id="payShifts">'+(openPay?'Hide':'Show')+' each shift</button></div>':'')+
+      (cur&&openPay?'<table style="margin-top:8px"><tr><th>Day</th><th>Shift</th><th>Hours</th><th>Rate</th><th>Pay</th></tr>'+st.days.map(function(d){var w=d.k==='day'||d.k==='night';return '<tr><td>'+dLabel(d.d)+'</td><td>'+(w?esc(SH[d.s]||d.s||(d.k==='night'?'Night':'Day'))+' <span class="mut">'+(d.k==='night'?'night rate':'day rate')+'</span>':esc({vac:'Vacation',sick:'Sick leave',study:'Study leave',fam:'Family leave',unp:'Unpaid'}[d.k]||d.k))+(d.mult>1?' <span class="tag">×'+d.mult+'</span>':'')+'</td><td>'+(w?d.h+(d.act?' <span class="leave" title="Hours entered by your manager (e.g. left early)">*</span>':''):'')+'</td><td>'+(w?money(d.rate,''):'')+'</td><td><b>'+money(d.amt,'')+'</b></td></tr>'}).join('')+'</table><div class="mut">* hours changed by your manager (for example you left early). Questions? Send "Question about my pay" from Schedule.</div>':'')+'</div>'});
+  /* evaluations */
+  h+='<h2 id="evals">My evaluations</h2>';
+  if(!ev.length)h+='<div class="card mut">No results have been shared with you yet.</div>';
+  ev.forEach(function(e,i){var lost=lostOf(e),on=openEv===i,mx=Math.max.apply(null,[1].concat(e.criteria.map(function(c){return c.score||0})));
+    h+='<div class="card" id="ev'+i+'"><div class="row click" data-ev="'+i+'"><div><b>'+esc(e.game||'Evaluation')+'</b>'+(e.kind?' <span class="tag">'+esc(e.kind)+'</span>':'')+'<div class="mut">'+esc(e.date)+' · '+(lost.length?lost.length+' criteria with points lost':'full score')+' · '+(on?'tap to close':'tap for details and comments')+'</div></div><div class="big">'+(e.total==null?'-':esc(e.total))+'%</div></div>';
+    if(on){e.criteria.filter(function(c){return c.score!=null}).sort(function(x,y){return x.score-y.score}).forEach(function(c){var full=c.score>=mx;h+='<div class="day"><span>'+esc(c.name)+(c.note?'<div class="mut">&#128172; '+esc(c.note)+'</div>':'')+'</span><span class="'+(full?'work':'leave')+'">'+(full?'&#10003; Full':'&minus;'+(mx-c.score)+' ('+c.score+'/'+mx+')')+'</span></div>'});
+      if(e.improve&&e.improve.length)h+='<div style="margin-top:8px"><span class="mut">Focus on: </span>'+e.improve.map(function(x){return '<span class="tag">'+esc(x)+'</span>'}).join(' ')+'</div>';
+      if(e.feedback)h+='<div class="fb">'+esc(e.feedback)+'</div>'}
     h+='</div>'});
+  /* mistakes */
+  h+='<h2 id="mistakes">My mistakes</h2>';
+  h+=(mi.length?'<div class="card"><h3>Procedural (points lost in evaluations)</h3><table><tr><th>Game</th><th>Criterion</th><th>Times</th><th>Last</th></tr>'+mi.map(function(m){return '<tr><td>'+esc(m.game)+'</td><td>'+esc(m.name)+'</td><td><b>'+m.n+'</b></td><td>'+esc(m.last)+'</td></tr>'}).join('')+'</table></div>':'<div class="card mut">No points lost in your shared evaluations.</div>');
+  h+=(inc.length?'<div class="card"><h3>Incidents on the floor ('+inc.length+')</h3>'+inc.slice(0,20).map(function(x){return '<div class="day"><span><b>'+dLabel(x.date)+'</b> · '+esc([x.type,x.game,x.table].filter(Boolean).join(' · '))+(x.summary?'<div class="mut">'+esc(x.summary)+(x.action?' — '+esc(x.action):'')+'</div>':'')+'</span><span class="'+(/critical|high/i.test(x.severity)?'bad':'leave')+'">'+esc(x.severity||'')+'</span></div>'}).join('')+'</div>':'');
+  /* remarks */
+  h+='<h2 id="remarks">Feedback, remarks and cases</h2>'+(rm.length?'<div class="card">'+rm.map(function(x){var k=RK[x.kind]||RK.note;return '<div class="day"><span><b>'+k[0]+' '+k[1]+'</b>'+(x.title?' · '+esc(x.title):'')+'<div class="mut">'+dLabel(x.date)+(x.by?' · '+esc(x.by):'')+'</div>'+(x.text?'<div class="fb">'+esc(x.text)+'</div>':'')+'</span><span class="'+k[2]+'">'+(x.kind==='positive'?'&#9733;':'')+'</span></div>'}).join('')+'</div>':'<div class="card mut">Nothing recorded.</div>');
+  /* games */
+  h+='<h2 id="games">My games</h2>'+gamesHtml();
+  var rt=D.retraining||[];if(rt.length)h+='<h2>My retraining</h2><div class="card">'+rt.map(function(x){return '<div class="day"><span><b>'+esc(x.date)+'</b><div class="mut">'+esc(x.reason||'')+'</div></span><span class="'+(x.status==='Completed'?'work':x.status==='Missed'?'bad':'leave')+'">'+esc(x.status)+'</span></div>'}).join('')+'</div>';
   return h;
 }
-function pMistakes(){
-  var mi=mistakes(),h='<h2>My procedural mistakes</h2><div class="mut" style="margin-bottom:10px">Criteria where you lost points in the evaluations shared with you, counted per game. Trainer notes are not shown here.</div>';
-  if(!mi.length)return h+'<div class="card mut">No points lost in your shared evaluations.</div>';
-  return h+'<div class="card"><table><tr><th>Game</th><th>Criterion</th><th>Times</th><th>Last</th></tr>'+mi.map(function(m){return '<tr><td>'+esc(m.game)+'</td><td>'+esc(m.name)+'</td><td><b>'+m.n+'</b></td><td>'+esc(m.last)+'</td></tr>'}).join('')+'</table></div>';
-}
-function pRetrain(){
-  var r=D.retraining||[],h='<h2>My retraining</h2>';
-  if(!r.length)return h+'<div class="card mut">No retraining on record.</div>';
-  return h+'<div class="card">'+r.map(function(x){return '<div class="day"><span><b>'+esc(x.date)+'</b><div class="mut">'+esc(x.reason||'')+'</div></span><span class="'+(x.status==='Completed'?'work':x.status==='Missed'?'bad':'leave')+'">'+esc(x.status)+'</span></div>'}).join('')+'</div>';
-}
-function pGames(){
-  var g=D.gameCounts,h='<h2>My games</h2>';
-  if(!g)return h+'<div class="card mut">Game counts are not available yet (the server has not been updated to send them).</div>';
-  if(!g.length)return h+'<div class="card mut">No game counts for you in the last 12 months.</div>';
+function gamesHtml(){
+  var g=D.gameCounts;
+  if(!g||!g.length)return '<div class="card mut">No game counts for you yet.</div>';
   var per={},tot={};g.forEach(function(x){var m=x.period.slice(0,7);per[m]=per[m]||{};per[m][x.game]=(per[m][x.game]||0)+x.count;tot[m]=(tot[m]||0)+x.count});
-  var ms=Object.keys(per).sort().reverse(),mx=Math.max.apply(null,[1].concat(ms.map(function(m){return tot[m]})));
-  h+='<div class="mut" style="margin-bottom:10px">Imported from the company analytics export. Last 12 months.</div>';
-  ms.forEach(function(m){var dt=new Date(m+'-01T12:00:00');h+='<div class="card"><div class="row"><b>'+dt.toLocaleDateString(undefined,{month:'long',year:'numeric'})+'</b><span class="big">'+tot[m].toLocaleString()+'</span></div><div style="height:6px;background:var(--bd);border-radius:3px;margin:6px 0"><div style="height:100%;width:'+(tot[m]/mx*100)+'%;background:var(--ac);border-radius:3px"></div></div>'+
-    Object.keys(per[m]).sort(function(a,b){return per[m][b]-per[m][a]}).map(function(k){return '<div class="day"><span>'+esc(k)+'</span><span>'+per[m][k].toLocaleString()+'</span></div>'}).join('')+'</div>'});
-  return h;
+  var ms=Object.keys(per).sort().reverse().slice(0,3),mx=Math.max.apply(null,[1].concat(ms.map(function(m){return tot[m]})));
+  return ms.map(function(m){return '<div class="card"><div class="row"><b>'+monthName(m)+'</b><span class="big">'+tot[m].toLocaleString()+'</span></div><div style="height:6px;background:var(--bd);border-radius:3px;margin:6px 0"><div style="height:100%;width:'+(tot[m]/mx*100)+'%;background:var(--ac);border-radius:3px"></div></div>'+
+    Object.keys(per[m]).sort(function(a,b){return per[m][b]-per[m][a]}).map(function(k){return '<div class="day"><span>'+esc(k)+'</span><span>'+per[m][k].toLocaleString()+'</span></div>'}).join('')+'</div>'}).join('');
 }
 function pSchedule(){
-  var h='',x=D.schedule;
+  var h='',x=D.schedule,pn=payNow();
+  h+='<div class="tiles">'+tile('#rqForm',pn?pn.totals.shifts:'-','Shifts worked this month')+tile('#rqForm',pn?pn.totals.hours:'-','Hours worked this month')+tile('#rqForm',pn?pn.totals.plannedShifts:'-','Shifts still planned')+tile('#myreq',(D.requests||[]).filter(function(r){return r.status==='pending'}).length,'Requests waiting')+'</div>';
   h+='<h2>My schedule</h2>';
   if(!x||!x.days.length)h+='<div class="card mut">Nothing has been sent to you yet.</div>';
   else{h+='<div class="card">';x.days.forEach(function(y){var work=SH[y.s],txt=work?SH[y.s]+(y.f!=null?' &middot; '+hh(y.f)+'-'+hh(y.t):''):esc(OFF[y.s]||y.s);h+='<div class="day"><span>'+dLabel(y.d)+'</span><span class="'+(work?'work':y.s==='rest'?'off':'leave')+'">'+txt+'</span></div>'});h+='</div>'}
-  var r=D.rotation;h+='<h2>My rotation</h2>';
+  if(pn&&pn.days.length){h+='<h2>Worked this month</h2><div class="card">'+pn.days.filter(function(d){return d.k==='day'||d.k==='night'}).slice().reverse().map(function(d){return '<div class="day"><span>'+dLabel(d.d)+' · '+esc(SH[d.s]||d.s||'')+'</span><span>'+d.h+' h'+(d.act?' <span class="leave">*</span>':'')+'</span></div>'}).join('')+'</div>'}
+  return h+pRequests();
+}
+function pRotation(){
+  var r=D.rotation,h='<h2>My rotation</h2><div class="mut" style="margin-bottom:8px">Your tables for the coming days. View only: if something must change, send a request from Schedule.</div>';
   if(!r||!(r.days||[]).length)return h+'<div class="card mut">No rotation has been shared with you yet.</div>';
   r.days.forEach(function(e){
     var c=e.c||[],grp=[],i,v;for(i=0;i<c.length;i++){v=cellTxt(c[i]);if(grp.length&&grp[grp.length-1].v===v)grp[grp.length-1].to=i+1;else grp.push({v:v,from:i,to:i+1})}
@@ -178,23 +189,24 @@ function pSchedule(){
 }
 function pRequests(){
   var rq=D.requests||[],wd=workDays();
-  var h='<h2>New request</h2><div class="card" id="rqForm"><label>What do you need?</label><select id="rqT">'+Object.keys(RT).map(function(k){return '<option value="'+k+'">'+RT[k]+'</option>'}).join('')+'</select>'+
+  var h='<h2>Send a request</h2><div class="card" id="rqForm"><label>What do you need?</label><select id="rqT">'+Object.keys(RT).map(function(k){return '<option value="'+k+'">'+RT[k]+'</option>'}).join('')+'</select>'+
     '<div id="rqShift"><label>Which shift?</label><select id="rqDay">'+(wd.length?wd.map(function(y){return '<option value="'+y.d+'" data-s="'+y.s+'">'+dLabel(y.d)+' · '+SH[y.s]+'</option>'}).join(''):'<option value="">No working days in the schedule sent to you</option>')+'</select></div>'+
     '<div id="rqWith"><label>Swap with (colleague\'s name)</label><input id="rqW" maxlength="80"></div>'+
     '<div id="rqRange" hidden><div class="row" style="flex-wrap:nowrap"><div style="flex:1"><label>From</label><input id="rqF" type="date"></div><div style="flex:1"><label>To</label><input id="rqTo" type="date"></div></div></div>'+
-    '<label>Note (optional)</label><textarea id="rqN" rows="2" maxlength="500"></textarea><div id="rqE" class="err"></div><button class="pri" id="rqGo">Send request</button></div>';
-  h+='<h2>My requests</h2>'+(rq.length?rq.map(function(r){var cls=r.status==='approved'?'work':r.status==='rejected'?'bad':r.status==='pending'?'leave':'off';
-    return '<div class="card"><div class="row"><b>'+esc(RT[r.type]||r.type)+'</b><span class="'+cls+'">'+esc(RS[r.status]||r.status)+'</span></div><div class="mut">'+esc(r.from)+(r.to&&r.to!==r.from?' → '+esc(r.to):'')+(r.shift?' · '+esc(SH[r.shift]||r.shift):'')+(r.withName?' · with '+esc(r.withName):'')+' · sent '+when(r.created)+'</div>'+
+    '<label id="rqNL">Note (optional)</label><textarea id="rqN" rows="2" maxlength="500"></textarea><div id="rqE" class="err"></div><button class="pri" id="rqGo">Send request</button></div>';
+  h+='<h2 id="myreq">My requests</h2>'+(rq.length?rq.map(function(r){var cls=r.status==='approved'?'work':r.status==='rejected'?'bad':r.status==='pending'?'leave':'off';
+    return '<div class="card"><div class="row"><b>'+esc(RT[r.type]||r.type)+'</b><span class="'+cls+'">'+esc(RS[r.status]||r.status)+'</span></div><div class="mut">'+(r.type==='payq'?'':esc(r.from)+(r.to&&r.to!==r.from?' → '+esc(r.to):'')+(r.shift?' · '+esc(SH[r.shift]||r.shift):'')+(r.withName?' · with '+esc(r.withName):'')+' · ')+'sent '+when(r.created)+'</div>'+
       (r.note?'<div class="fb">'+esc(r.note)+'</div>':'')+(r.decisionNote?'<div class="fb" style="border-color:var(--warn)">'+esc(r.decisionNote)+'</div>':'')+(r.status==='pending'?'<div style="margin-top:8px"><button data-cx="'+esc(r.id)+'">Cancel request</button></div>':'')+'</div>'}).join(''):'<div class="card mut">You have not sent any requests.</div>');
   return h;
 }
 function wireRequests(){
   var t=$('rqT');
-  function sync(){var v=t.value,one=v==='swap'||v==='giveaway';$('rqShift').hidden=!one;$('rqWith').hidden=v!=='swap';$('rqRange').hidden=one;var mn=v==='sick'?iso(new Date(Date.now()-14*864e5)):today();$('rqF').min=mn;$('rqTo').min=mn;$('rqE').textContent=''}
+  function sync(){var v=t.value,one=v==='swap'||v==='giveaway',pq=v==='payq';$('rqShift').hidden=!one;$('rqWith').hidden=v!=='swap';$('rqRange').hidden=one||pq;$('rqNL').textContent=pq?'Your question (which shift, which amount?)':'Note (optional)';var mn=v==='sick'?iso(new Date(Date.now()-14*864e5)):today();$('rqF').min=mn;$('rqTo').min=mn;$('rqE').textContent=''}
   t.onchange=sync;sync();
   $('rqGo').onclick=function(){
     var v=t.value,b={action:'reqNew',type:v,note:$('rqN').value.trim()},e=$('rqE');
     if(v==='swap'||v==='giveaway'){var o=$('rqDay').selectedOptions[0];if(!o||!o.value){e.textContent='There is no working day you can choose.';return}b.from=b.to=o.value;b.shift=o.getAttribute('data-s');if(v==='swap'){b.withName=$('rqW').value.trim();if(!b.withName){e.textContent='Write who you swap with.';return}}}
+    else if(v==='payq'){b.from=b.to=today();if(!b.note){e.textContent='Write your question.';return}}
     else{b.from=$('rqF').value;b.to=$('rqTo').value||b.from;if(!b.from){e.textContent='Choose the first day.';return}if(b.to<b.from){e.textContent='The end date is before the start date.';return}}
     this.disabled=true;e.textContent='Sending...';var btn=this;
     call(b).then(function(j){btn.disabled=false;if(j.error){if(j.error==='sign-in invalid')return signedOut(ERRS[j.error]);e.textContent=j.error;return}D.requests=j.requests;show()}).catch(function(){btn.disabled=false;e.textContent='Could not reach the server. Nothing was sent.'});
@@ -206,13 +218,20 @@ function wireRequests(){
 /* ---------- demo (only with ?demo in the address; clearly labelled, never talks to the server) ---------- */
 function demoData(){
   var d=function(n){var x=new Date();x.setDate(x.getDate()+n);return iso(x)},S=['morning','morning','rest','afternoon','afternoon','night','rest'],days=[];
-  for(var i=0;i<14;i++){var s=S[i%7];days.push({d:d(i),s:s,f:s==='morning'?7:s==='afternoon'?15:s==='night'?23:null,t:s==='morning'?15:s==='afternoon'?23:s==='night'?7:null})}
-  var crit=function(a){return[{name:'Card handling',score:a[0]},{name:'Payout accuracy',score:a[1]},{name:'Game protection',score:a[2]},{name:'Customer service',score:a[3]}]};
-  return{email:'demo.employee@example.com',name:'Demo Employee',profile:{name:'Demo Employee',nickname:'Demo',workId:'W-0001',status:'Active',position:'Dealer',team:'Team A',shift:'Rotating',manager:'',startDate:'2025-03-01',phone:'',email:'demo.employee@example.com',games:['Roulette','Blackjack']},
-    evaluations:[{game:'Roulette',date:d(-5),ts:Date.now()-5*864e5,total:88,criteria:crit([5,4,5,3]),improve:['Customer service','Payout accuracy'],feedback:'Good pace. Announce the winning number clearly.',kind:''},{game:'Blackjack',date:d(-40),ts:Date.now()-40*864e5,total:92,criteria:crit([5,5,4,4]),improve:['Game protection'],feedback:'',kind:''}],
+  for(var i=0;i<14;i++){var s=S[i%7];days.push({d:d(i),s:s,f:s==='morning'?8:s==='afternoon'?16:s==='night'?0:null,t:s==='morning'?16:s==='afternoon'?24:s==='night'?8:null})}
+  var crit=function(a,n){return[{name:'Card handling',score:a[0],note:n&&n[0]||''},{name:'Payout accuracy',score:a[1],note:n&&n[1]||''},{name:'Game protection',score:a[2],note:''},{name:'Customer service',score:a[3],note:n&&n[2]||''}]};
+  var y=today().slice(0,7),dn=new Date().getDate(),pd=[],tot={shifts:0,hours:0,earned:0};
+  for(var k=1;k<=dn;k++){var ds=y+'-'+String(k).padStart(2,'0'),w=k%7,sh=w===3||w===0?null:w===6?'night':w===4||w===5?'afternoon':'morning';if(!sh)continue;var hrs=k===dn-3?5:8,rate=sh==='night'?14:11,amt=rate*hrs*(k===dn-1?2:1);pd.push({d:ds,k:sh==='night'?'night':'day',s:sh,h:hrs,act:hrs!==8,rate:rate,mult:k===dn-1?2:1,amt:amt});tot.shifts++;tot.hours+=hrs;tot.earned+=amt}
+  var lm=new Date();lm.setDate(1);lm.setMonth(lm.getMonth()-1);var ly=iso(lm).slice(0,7);
+  return{email:'ana.beridze@example.com',name:'Ana Beridze',profile:{name:'Ana Beridze',nickname:'Annie',workId:'W1000',status:'Employed',position:'VIP Game Presenter',team:'Team Red',shift:'Rotating',manager:'Nino Kapanadze',startDate:'2024-03-01',phone:'+995 555 12 34 56',email:'ana.beridze@example.com',games:['Roulette','Blackjack','Baccarat']},
+    evaluations:[{game:'Roulette',date:d(-5),ts:Date.now()-5*864e5,total:92,criteria:crit([3,2,3,3],['','Paid 35:1 on a split once; recheck the chip count','']),improve:['Payout accuracy'],feedback:'Great pace and energy. Count the chips twice on splits.',kind:'Regular'},{game:'Blackjack',date:d(-21),ts:Date.now()-21*864e5,total:100,criteria:crit([3,3,3,3]),improve:[],feedback:'Perfect round.',kind:'Close-up'}],
     retraining:[{date:d(3),reason:'Payout accuracy on roulette',status:'Scheduled'}],
-    gameCounts:[{game:'Roulette',period:d(-30).slice(0,7),count:1240},{game:'Blackjack',period:d(-30).slice(0,7),count:860},{game:'Roulette',period:d(-60).slice(0,7),count:1100}],
-    schedule:{days:days},rotation:{days:[{d:d(0),s:'morning',f:7,c:['3','3','3','3','b','5','5','5','5','b','1','1','1','1','1','1']}]},requests:[]};
+    gameCounts:[{game:'Roulette',period:y,count:1240},{game:'Blackjack',period:y,count:860},{game:'Baccarat',period:y,count:310},{game:'Roulette',period:ly,count:1105},{game:'Blackjack',period:ly,count:990}],
+    incidents:[{date:d(-4),type:'Procedural mistake',game:'Roulette',table:'RO 2',severity:'Medium',summary:'Closed bets late',action:'Game resumed with the internal tool'}],
+    remarks:[{date:d(-2),kind:'positive',title:'Thank you from a VIP player',text:'Player wrote to support about the friendly game.',by:'Nino Kapanadze'},{date:d(-9),kind:'remark',title:'Late 10 minutes',text:'Please be at the table 5 minutes before the shift.',by:'Shift lead'},{date:d(-30),kind:'violation',title:'Phone on the floor',text:'Phones stay in the locker.',by:'Nino Kapanadze'}],
+    pay:[{ym:y,unit:'hour',cur:'GEL',final:false,upTo:today(),days:pd,bonus:[],extra:[],totals:{shifts:tot.shifts,hours:tot.hours,earned:tot.earned,leave:0,bonus:0,total:tot.earned,plannedShifts:9,plannedHours:72,planned:820}},
+      {ym:ly,unit:'hour',cur:'GEL',final:true,upTo:ly+'-28',days:[],bonus:[{name:'VIP quality bonus',type:'Performance',level:3,of:5,amount:150}],extra:[],totals:{shifts:20,hours:158,earned:1890,leave:88,bonus:150,total:2128,plannedShifts:0,plannedHours:0,planned:0}}],
+    schedule:{days:days},rotation:{days:[{d:d(0),s:'morning',f:8,c:['3','3','3','3','b','5','5','5','5','b','1','1','1','1','1','1']},{d:d(1),s:'morning',f:8,c:['7','7','7','7','b','2','2','2','2','b','4','4','4','4','4','4']}]},requests:[{id:'d1',type:'annual',from:d(20),to:d(24),status:'pending',created:Date.now()-864e5,note:'Family trip'}]};
 }
 function demoCall(b){
   if(b.action==='me')return D;
