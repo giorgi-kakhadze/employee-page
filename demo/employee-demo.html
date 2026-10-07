@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>My work page</title>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<title>My work page — demo</title>
 <style>
 :root{--bg:#f6f7f9;--card:#fff;--tx:#1d2330;--mut:#6b7385;--ac:#2b5cd9;--ok:#1f9d55;--warn:#d9822b;--bad:#c0392b;--bd:#e3e6ec}
 @media(prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b2030;--tx:#e8ebf2;--mut:#98a0b3;--bd:#2a3145;--ac:#6b8ff0}}
@@ -46,7 +45,7 @@ var SERVER_URL = 'PASTE-YOUR-APPS-SCRIPT-WEB-APP-URL-HERE';   /* ends in /exec *
 /* ==================== */
 /* Employee self-service. Everything shown here comes from the Apps Script action "me", which checks the Google sign-in and returns ONLY this person's own data
    (profile, shared evaluations with comments, retraining, game counts, schedule, rotation, own requests, v3.31: own pay statements, bonuses, incidents and the remarks staff chose to show). Nothing about other people is ever sent to this page. */
-var tok = null, D = null, tab = 'home', refreshT = null, DEMO = /[?&]demo\b/.test(location.search);
+var tok = null, D = null, tab = 'home', refreshT = null, DEMO = true;   /* stand-alone demo: never signs in, never talks to a server */
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function $(id){return document.getElementById(id)}
 function err(m){$('err').textContent=m}
@@ -99,8 +98,8 @@ function payNow(){var p=D.pay||[],y=today().slice(0,7);return p.filter(function(
 function payLast(){var p=D.pay||[],y=today().slice(0,7);return p.filter(function(x){return x.ym<y})[0]||null}
 function show(){
   $('login').hidden=true;var a=$('app');a.hidden=false;if(!TABS.some(function(t){return t[0]===tab}))tab='home';
-  var h=(DEMO?'<div class="banner"><b>Demo data.</b> This page is not connected to the server. Nothing you do here is sent anywhere.</div>':'')+
-    '<div class="row"><div><h1>Hello, '+esc((D.profile&&D.profile.nickname)||D.name||D.email)+'</h1><div class="mut">'+esc(D.email)+'</div></div><span><button onclick="load()">&#8635; Refresh</button> <button onclick="location.reload()">Sign out</button></span></div>'+
+  var h=(DEMO?'<div class="banner"><b>Demo with random data.</b> Not connected to anything; nothing is sent anywhere. <button type="button" onclick="D=demoData();tab=\'home\';show();scrollTo(0,0)" style="margin-left:6px;padding:3px 10px;font-size:.85rem">🎲 Another random employee</button></div>':'')+
+    '<div class="row"><div><h1>Hello, '+esc((D.profile&&D.profile.nickname)||D.name||D.email)+'</h1><div class="mut">'+esc(D.email)+'</div></div><span></span></div>'+
     '<nav class="main3">'+TABS.map(function(t){return '<button data-t="'+t[0]+'" class="'+(t[0]===tab?'on':'')+'">'+t[1]+'</button>'}).join('')+'</nav><div id="pg"></div>';
   a.innerHTML=h;
   a.querySelector('nav').onclick=function(e){var b=e.target.closest('button');if(b){tab=b.getAttribute('data-t');show();window.scrollTo(0,0)}};
@@ -217,21 +216,33 @@ function wireRequests(){
 
 /* ---------- demo (only with ?demo in the address; clearly labelled, never talks to the server) ---------- */
 function demoData(){
-  var d=function(n){var x=new Date();x.setDate(x.getDate()+n);return iso(x)},S=['morning','morning','rest','afternoon','afternoon','night','rest'],days=[];
-  for(var i=0;i<14;i++){var s=S[i%7];days.push({d:d(i),s:s,f:s==='morning'?8:s==='afternoon'?16:s==='night'?0:null,t:s==='morning'?16:s==='afternoon'?24:s==='night'?8:null})}
-  var crit=function(a,n){return[{name:'Card handling',score:a[0],note:n&&n[0]||''},{name:'Payout accuracy',score:a[1],note:n&&n[1]||''},{name:'Game protection',score:a[2],note:''},{name:'Customer service',score:a[3],note:n&&n[2]||''}]};
-  var y=today().slice(0,7),dn=new Date().getDate(),pd=[],tot={shifts:0,hours:0,earned:0};
-  for(var k=1;k<=dn;k++){var ds=y+'-'+String(k).padStart(2,'0'),w=k%7,sh=w===3||w===0?null:w===6?'night':w===4||w===5?'afternoon':'morning';if(!sh)continue;var hrs=k===dn-3?5:8,rate=sh==='night'?14:11,amt=rate*hrs*(k===dn-1?2:1);pd.push({d:ds,k:sh==='night'?'night':'day',s:sh,h:hrs,act:hrs!==8,rate:rate,mult:k===dn-1?2:1,amt:amt});tot.shifts++;tot.hours+=hrs;tot.earned+=amt}
-  var lm=new Date();lm.setDate(1);lm.setMonth(lm.getMonth()-1);var ly=iso(lm).slice(0,7);
-  return{email:'ana.beridze@example.com',name:'Ana Beridze',profile:{name:'Ana Beridze',nickname:'Annie',workId:'W1000',status:'Employed',position:'VIP Game Presenter',team:'Team Red',shift:'Rotating',manager:'Nino Kapanadze',startDate:'2024-03-01',phone:'+995 555 12 34 56',email:'ana.beridze@example.com',games:['Roulette','Blackjack','Baccarat']},
-    evaluations:[{game:'Roulette',date:d(-5),ts:Date.now()-5*864e5,total:92,criteria:crit([3,2,3,3],['','Paid 35:1 on a split once; recheck the chip count','']),improve:['Payout accuracy'],feedback:'Great pace and energy. Count the chips twice on splits.',kind:'Regular'},{game:'Blackjack',date:d(-21),ts:Date.now()-21*864e5,total:100,criteria:crit([3,3,3,3]),improve:[],feedback:'Perfect round.',kind:'Close-up'}],
-    retraining:[{date:d(3),reason:'Payout accuracy on roulette',status:'Scheduled'}],
-    gameCounts:[{game:'Roulette',period:y,count:1240},{game:'Blackjack',period:y,count:860},{game:'Baccarat',period:y,count:310},{game:'Roulette',period:ly,count:1105},{game:'Blackjack',period:ly,count:990}],
-    incidents:[{date:d(-4),type:'Procedural mistake',game:'Roulette',table:'RO 2',severity:'Medium',summary:'Closed bets late',action:'Game resumed with the internal tool'}],
-    remarks:[{date:d(-2),kind:'positive',title:'Thank you from a VIP player',text:'Player wrote to support about the friendly game.',by:'Nino Kapanadze'},{date:d(-9),kind:'remark',title:'Late 10 minutes',text:'Please be at the table 5 minutes before the shift.',by:'Shift lead'},{date:d(-30),kind:'violation',title:'Phone on the floor',text:'Phones stay in the locker.',by:'Nino Kapanadze'}],
-    pay:[{ym:y,unit:'hour',cur:'GEL',final:false,upTo:today(),days:pd,bonus:[],extra:[],totals:{shifts:tot.shifts,hours:tot.hours,earned:tot.earned,leave:0,bonus:0,total:tot.earned,plannedShifts:9,plannedHours:72,planned:820}},
-      {ym:ly,unit:'hour',cur:'GEL',final:true,upTo:ly+'-28',days:[],bonus:[{name:'VIP quality bonus',type:'Performance',level:3,of:5,amount:150}],extra:[],totals:{shifts:20,hours:158,earned:1890,leave:88,bonus:150,total:2128,plannedShifts:0,plannedHours:0,planned:0}}],
-    schedule:{days:days},rotation:{days:[{d:d(0),s:'morning',f:8,c:['3','3','3','3','b','5','5','5','5','b','1','1','1','1','1','1']},{d:d(1),s:'morning',f:8,c:['7','7','7','7','b','2','2','2','2','b','4','4','4','4','4','4']}]},requests:[{id:'d1',type:'annual',from:d(20),to:d(24),status:'pending',created:Date.now()-864e5,note:'Family trip'}]};
+  var R=function(n){return Math.floor(Math.random()*n)},P=function(a){return a[R(a.length)]},d=function(n){var x=new Date();x.setDate(x.getDate()+n);return iso(x)};
+  var first=P(['Ana','Nino','Mariam','Salome','Luka','Giorgi','Elene','Tamar','Davit','Nika','Sophie','Irakli']),last=P(['Beridze','Kapanadze','Gelashvili','Lomidze','Tsiklauri','Abashidze','Kvaratskhelia','Japaridze']),name=first+' '+last;
+  var pos=P(['VIP Game Presenter','Premium Game Presenter','Game Presenter','Beginner Game Presenter','Shuffler']),games=['Roulette','Blackjack','Baccarat','Poker','Dragon Tiger'].sort(function(){return Math.random()-.5}).slice(0,2+R(3));
+  var CR={Roulette:['Ball spin','Chip handling','Payout accuracy','Closing bets on time','Customer interaction'],Blackjack:['Card handling','Dealing procedure','Payout accuracy','Game protection','Customer interaction'],Baccarat:['Card squeeze','Dealing procedure','Payout accuracy','Game protection','Customer interaction'],Poker:['Card handling','Pot calculation','Game protection','Customer interaction'],'Dragon Tiger':['Card handling','Dealing procedure','Payout accuracy','Customer interaction']};
+  var NOTES=['Paid the wrong amount once; count the chips twice','Closed the bets a little late','Card was exposed during the deal','Forgot to announce the result','Spun the ball too softly on one round','Good, but keep the pace steady','Hand position blocked the camera once'];
+  var FB=['Great energy and clear voice. Keep working on the payouts.','Solid round. Watch the timing when closing bets.','Very professional with players. Check the chip count on splits.','Good progress since last time. Focus on game protection.','Excellent round, nothing to add.'];
+  var evals=[];for(var i=0;i<4+R(3);i++){var g=P(games),cs=CR[g].map(function(c){var sc=Math.random()<.7?3:Math.random()<.6?2:R(2);return{name:c,group:'',score:sc,note:sc<3?P(NOTES):''}}),tot=Math.round(cs.reduce(function(a,c){return a+c.score},0)/(cs.length*3)*100),dd=-(3+i*9+R(6));
+    evals.push({game:g,date:d(dd),ts:Date.now()+dd*864e5,total:tot,criteria:cs,improve:cs.filter(function(c){return c.score<3}).sort(function(a,b){return a.score-b.score}).slice(0,2).map(function(c){return c.name}),feedback:tot===100?FB[4]:P(FB.slice(0,4)),kind:P(['Regular','Regular','Close-up','Exam'])})}
+  var IT=['Procedural mistake','Wrong result / payout','Card / ball handling','Game resumed','Late bet closing'],inc=[];for(i=0;i<R(6);i++){var g2=P(games);inc.push({date:d(-(1+R(40))),type:P(IT),game:g2,table:g2.slice(0,2).toUpperCase()+' '+(1+R(8)),severity:P(['Low','Low','Medium','High']),summary:P(['Paid a losing bet','Card exposed before closing bets','Ball launched after no more bets','Wrong number announced','Dealt to the wrong box']),action:P(['Game resumed with the internal tool','Payout corrected by the shift lead','Round voided','Coaching session booked'])})}
+  inc.sort(function(a,b){return b.date.localeCompare(a.date)});
+  var RM=[['positive','Thank you from a player','A player praised the friendly game in the chat.'],['positive','Helped a new colleague','Showed a trainee the table routine without being asked.'],['remark','Late 10 minutes','Please be at the table 5 minutes before the shift.'],['remark','Uniform','Name badge was missing.'],['violation','Phone on the floor','Phones stay in the locker.'],['disciplinary','Written warning','Second late arrival this month.']],rem=[];
+  RM.sort(function(){return Math.random()-.5}).slice(0,1+R(4)).forEach(function(x){rem.push({date:d(-(1+R(45))),kind:x[0],title:x[1],text:x[2],by:P(['Shift lead','Team manager','Performance coach'])})});rem.sort(function(a,b){return b.date.localeCompare(a.date)});
+  var T={morning:[8,16],afternoon:[16,24],night:[0,8]},cyc=P([['morning','morning','afternoon','afternoon','rest','rest'],['night','night','night','rest','rest','morning','morning'],['afternoon','afternoon','afternoon','rest','morning','morning','rest']]),off=R(7),days=[];
+  for(i=0;i<21;i++){var s1=cyc[(i+off)%cyc.length];if(i===6+R(6))s1=P(['vacation','sick','rest']);days.push({d:d(i),s:s1,f:T[s1]?T[s1][0]:null,t:T[s1]?T[s1][1]:null})}
+  var rot=[];days.filter(function(x){return T[x.s]}).slice(0,3).forEach(function(x){var c=[];var t=1+R(8);for(var k=0;k<16;k++){if(k%5===4){c.push('b');t=1+R(8)}else c.push(String(t))}rot.push({d:x.d,s:x.s,f:x.f,c:c})});
+  var y=today().slice(0,7),dn=new Date().getDate(),pd=[],tot2={shifts:0,hours:0,earned:0},dr=9+R(5),nr=dr+3;
+  for(var k2=1;k2<=dn;k2++){var ds=y+'-'+String(k2).padStart(2,'0'),sh=cyc[(k2+off)%cyc.length];if(sh==='rest')continue;var hrs=Math.random()<.08?4+R(3):8,rate=sh==='night'?nr:dr,mult=Math.random()<.04?2:1,amt=rate*hrs*mult;pd.push({d:ds,k:sh==='night'?'night':'day',s:sh,h:hrs,act:hrs!==8,rate:rate,mult:mult,amt:amt});tot2.shifts++;tot2.hours+=hrs;tot2.earned+=amt}
+  var lm=new Date();lm.setDate(1);lm.setMonth(lm.getMonth()-1);var ly=iso(lm).slice(0,7),lv=1+R(5),lb=lv*50,le=1500+R(700),ll=R(2)*88;
+  var gc=[];games.forEach(function(g){gc.push({game:g,period:y,count:200+R(1200)},{game:g,period:ly,count:400+R(1400)})});
+  var email=(first+'.'+last).toLowerCase()+'@example.com',wid='W'+(1000+R(9000));
+  return{email:email,name:name,profile:{name:name,nickname:P(['Ace','Sunny','Max','Lucky','Star','Kiki','Leo','Mimi','Nini','Gio']),workId:wid,status:P(['Employed','Employed','Probation']),position:pos,team:'Team '+P(['Red','Blue','Green','Gold']),shift:'Rotating',manager:P(['Nino Kapanadze','Levan Gelashvili','Mia Manager']),startDate:d(-(120+R(900))),phone:'+995 555 '+(10+R(89))+' '+(10+R(89))+' '+(10+R(89)),email:email,games:games},
+    evaluations:evals.sort(function(a,b){return b.ts-a.ts}),
+    retraining:evals.some(function(e){return e.total<85})?[{date:d(2+R(10)),reason:(evals.filter(function(e){return e.total<85})[0].improve[0]||'Procedure')+' on '+evals.filter(function(e){return e.total<85})[0].game,status:'Scheduled'}]:[],
+    gameCounts:gc,incidents:inc,remarks:rem,
+    pay:[{ym:y,unit:'hour',cur:'GEL',final:false,upTo:today(),days:pd,bonus:[],extra:[],totals:{shifts:tot2.shifts,hours:tot2.hours,earned:tot2.earned,leave:0,bonus:0,total:tot2.earned,plannedShifts:6+R(6),plannedHours:72,planned:600+R(400)}},
+      {ym:ly,unit:'hour',cur:'GEL',final:true,upTo:ly+'-28',days:[],bonus:[{name:pos.indexOf('VIP')>=0?'VIP quality bonus':'Quality bonus',type:'Performance',level:lv,of:5,amount:lb}],extra:[],totals:{shifts:18+R(5),hours:150+R(20),earned:le,leave:ll,bonus:lb,total:le+ll+lb,plannedShifts:0,plannedHours:0,planned:0}}],
+    schedule:{days:days},rotation:{days:rot},requests:Math.random()<.6?[{id:'d1',type:P(['annual','swap','dayoff']),from:d(10+R(10)),to:d(12+R(10)),status:P(['pending','approved']),created:Date.now()-864e5,note:'Family event',decisionNote:''}]:[]};
 }
 function demoCall(b){
   if(b.action==='me')return D;
