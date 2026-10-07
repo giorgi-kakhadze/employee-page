@@ -14,6 +14,7 @@ node tests/schedule_grid.test.js
 node tests/evaluation.test.js
 node tests/overview_history.test.js
 node tests/service_mgmt.test.js
+node tests/unique_names.test.js
 ```
 
 - `sync_privacy.test.js`: what each person receives (tickets, cases, comments, announcements, audit log), writes from people who see only part of the list, deleting, forged pushes, two people saving at once, HR case progress.
@@ -27,5 +28,6 @@ node tests/service_mgmt.test.js
 - `evaluation.test.js`: evaluation kinds (Exam, Beginner, Regular…) and Average / Close-up scoring (main criteria only, procedural deductions shown but not counted); a photo attached while evaluating one by one is stored with the result and shown in Results; a video is uploaded to (simulated) Drive and linked to the result; grid photos; the type editor keeps the method and main criteria; saving inside the evaluation frame is recorded in the change journal.
 - `overview_history.test.js`: Settings instead of Print/Backup (who sees it, full backup only for the admin and managers); every department opens on its Overview, with History at the end of its second bar; the tools moved out of More; Retraining stays in Academy, Performance or FMD; the FMD staff directory (search by Work ID, barcode, badge, screen name; position, team, status and working-today filters; opening a profile); the profile's next 7 days and rotation right now; shift and profile changes recorded with who and when, shown in the profile History and FMD → History; the server journal is add-only and each person reads only what they may; sync does not record changes twice or resend the journal.
 - `service_mgmt.test.js`: the Service Management department (🚨 Service, position Service manager): its Overview and second bar; the Jira CSV import (date formats, column guessing from Jira headers, Check, employee matching by Work ID / name / screen name, re-import updates by Jira key and keeps the follow-up note, undo); logging an incident by hand; reports and CSV; the journal; who receives incidents on the server (coaches read only, HR and shift leads nothing, a position mapped to the department yes); the person 360 view.
+- `unique_names.test.js`: one nickname / one full name per person in Onboarding (typing, paste, import) and the employee file; repeated names get a number ("Georgi Kakadze 1"); the same person moving groups is not a duplicate; only the admin can switch the rules off (admin space, Settings), and the server refuses the setting from anyone else; the duplicate finder.
 
 Each prints one line per check and exits with code 1 if any check fails.

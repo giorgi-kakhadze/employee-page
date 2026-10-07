@@ -26,6 +26,7 @@
  *   entries about data they may read themselves. Photos attached to evaluations ('evalPhotos') follow the evaluation rights.
  * v3.29: Service Management department ('service', position 'service_manager'). Incidents ('totIncidents', import history 'totIncImports', settings
  *   'totIncCfg') go to service managers, managers, seniors, performance coaches (read only) and positions mapped to the department.
+ * v3.30: 'totUniqRules' (one nickname / one full name per person) can only be written with the admin key.
  * Data lives in your Google Drive folder "Tool Data": tool-data.json (shared data) and access.json (who may use the tool).
  */
 const ADMIN_SECRET = 'CHANGE-ME-ADMIN-KEY';
@@ -37,7 +38,7 @@ const PAY_ROLES = ['manager'];   /* v2.1: matches the tool, where only the Manag
 const RESTRICT = { totIncidents: ['manager', 'senior', 'service_manager', 'performance_coach'], totIncImports: ['manager', 'senior', 'service_manager', 'performance_coach'], totIncCfg: ['manager', 'senior', 'service_manager', 'performance_coach'], totRecruitment: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totWorkbooks: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totEmpRequests: ['manager', 'senior', 'scheduling_coordinator', 'hr_recruiter'], totGameCounts: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'], totImportHistory: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'], totLifecycle: ['manager', 'senior', 'hr_recruiter'], totMySchedules: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'] };   /* v2.3: per-person 28-day schedules, written only by schedule editors */
 /* v2.2 employee self-service: paste your Web client ID from Google Cloud (APIs & Services > Credentials > OAuth client ID > Web application). Leave as is to keep the feature off. */
 const GOOGLE_CLIENT_ID = '121975980339-fu9nd124kov2g6j94qiofOrkjkhbkee6.apps.googleusercontent.com';
-const ADMIN_ONLY_WRITE = ['totAccessPolicy', 'totSites', 'wsCustomConfig', 'totEvalKinds', 'totEvalCfgBackups', 'totProcessTpl', 'totIntegrations', 'totDeptCfg', 'totAccessGrants'];   /* v3.19: evaluation setup, kinds, backups, process templates and integration settings can only be written with the admin key */
+const ADMIN_ONLY_WRITE = ['totUniqRules', 'totAccessPolicy', 'totSites', 'wsCustomConfig', 'totEvalKinds', 'totEvalCfgBackups', 'totProcessTpl', 'totIntegrations', 'totDeptCfg', 'totAccessGrants'];   /* v3.19: evaluation setup, kinds, backups, process templates and integration settings can only be written with the admin key */
 const MAX_TRIES = 8, LOCK_SECONDS = 900, KEEP_BACKUPS = 14;
 
 function folder_() { var it = DriveApp.getFoldersByName(FOLDER); return it.hasNext() ? it.next() : DriveApp.createFolder(FOLDER); }
