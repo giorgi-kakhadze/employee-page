@@ -11,18 +11,18 @@ let fails = 0; function ok(name, cond, extra) { if (!cond) fails++; console.log(
   const L = await A.evaluate(async () => { const w = (ms) => new Promise(r => setTimeout(r, ms)), o = [...document.querySelectorAll('.adOv')].find(x => x.querySelector('#adClose')), box = o.querySelector('.adBox'), r = {};
     r.wide = o.classList.contains('adWide'); r.boxW = Math.round(box.getBoundingClientRect().width); r.nav = [...o.querySelectorAll('.adNi')].map(b => b.textContent.trim());
     r.visible = [...box.children].filter(c => getComputedStyle(c).display !== 'none' && !c.classList.contains('adHdr')).length;
-    const b = [...o.querySelectorAll('.adNi')].find(x => /Detailed access/.test(x.textContent)); b.click(); await w(100);
-    r.detailOpen = [...box.children].some(c => c.tagName === 'DETAILS' && c.classList.contains('adOn') && c.open && /Detailed access/.test(c.textContent));
+    const b = [...o.querySelectorAll('.adNi')].find(x => /Access management/.test(x.textContent)); b.click(); await w(100);
+    r.detailOpen = [...box.children].some(c => c.tagName === 'DETAILS' && c.classList.contains('adOn') && c.open && /Access management/.test(c.textContent));
     const q = o.querySelector('.adNav input'); q.value = 'drive'; q.dispatchEvent(new Event('input', { bubbles: true })); await w(100);
     r.found = [...o.querySelectorAll('.adNi')].filter(x => x.style.display !== 'none').map(x => x.textContent.trim());
     o.querySelector('.adCl').click(); await w(100); r.closed = !o.classList.contains('open'); return r; });
   ok('opens as a wide window with a side menu', L.wide && L.boxW > 800, JSON.stringify({ wide: L.wide, w: L.boxW }));
   ok('the menu lists every section (passwords, Drive sync, access, backup…)', L.nav.length >= 12 && L.nav.some(t => /Drive sync/.test(t)) && L.nav.some(t => /Backup/.test(t)) && L.nav.some(t => /Name & admin password/.test(t)), L.nav.join(' | '));
   ok('one section at a time', L.visible <= 8, L.visible);
-  ok('a section opens fully (Detailed access)', L.detailOpen);
+  ok('a section opens fully (Access management)', L.detailOpen);
   ok('search finds a section by its content', L.found.length >= 1 && L.found.some(t => /Drive/.test(t)), L.found.join(' | '));
   ok('Close in the menu closes the admin space', L.closed);
-  ok('the version is up to date', await A.evaluate(() => window.TOT_VERSION) === '3.36');
+  ok('the version is up to date', await A.evaluate(() => window.TOT_VERSION) === '3.37');
   ok('site and person pills sit in the action row', await A.evaluate(() => document.getElementById('psPill').parentNode.classList.contains('top-bar-actions')));
   ok('no part of the top bar runs off the screen', await A.evaluate(() => [...document.querySelectorAll('.nav-tabs > *, .top-bar-actions > *')].filter(e => getComputedStyle(e).display !== 'none').every(e => e.getBoundingClientRect().right <= window.innerWidth + 1)));
 

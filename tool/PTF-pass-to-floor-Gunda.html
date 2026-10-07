@@ -14,6 +14,7 @@
   v3.34: Look & feel: the admin space opens as a wide window with a side menu and search on laptops (one column on phones); site and person pills in the action row; sub-bars wrap on wide screens; page, window, menu, card and button motion (Reduce animations switch in More); soft sound on windows when sounds are on; Giorgi knows the whole tool (departments, schedule, pay, service, projects, teams, approvals, admin).
   v3.35: The full backup now includes the schedule (rotation, pay), tickets, cases, announcements, comments, shared results, photos / videos list, the access list, sites and removal requests (they were synced but left out of the file). The storage estimate counts against the real browser limit (about 5 million characters), so it no longer warns at half the real use.
   v3.36: Access to spaces and pages. Admin → 🔐 Access to spaces and pages sets every space, page and department board to Hidden, View only or Edit, per position and per person (person first). Spaces with nothing visible leave the top bar; View only shows a ribbon and does not save changes; new spaces, pages, tabs and custom spaces appear in the list by themselves. The server enforces the same levels.
+  v3.37: One Access management section in the admin space: choose Access by role (tool parts per position, the old Detailed access) or Access by spaces and pages (Hidden / View only / Edit). The spaces list opens with a position already chosen, so it is never empty.
   ============================================================
 -->
 <html lang="en">
@@ -30,7 +31,7 @@
    Sites: every location keeps its own data under its own prefix. The first site ("main") is the data you already had, stored exactly where it always was, so nothing is moved.
    Test mode: open this file with #test at the end of the address. Separate data, no network, red bar. Both now also cover the embedded tools (Workshop, ID). */
 (function () {
-  window.TOT_VERSION = '3.36';
+  window.TOT_VERSION = '3.37';
   try {
     var TP = 'TEST::', SP_ = 'SITE::';
     var NOCOPY = ['totSyncCfg', 'totSyncMeta', 'totSyncPrev', 'totMailerCfg', 'totMailerLast', 'totAdminHash', 'totAdminIdleMin'];
@@ -1856,7 +1857,7 @@ const giorgiKnowledge = {
       sug: ['pf.approvals', 'pf.projects'] },
     { id: 'pf.pageaccess', q: 'How do I hide a space or give view-only access?',
       phrases: ['hide space', 'hide a space', 'hide page', 'view only', 'view-only', 'read only', 'give access', 'take access', 'remove access', 'access to space', 'access to page', 'access to board', 'permission', 'permissions', 'restrict space', 'who sees which space', 'only academy'],
-      resp: 'Admin space → **🔐 Access to spaces and pages**. Choose a **position** or a **person**, then set **All spaces**, each **space** and each **page or board** to **🚫 Hidden** (not seen at all), **👁 View only** (open, but nothing is saved) or **✏️ Edit**. **As before** keeps the position\'s normal rules. The most specific setting wins, and a person\'s settings come before their position\'s. A space with nothing visible leaves the top bar; Home always stays. New spaces, pages and custom spaces appear in the list by themselves, and the server enforces the same levels.',
+      resp: 'Admin space → **🔐 Access management**. Pick **🧩 Access by role** to tick the parts of each tool a position may use, or **🗂 Access by spaces and pages** to hide or open whole spaces. For spaces and pages, choose a **position** or a **person**, then set **All spaces**, each **space** and each **page or board** to **🚫 Hidden** (not seen at all), **👁 View only** (open, but nothing is saved) or **✏️ Edit**. **As before** keeps the position\'s normal rules. The most specific setting wins, and a person\'s settings come before their position\'s. A space with nothing visible leaves the top bar; Home always stays. New spaces, pages and custom spaces appear in the list by themselves, and the server enforces the same levels.',
       sug: ['pf.depts', 'pf.sync'] },
     { id: 'pf.sync', q: 'How does sync and privacy work?',
       phrases: ['sync', 'drive sync', 'google drive', 'server', 'who sees what', 'privacy', 'shared data', 'offline'],
@@ -27159,13 +27160,30 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       return out; }
     window.totAcc.pages = pages;
 
-    /* ---------- Admin → 🔐 Access to spaces and pages ---------- */
+    /* ---------- Admin → 🔐 Access management (v3.37: one section, two ways — by role (tool parts) or by spaces and pages) ---------- */
     var panel = [].filter.call(document.querySelectorAll('.adOv'), function (o) { return o.querySelector('#adClose'); })[0], box = panel && panel.querySelector('.adBox'); if (!box) return;
     var NAMES = { '': '', def: 'As before', none: '🚫 Hidden', view: '👁 View only', edit: '✏️ Edit' };
-    var d = document.createElement('details'); d.id = 'accSec'; d.style.cssText = 'margin-top:12px';
-    d.innerHTML = '<summary style="cursor:pointer;font-weight:600">🔐 Access to spaces and pages</summary><div id="accBody"></div>';
-    box.insertBefore(d, box.querySelector('#adClose'));
-    var who = '';
+    var dc = [].filter.call(box.querySelectorAll(':scope > details'), function (x) { var su = x.querySelector('summary'); return su && /Detailed access by role/.test(su.textContent); })[0];
+    var mg = document.createElement('details'); mg.id = 'accMgr'; mg.style.cssText = 'margin-top:12px';
+    mg.innerHTML = '<summary style="cursor:pointer;font-weight:600">🔐 Access management</summary>' +
+      '<div style="font-size:12px;opacity:.75;margin:8px 0">Choose how you want to give or take access. Both work together: <b>by role</b> ticks the parts of each tool a position may use; <b>by spaces and pages</b> hides a space, board or page, or makes it view only or editable, for a position or for one person, and comes first.</div>' +
+      '<div class="accModes" role="tablist"><button type="button" class="accMode" data-m="role" role="tab">🧩 Access by role<small>tool parts per position</small></button><button type="button" class="accMode" data-m="pages" role="tab">🗂 Access by spaces and pages<small>Hidden · View only · Edit, per position or person</small></button></div>';
+    var mst = document.createElement('style'); mst.textContent = '#accMgr details.accInner{margin-top:6px!important}#accMgr details.accInner>summary{display:none}' +
+      '.accModes{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px}.accMode{flex:1 1 220px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 12px;border-radius:12px;border:1px solid var(--border,#2a3150);background:transparent;color:inherit;font:inherit;font-weight:600;cursor:pointer;text-align:left}.accMode small{font-weight:400;font-size:11.5px;opacity:.65}.accMode:hover{background:rgba(148,163,184,.10)}.accMode.on{background:var(--accent,#3b82f6);border-color:var(--accent,#3b82f6);color:#fff}.accMode.on small{opacity:.85}';
+    document.head.appendChild(mst);
+    var d = document.createElement('details'); d.id = 'accSec'; d.className = 'accInner';
+    d.innerHTML = '<summary>🗂 Access by spaces and pages</summary><div id="accBody"></div>';
+    box.insertBefore(mg, dc || box.querySelector('#adClose'));
+    if (dc) { dc.classList.add('accInner'); dc.style.marginTop = ''; mg.appendChild(dc); }
+    mg.appendChild(d);
+    var mode = 'role'; try { mode = sessionStorage.getItem('accMode') || (dc ? 'role' : 'pages'); } catch (e) {} if (!dc) mode = 'pages';
+    function showMode(m) { mode = m === 'pages' || !dc ? 'pages' : 'role'; try { sessionStorage.setItem('accMode', mode); } catch (e) {}
+      mg.querySelectorAll('.accMode').forEach(function (b) { var on = b.getAttribute('data-m') === mode; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); if (!dc && b.getAttribute('data-m') === 'role') b.style.display = 'none'; });
+      if (dc) { dc.style.display = mode === 'role' ? '' : 'none'; if (mode === 'role') { dc.open = true; dc.dispatchEvent(new Event('toggle')); } }
+      d.style.display = mode === 'pages' ? '' : 'none'; if (mode === 'pages') { d.open = true; draw(); } }
+    mg.addEventListener('toggle', function (e) { if (e.target === mg && mg.open) showMode(mode); });
+    mg.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('.accMode'); if (b) showMode(b.getAttribute('data-m')); });
+    var who = 'r:' + (Object.keys(ROLES)[0] || '');   /* v3.37: opens with the first position chosen, so the list is never empty */
     function users() { var u = pol().users || {}; return Object.keys(u).sort().map(function (k) { return { em: k, name: (u[k] && u[k].name) || k, role: (u[k] && u[k].role) || '' }; }); }
     function target() { var A = acc() || {}, m = /^(r|u):(.*)$/.exec(who) || []; return { kind: m[1] || '', id: m[2] || '', map: m[1] === 'r' ? ((A.roles || {})[m[2]] || {}) : m[1] === 'u' ? ((A.users || {})[m[2]] || {}) : {} }; }
     function opts(kind, scope, cur) { var first = scope === '*' ? (kind === 'u' ? 'Same as their position' : 'As before (normal rules of the position)') : scope === 'space' ? 'Same as "All spaces"' : 'Same as the space';
@@ -27178,7 +27196,8 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       if (ls.every(function (v) { return v === 'none'; })) return '<span style="color:#ef4444">space hidden</span>';
       var k = {}; ls.forEach(function (v) { k[v || 'def'] = (k[v || 'def'] || 0) + 1; });
       return Object.keys(k).map(function (v) { return (v === 'def' ? 'as before' : v === 'none' ? 'hidden' : v === 'view' ? 'view only' : 'edit') + ' ' + k[v]; }).join(' · '); }
-    function draw() {
+    function draw() { try { draw0(); } catch (e) { var b = d.querySelector('#accBody'); if (b) b.innerHTML = '<div class="adMsg" style="color:#ef4444">Could not show the access list: ' + esc(e && e.message) + '</div>'; console.warn('access list', e); } }
+    function draw0() {
       var b = d.querySelector('#accBody'), rs = Object.keys(ROLES), us = users(), t = target(), s = subj(), A = acc() || {};
       var h = '<div style="font-size:12px;opacity:.75;margin:8px 0">Choose a position or a person, then set each space, board and page to <b>🚫 Hidden</b> (they do not see it at all), <b>👁 View only</b> (they open it but cannot change anything) or <b>✏️ Edit</b>. <b>As before</b> keeps the normal rules of the position. A space whose pages are all hidden disappears from the top bar; Home always stays. Settings for a person come before the settings of their position. New spaces, boards and pages appear here by themselves.</div>' +
         '<select id="accWho" style="' + SEL + ';width:100%;padding:8px"><option value="">— choose a position or a person —</option><optgroup label="Positions">' + rs.map(function (r) { var n = Object.keys((A.roles || {})[r] || {}).length; return '<option value="r:' + r + '"' + (who === 'r:' + r ? ' selected' : '') + '>' + esc(ROLES[r].label) + (n ? ' · ' + n + ' setting' + (n > 1 ? 's' : '') : '') + '</option>'; }).join('') + '</optgroup>' +
@@ -27200,14 +27219,15 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       try { var a = JSON.parse(localStorage.getItem('auditLog') || '[]'); if (!Array.isArray(a)) a = []; a.push({ id: Date.now() + '-acc', ts: Date.now(), who: 'Admin', role: 'admin', cat: 'access', act: act }); localStorage.setItem('auditLog', JSON.stringify(a.slice(-5000))); } catch (e) {}
       try { if (window.applyRoleAccess) applyRoleAccess(); } catch (e) {} return true; }
     function tName() { var t = target(); return t.kind === 'r' ? 'position ' + ((ROLES[t.id] || {}).label || t.id) : t.id; }
-    d.addEventListener('toggle', function (e) { if (e.target === d && d.open) draw(); else if (e.target.classList && e.target.classList.contains('accSp')) { d.__open = d.__open || {}; d.__open[e.target.getAttribute('data-sp')] = e.target.open; } }, true);
+    d.addEventListener('toggle', function (e) { if (e.target === d) return; if (e.target.classList && e.target.classList.contains('accSp')) { d.__open = d.__open || {}; d.__open[e.target.getAttribute('data-sp')] = e.target.open; } }, true);
     d.addEventListener('change', function (e) { if (e.target.id === 'accWho') { who = e.target.value; draw(); } });
     d.addEventListener('click', function (e) { var id = e.target.id; if (/^(SELECT|OPTION)$/.test(e.target.tagName) && e.target.closest('summary')) e.preventDefault();   /* choosing a level does not fold the space */
       if (id === 'accSave') { var map = collect(), ok = store(map, 'Access to spaces and pages: ' + tName() + ' → ' + (Object.keys(map).map(function (k) { return k + '=' + map[k]; }).join(', ') || 'cleared')); draw(); var m = d.querySelector('#accMsg'); if (m) { m.style.color = ok ? '#22c55e' : '#ef4444'; m.textContent = ok ? 'Saved. It applies on their next sync (about a minute).' : 'Not saved (storage full).'; } }
       else if (id === 'accClear') { if (confirm('Remove every access setting for ' + tName() + '?')) { store({}, 'Access to spaces and pages: ' + tName() + ' cleared'); draw(); } }
       else if (id === 'accOnly') { var a = d.querySelector('select.accL[data-k="*"]'); if (a) a.value = 'none'; var m2 = d.querySelector('#accMsg'); if (m2) { m2.style.color = '#f59e0b'; m2.textContent = '"All spaces" is now Hidden: only spaces and pages you set to View only, Edit or As before stay visible. Press Save access.'; } }
     });
-    window.totAcc.adminDraw = function (w) { if (w != null) who = w; d.open = true; draw(); };
+    window.totAcc.adminDraw = function (w) { if (w != null) who = w; mg.open = true; showMode('pages'); };
+    window.totAcc.adminMode = function (m) { mg.open = true; showMode(m); };
   } catch (e) { console.warn('Page access disabled:', e); }
 })();
 </script>

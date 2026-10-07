@@ -22,8 +22,12 @@ const TOP = { navAcademy: 'academy', navPerformance: 'performance', navSchedule:
   await A.evaluate(() => { localStorage.setItem('customSpaces', JSON.stringify([{ id: 'sNew', title: 'Safety rules', text: 'Wear shoes', roles: [] }])); });
   await A.evaluate(() => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', ctrlKey: true, bubbles: true })); }); await A.waitForTimeout(500);
   const U = await A.evaluate(async () => { const w = (ms) => new Promise(r => setTimeout(r, ms)), r = {}, o = [...document.querySelectorAll('.adOv')].find(x => x.querySelector('#adClose'));
-    const nb = [...o.querySelectorAll('.adNi')].find(b => /Access to spaces and pages/.test(b.textContent)); r.inMenu = !!nb; if (nb) nb.click(); await w(200);
-    const d = document.getElementById('accSec'); d.open = true; d.dispatchEvent(new Event('toggle')); await w(100);
+    const nb = [...o.querySelectorAll('.adNi')].find(b => /Access management/.test(b.textContent)); r.inMenu = !!nb; if (nb) nb.click(); await w(300);
+    r.oldGone = ![...o.querySelectorAll('.adNi')].some(b => /Detailed access by role|Access to spaces and pages/.test(b.textContent));
+    const mg = document.getElementById('accMgr'), dc = mg.querySelector('#dcTab'); r.modes = [...mg.querySelectorAll('.accMode')].map(b => b.textContent);
+    mg.querySelector('.accMode[data-m="role"]').click(); await w(150); r.roleTable = dc && dc.offsetParent !== null && mg.querySelectorAll('#dcTab input[type=checkbox]').length > 20;
+    mg.querySelector('.accMode[data-m="pages"]').click(); await w(150);
+    const d = document.getElementById('accSec'); r.notEmpty = d.offsetParent !== null && d.querySelectorAll('select.accL').length > 20 && dc.offsetParent === null;
     const set = (k, v) => { const s = d.querySelector('select.accL[data-k="' + k + '"]'); if (!s) return false; s.value = v; return true; };
     const who = (v) => { const s = d.querySelector('#accWho'); s.value = v; s.dispatchEvent(new Event('change', { bubbles: true })); };
     who('r:training_coordinator'); await w(50);
@@ -40,7 +44,9 @@ const TOP = { navAcademy: 'academy', navPerformance: 'performance', navSchedule:
     who('u:coach@x.com'); await w(50); r.s3 = set('*', 'none') && set('fmd.schedule', 'view'); d.querySelector('#accSave').click(); await w(100);
     who('u:fmd@x.com'); await w(50); r.s4 = set('dw.hr.board', 'view') && set('dw.fmd.board', 'none'); d.querySelector('#accSave').click(); await w(100);
     r.pol = JSON.parse(localStorage.getItem('totAccessPolicy')).access; return r; });
-  ok('the section is in the admin menu', U.inMenu);
+  ok('one Access management section in the admin menu (the two old sections are inside it)', U.inMenu && U.oldGone, U.modes.join(' | '));
+  ok('Access by role: the tool-part ticks per position', U.roleTable);
+  ok('Access by spaces and pages: opens with a position chosen and its list shown (never empty)', U.notEmpty);
   ok('it lists every space, also custom spaces', ['academy', 'performance', 'fmd', 'uniforms', 'hr', 'office', 'service', 'projects', 'custom'].every(s => U.spaces.indexOf(s) >= 0), U.spaces.join(','));
   ok('it lists pages, department tabs and the custom space one by one', ['academy.workshop', 'academy.onboarding', 'fmd.employee_requests', 'performance.results', 'dw.fmd.board', 'dw.service.inc', 'dw.hr.life', 'dw.access.board', 'dw.it.board', 'projects.all_projects', 'custom.sNew'].every(k => U.pages.indexOf(k) >= 0), U.pages.length + ' rows');
   ok('positions and people can be set', U.s1 && U.s2 && U.s3 && U.s4 && /Saved/.test(U.msg1));
@@ -103,7 +109,7 @@ const TOP = { navAcademy: 'academy', navPerformance: 'performance', navSchedule:
   console.log('6. Nothing set = as before');
   const M = await H.open({ email: 'mgr@x.com', pw: 'pw-mgr@x.com' }); await M.setViewportSize({ width: 1440, height: 900 }); await M.sync();
   const mTop = await top(M); ok('the manager still sees every space', ['academy', 'performance', 'fmd', 'uniforms', 'hr', 'office', 'service', 'projects'].every(s => mTop.indexOf(s) >= 0), mTop.join(','));
-  ok('the version is up to date', await M.evaluate(() => window.TOT_VERSION) === '3.36');
+  ok('the version is up to date', await M.evaluate(() => window.TOT_VERSION) === '3.37');
   const gi = await M.evaluate(async () => { openGiorgiChat(); await new Promise(r => setTimeout(r, 200)); giorgiChat.ask('how do I hide a space or give view only access'); await new Promise(r => setTimeout(r, 1700)); const rows = [...document.querySelectorAll('#giorgiChat .gc-row')]; return rows[rows.length - 1].textContent; });
   ok('Giorgi explains where to set access', /Access to spaces and pages/.test(gi), gi.slice(0, 80));
   await M.context().close();
