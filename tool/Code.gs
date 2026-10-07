@@ -35,6 +35,9 @@
  * v3.33: teams ('totTeams': managers and seniors write; a member counts for the team and its department in project access), restricted / shared
  *   project items, board rights per project, approvals (each approver writes only their own decision; the status is computed here; a workflow stage
  *   that needs approval is entered only after it is approved), comments on items, project files in Drive (actions 'pjFileUp' / 'pjFileGet').
+ * v3.36: access to spaces and pages (totAccessPolicy.access, admin-only): per position and per person, each page, space or all can be Hidden, View only
+ *   or Edit. Pages' data (KEY_PAGES) is sent only when a page using it is open, saved only from a page set to Edit; parts (ACC_CAPS) and department
+ *   boards (tickets: dw.<dept>.board) follow the same levels. Each person receives only their own personal settings.
  * Data lives in your Google Drive folder "Tool Data": tool-data.json (shared data) and access.json (who may use the tool).
  */
 const ADMIN_SECRET = 'CHANGE-ME-ADMIN-KEY';
@@ -241,13 +244,47 @@ const KEY_CAPS = { totWorkshopFiles: { read: ['ws_register'], write: ['ws_regist
   totAppearanceDept: { read: ['appearance_view', 'appearance_issue', 'appearance_manage'], write: ['appearance_issue', 'appearance_manage'] } };   /* v2.5: uniforms inventory and transactions */
 function capsFor_(cur, role) { var p = policy_(cur), r = (p.roles || {})[role], c = r && r.caps; if (c && typeof c === 'object') return c;
   var views = r && Array.isArray(r.views) ? r.views : (DEFAULT_VIEWS[role] || ['onboarding', 'exam', 'id', 'logbooks', 'schedule', 'appearance']), o = {}; Object.keys(CAP_VIEW).forEach(function (k) { o[k] = views.indexOf(CAP_VIEW[k]) >= 0; }); o.videos_view = role === 'manager'; return o; }
+/* v3.36 ACCESS TO SPACES AND PAGES (policy.access, set in the tool: Admin → 🔐 Access to spaces and pages). Same rules as the tool:
+   level per page id, space ('@<space>') or all ('*'), for a person (users[e-mail]) before their position (roles[role]); 'def' or nothing = the old rules. */
+const ACC_LV = { none: 1, view: 1, edit: 1 }, DEPT_SPACE = { appearance: 'uniforms', access: 'office', it: 'office' };
+function accA_(cur) { var A = policy_(cur).access; return A && typeof A === 'object' ? A : null; }
+function accSp_(pid) { var a = String(pid).split('.'); return a[0] === 'dw' ? (DEPT_SPACE[a[1]] || a[1]) : a[0]; }
+function accPick_(m, pid, sp) { if (!m || typeof m !== 'object') return ''; return m[pid] || m['@' + sp] || m['*'] || ''; }
+function accLvl_(A, em, role, pid) { if (!A) return ''; var sp = accSp_(pid), v = accPick_(em && A.users && A.users[em], pid, sp) || accPick_(role && A.roles && A.roles[role], pid, sp); return ACC_LV[v] ? v : ''; }
+/* parts of the tool (KEY_CAPS, videos) follow the page levels: c = pages that use the part, e = pages where it changes data (Edit only) */
+const ACC_CAPS = { onboarding: { c: ['academy.onboarding', 'academy.trainee_progress'] }, ws_register: { c: ['academy.workshop'] }, ws_checklist: { c: ['academy.workshop', 'performance.workshop_evaluation'] },
+  id: { c: ['academy.id_creation'] }, logbooks: { c: ['academy.logbooks'] }, retrain: { c: ['academy.retraining', 'performance.retraining', 'fmd.retraining'] },
+  results_view: { c: ['academy.retakes_notes', 'academy.who_needs_what', 'performance.results', 'performance.send_results', 'performance.coaching_hub', 'performance.who_needs_what'] },
+  exam_check: { c: ['performance.exam_evaluation'] }, results_edit: { e: ['performance.results'] }, results_send: { e: ['performance.send_results'] },
+  videos_view: { c: ['performance.videos'] }, videos_upload: { e: ['performance.videos'] }, fmd_view: { c: ['fmd.schedule'] },
+  appearance_view: { c: ['uniforms.uniforms'] }, appearance_issue: { e: ['uniforms.uniforms'] }, appearance_manage: { e: ['uniforms.uniforms'] } };
+function accCaps_(A, em, role, caps) { if (!A) return caps; var o = {}; Object.keys(caps || {}).forEach(function (k) { o[k] = caps[k]; });
+  Object.keys(ACC_CAPS).forEach(function (k) { var r = ACC_CAPS[k], und = false, g = (r.c || []).concat(r.e || []).some(function (p) { var L = accLvl_(A, em, role, p), inE = (r.e || []).indexOf(p) >= 0; if (!L) { und = true; return false; } return inE ? L === 'edit' : L !== 'none'; });
+    o[k] = g || (und && !!o[k]); });
+  return o; }
+/* data that belongs to certain pages only: readable when one of them is View only or Edit, writable when one is Edit, refused when all are Hidden, else the old rules */
+const PJ_PAGES = ['projects.my_work', 'projects.all_projects', 'projects.progress', 'projects.teams_departments', 'projects.data_explorer', 'projects.updates'], INC_PAGES = ['dw.service.inc', 'dw.service.jira', 'dw.service.rep'];
+const KEY_PAGES = { totIncidents: INC_PAGES, totIncImports: INC_PAGES, totIncCfg: INC_PAGES, totRecruitment: ['hr.recruiting', 'dw.hr.cand'], totWorkbooks: ['hr.recruiting', 'dw.hr.cand'], totLifecycle: ['dw.hr.life'],
+  totEmpRequests: ['fmd.employee_requests'], totBonusCfg: ['dw.fmd.bonus'], totBonusReviews: ['dw.fmd.bonus'], totGameCounts: ['dw.fmd.games'], totImportHistory: ['dw.fmd.games'],
+  totSchedule: ['fmd.schedule'], totMySchedules: ['fmd.schedule'], totProjects: PJ_PAGES, totProjItems: PJ_PAGES, totProjBoard: PJ_PAGES,
+  totOnboardingHier: ['academy.onboarding', 'academy.trainee_progress'], totOnboardingV2: ['academy.onboarding', 'academy.trainee_progress'], totRetrain: ['academy.retraining', 'performance.retraining', 'fmd.retraining'],
+  idPrintHistory: ['academy.id_creation'], logbookDescriptions: ['academy.logbooks'], logbookCustomGames: ['academy.logbooks'], logbookSettings: ['academy.logbooks'] };
+/* one check for reading or writing a key: page levels first, then the position rules (roleOk_, writeOk_, capOk_) and the admin-only mode (gateOk_) */
+function keyOk_(cur, em, me, cx, name, mode) {
+  var legacy = function () { return roleOk_(name, me.role, cx.dept) && (mode !== 'write' || writeOk_(name, me.role, cx.dept)) && capOk_(name, me, mode); };
+  var ps = KEY_PAGES[name], A = me.acc;
+  if (ps && A) { var ls = ps.map(function (p) { return accLvl_(A, em, me.role, p); });
+    if (ls.some(function (v) { return mode === 'write' ? v === 'edit' : (v === 'view' || v === 'edit'); })) return gateOk_(cur, em, name);
+    if (!ls.some(function (v) { return !v; })) return false; }
+  return legacy() && gateOk_(cur, em, name); }
 function capOk_(name, me, mode) { var r = KEY_CAPS[name]; if (!r) return true; return r[mode].some(function (k) { return !!(me.caps && me.caps[k]); }); }
 /* v3.24: a non-admin receives their own full entry plus a directory of colleagues for "Assign to…", with only { name, role } each:
    everyone in their own department, or everyone for managers, seniors and Management (c is ctx_, so the department rules match the ticket rules) */
 function redactPolicy_(e, em, c) { try { var p = JSON.parse(e.v), all = p.users || {}, u = {};
   Object.keys(all).forEach(function (k) { var x = all[k]; if (!x || typeof x !== 'object') return; if (k === em) { u[k] = x; return; }
     if (c && (c.all || (c.dept && c.dOf(x.role) === c.dept))) u[k] = { name: String(x.name || ''), role: String(x.role || '') }; });
-  return { v: JSON.stringify({ roles: p.roles || {}, depts: p.depts || {}, users: u, upd: p.upd || 0 }), t: e.t }; } catch (x) { return { v: JSON.stringify({ roles: {}, users: {}, upd: 0 }), t: e.t }; } }
+  var A = p.access && typeof p.access === 'object' ? p.access : null, ac = A ? { roles: A.roles || {}, users: {} } : undefined; if (A && A.users && A.users[em]) ac.users[em] = A.users[em];   /* v3.36 */
+  return { v: JSON.stringify({ roles: p.roles || {}, depts: p.depts || {}, users: u, upd: p.upd || 0, access: ac }), t: e.t }; } catch (x) { return { v: JSON.stringify({ roles: {}, users: {}, upd: 0 }), t: e.t }; } }
 function stripPay_(e) { try { var o = JSON.parse(e.v); if (o && typeof o === 'object' && !Array.isArray(o) && 'pay' in o) { delete o.pay; return { v: JSON.stringify(o), t: e.t }; } } catch (x) {} return e; }
 function keepPay_(newV, oldV) { try { var n = JSON.parse(newV); if (!n || typeof n !== 'object' || Array.isArray(n)) return newV; var o = oldV ? JSON.parse(oldV) : null; if (o && o.pay !== undefined) n.pay = o.pay; else delete n.pay; return JSON.stringify(n); } catch (x) { return newV; } }
 
@@ -271,6 +308,8 @@ function ctx_(cur, em, admin) {
   var p = policy_(cur), u = (p.users || {})[em] || {}, depts = p.depts || {}, role = String(u.role || '');
   c.dOf = function (x) { x = String(x || ''); return DEPT_IDS.indexOf(x) >= 0 ? x : (depts[x] || DEPT_DEF[x] || x); };
   c.name = low_(u.name); c.dept = c.dOf(role);
+  var A = p.access && typeof p.access === 'object' ? p.access : null;   /* v3.36: department boards opened (View only / Edit) or Hidden for this person or position */
+  c.bl = function (d) { var k = 'bl:' + d; if (!(k in cache)) cache[k] = accLvl_(A, em, role, 'dw.' + d + '.board'); return cache[k]; };
   /* same people the tool lets open "All tasks" and every department (__dept.wide()). The last clause is legacy compatibility only: before v3.25 the admin
      could map a position to the Management department in policy.depts, and such a position keeps seeing everything. */
   c.all = role === 'manager' || role === 'senior' || c.dept === 'management';
@@ -282,9 +321,13 @@ function taskVis_(t, c) {
   var fe = low_(t.fromEmail), te = low_(t.toEmail);
   if (fe ? fe === c.em : (c.name && low_(t.fromName) === c.name)) return true;
   if (te ? te === c.em : (c.name && !!t.toName && low_(t.toName) === c.name)) return true;
-  if (c.dept && (c.dOf(t.toRole) === c.dept || c.dOf(t.fromRole) === c.dept)) return true;
+  var td = c.dOf(t.toRole), bl = c.bl ? c.bl(td) : '';
+  if (bl === 'view' || bl === 'edit') return true;   /* v3.36: a board opened to this person */
+  if (c.dept && (c.bl ? c.bl(c.dept) : '') !== 'none' && (td === c.dept || c.dOf(t.fromRole) === c.dept)) return true;   /* their own board, unless Hidden */
   return !!t.caseId && c.dept === 'hr';
 }
+/* v3.36: a ticket on a board this person may only view (View only) cannot be changed by them, unless they sent it or it is assigned to them */
+function taskEd_(t, c) { if (c.all || !c.bl || !t) return true; var fe = low_(t.fromEmail), te = low_(t.toEmail); if ((fe && fe === c.em) || (te && te === c.em)) return true; return c.bl(c.dOf(t.toRole)) !== 'view'; }
 /* a case record is visible to HR, to people who see everything, to its creator, and (v3.25) for READING to anyone who can see one of the tickets the case
    itself created (ref 'case:' or 'wt:', sent by the case creator), so Uniforms / Building access / IT see the case title of their linked ticket. A ticket a
    person makes up with someone else's caseId does not count. Saving a case still needs HR, full access or being its creator (scopedPush_ passes pre=null).
@@ -315,7 +358,7 @@ function scopedPull_(name, v, c, pre) { var a = jp_(v, null); if (!Array.isArray
 function scopedPush_(name, newV, oldV, c, pre, del) {
   if (PROJ_KEYS.indexOf(name) >= 0) return projPush_(name, newV, oldV, c, pre, del);   /* v3.32 */
   var n = jp_(newV, null), o = jp_(oldV, []), now = Date.now(); if (!Array.isArray(n)) return null; if (!Array.isArray(o)) o = [];
-  var inN = {}, seen = {}, out = [], vis = function (x) { return recVis_(name, x, c, name === 'totCases' ? null : pre); };   /* v3.25: linked-ticket case visibility is read-only */
+  var inN = {}, seen = {}, out = [], vis = function (x) { return recVis_(name, x, c, name === 'totCases' ? null : pre) && (name !== 'totTasks' || taskEd_(x, c)); };   /* v3.25: linked-ticket case visibility is read-only; v3.36: View-only boards */
   n.forEach(function (x) { if (x && x.id != null) inN[String(x.id)] = x; });
   o.forEach(function (x) { var id = x && x.id != null ? String(x.id) : null; if (id == null) { out.push(x); return; } seen[id] = 1;
     if (!vis(x)) { out.push(x); return; }
@@ -558,7 +601,7 @@ function doPost(e) {
       var mime = /^video\//.test(String(b.mime || '')) ? String(b.mime) : 'video/mp4', loc = cache.get('u:' + up);
       if (!loc) {
         if (i !== 0) return out_({ error: 'upload session lost, start again' });
-        if (!admin) { var dfv = file_(DATA, '{"keys":{}}'), curv = readJ_(dfv, { keys: {} }); curv.keys = curv.keys || {}; var mv = whoIs_(curv, em); if (!capsFor_(curv, mv.role).videos_upload) return out_({ error: 'not allowed' }); }   /* v2.4 */
+        if (!admin) { var dfv = file_(DATA, '{"keys":{}}'), curv = readJ_(dfv, { keys: {} }); curv.keys = curv.keys || {}; var mv = whoIs_(curv, em); if (!accCaps_(accA_(curv), em, mv.role, capsFor_(curv, mv.role)).videos_upload) return out_({ error: 'not allowed' }); }   /* v2.4 */
         var ir = UrlFetchApp.fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id', { method: 'post', contentType: 'application/json; charset=UTF-8', headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken(), 'X-Upload-Content-Type': mime, 'X-Upload-Content-Length': String(size) }, payload: JSON.stringify({ name: String(b.name || 'video').slice(0, 100), parents: [folder_().getId()] }), muteHttpExceptions: true });
         loc = ir.getHeaders().Location || ir.getHeaders().location; if (!loc) return out_({ error: 'drive refused the upload' });
         cache.put('u:' + up, loc, 21000);
@@ -574,7 +617,7 @@ function doPost(e) {
       return out_({ error: 'drive error ' + code });
     }
     var df = file_(DATA, '{"keys":{}}'), cur = readJ_(df, { keys: {} }); cur.keys = cur.keys || {};
-    var me = admin ? null : whoIs_(cur, em); if (me) me.caps = capsFor_(cur, me.role);
+    var me = admin ? null : whoIs_(cur, em); if (me) { me.acc = accA_(cur); me.caps = accCaps_(me.acc, em, me.role, capsFor_(cur, me.role)); }   /* v3.36 page levels */
 
     if (act === 'videoGet') {   /* v2.91: managers only; the file must live in the tool folder */
       if (!(admin || (me && me.caps && me.caps.videos_view))) return out_({ error: 'not allowed' });   /* v2.4: was managers only; now the "Watch evaluation videos" tick */
@@ -587,6 +630,7 @@ function doPost(e) {
       return out_({ ok: true, n: Math.ceil(vsize / VCH), mime: vf.getMimeType(), data: Utilities.base64Encode(rr.getContent()) });
     }
     var cx = ctx_(cur, em, admin);   /* v3.23 who is asking, for record-level filtering */
+    if (me && /^(projNotify|pjFileUp|pjFileGet)$/.test(act) && !keyOk_(cur, em, me, cx, 'totProjects', act === 'pjFileGet' ? 'read' : 'write')) return out_({ error: 'not allowed' });   /* v3.36: Projects hidden or View only */
     if (act === 'projNotify') return out_(projNotify_(cur, cx, b, me));   /* v3.32 */
     if (act === 'pjFileUp') return out_(pjFileUp_(b, cx, me));   /* v3.33 */
     if (act === 'pjFileGet') return out_(pjFileGet_(b, cx, me));
@@ -599,11 +643,11 @@ function doPost(e) {
         if (k === 'totSites') { res.keys[k] = en; return; }
         if (p.name === 'totAccessGrants') { res.keys[k] = redactGrants_(en, em); return; }
         if (p.name === 'totAccessAsks') { res.keys[k] = mineAsks_(en, em); return; }
-        if (me.sites.indexOf(p.site) < 0 || !roleOk_(p.name, me.role, cx.dept) || !capOk_(p.name, me, 'read') || !gateOk_(cur, em, p.name)) return;
+        if (me.sites.indexOf(p.site) < 0 || !keyOk_(cur, em, me, cx, p.name, 'read')) return;
         var pre = k.slice(0, k.length - p.name.length);
         if (SCOPED.indexOf(p.name) >= 0) { res.keys[k] = { v: scopedPull_(p.name, en.v, cx, pre), t: en.t }; return; }   /* v3.23 */
         if (p.name === 'auditLog') { res.keys[k] = { v: auditPull_(en.v, cx), t: en.t }; return; }
-        if (p.name === 'totJournal') { res.keys[k] = { v: journalPull_(en.v, cx, function (src) { return src !== 'totJournal' && src !== 'auditLog' && ADMIN_ONLY_WRITE.indexOf(src) < 0 && roleOk_(src, me.role, cx.dept) && capOk_(src, me, 'read') && gateOk_(cur, em, src); }), t: en.t }; return; }   /* v3.28 */
+        if (p.name === 'totJournal') { res.keys[k] = { v: journalPull_(en.v, cx, function (src) { return src !== 'totJournal' && src !== 'auditLog' && ADMIN_ONLY_WRITE.indexOf(src) < 0 && keyOk_(cur, em, me, cx, src, 'read'); }), t: en.t }; return; }   /* v3.28 */
         res.keys[k] = (p.name === 'totSchedule' && PAY_ROLES.indexOf(me.role) < 0) ? stripPay_(en) : en;
       });
       return out_(res);
@@ -614,7 +658,7 @@ function doPost(e) {
       Object.keys(b.keys || {}).sort(function (x, y) { return order(x) - order(y); }).forEach(function (k) {
         var n = b.keys[k], p = parseKey_(k);
         if (!p || !n || typeof n.v !== 'string' || n.v.length > 4500000) { denied.push(k); return; }
-        if (!admin && (ADMIN_ONLY_WRITE.indexOf(k) >= 0 || ADMIN_ONLY_WRITE.indexOf(p.name) >= 0 || me.sites.indexOf(p.site) < 0 || !roleOk_(p.name, me.role, cx.dept) || !writeOk_(p.name, me.role, cx.dept) || !capOk_(p.name, me, 'write') || !gateOk_(cur, em, p.name))) { denied.push(k); return; }
+        if (!admin && (ADMIN_ONLY_WRITE.indexOf(k) >= 0 || ADMIN_ONLY_WRITE.indexOf(p.name) >= 0 || me.sites.indexOf(p.site) < 0 || !keyOk_(cur, em, me, cx, p.name, 'write'))) { denied.push(k); return; }
         var o = cur.keys[k], t = Math.min(+n.t || now, now + 60000), pre = k.slice(0, k.length - p.name.length);
         if (!admin && p.name === 'totJournal') { var jv = auditPush_(n.v, o && o.v, cx, JOURNAL_MAX); if (jv == null) { denied.push(k); return; } cur.keys[k] = { v: jv, t: Math.max(now, (+(o && o.t) || 0) + 1) }; changed = true; return; }   /* v3.28 add-only */
         if (!admin && p.name === 'auditLog') { var av = auditPush_(n.v, o && o.v, cx); if (av == null) { denied.push(k); return; } cur.keys[k] = { v: av, t: Math.max(now, (+(o && o.t) || 0) + 1) }; changed = true; return; }   /* v3.23 add-only, never a conflict */

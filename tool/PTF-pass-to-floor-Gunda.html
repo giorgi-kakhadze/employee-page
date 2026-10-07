@@ -13,6 +13,7 @@
   v3.33: Projects round 2: 👥 Teams & departments (managers / seniors arrange teams; teams can be assigned), 🔒 restricted / 🔗 shared items and files, board drawing rights, branching sub-tasks and 👥 Distribute, comments on items, deadline warnings, workflow stages, ✔ approval flow (stage gates), file upload / download with access, 📊 Progress page for projects, teams and departments.
   v3.34: Look & feel: the admin space opens as a wide window with a side menu and search on laptops (one column on phones); site and person pills in the action row; sub-bars wrap on wide screens; page, window, menu, card and button motion (Reduce animations switch in More); soft sound on windows when sounds are on; Giorgi knows the whole tool (departments, schedule, pay, service, projects, teams, approvals, admin).
   v3.35: The full backup now includes the schedule (rotation, pay), tickets, cases, announcements, comments, shared results, photos / videos list, the access list, sites and removal requests (they were synced but left out of the file). The storage estimate counts against the real browser limit (about 5 million characters), so it no longer warns at half the real use.
+  v3.36: Access to spaces and pages. Admin → 🔐 Access to spaces and pages sets every space, page and department board to Hidden, View only or Edit, per position and per person (person first). Spaces with nothing visible leave the top bar; View only shows a ribbon and does not save changes; new spaces, pages, tabs and custom spaces appear in the list by themselves. The server enforces the same levels.
   ============================================================
 -->
 <html lang="en">
@@ -29,7 +30,7 @@
    Sites: every location keeps its own data under its own prefix. The first site ("main") is the data you already had, stored exactly where it always was, so nothing is moved.
    Test mode: open this file with #test at the end of the address. Separate data, no network, red bar. Both now also cover the embedded tools (Workshop, ID). */
 (function () {
-  window.TOT_VERSION = '3.35';
+  window.TOT_VERSION = '3.36';
   try {
     var TP = 'TEST::', SP_ = 'SITE::';
     var NOCOPY = ['totSyncCfg', 'totSyncMeta', 'totSyncPrev', 'totMailerCfg', 'totMailerLast', 'totAdminHash', 'totAdminIdleMin'];
@@ -2803,6 +2804,7 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
   };
   const PLAIN_KEYS = ['rememberSupervisor', 'supFirstName', 'idCompanyLogo', 'idCardFreeLayoutEnabled', 'totAppTheme', 'idBulkDraft', 'totTrainerDisplayName', 'totTrainerEmail', 'totSupervisorHistory'];
   const KNOWN_LS_KEYS = Object.keys(JSON_KEYS).concat(PLAIN_KEYS);
+  window.__totDataKeys = Object.keys(JSON_KEYS);   /* v3.36: the view-only guard blocks writes to these while a page is view only */
   const LAST_BACKUP_KEY = 'totLastBackup';
   const BACKUP_WARN_DAYS = 7;
   function isBackupKey(k) { return Object.prototype.hasOwnProperty.call(JSON_KEYS, k) || PLAIN_KEYS.indexOf(k) !== -1 || String(k).indexOf('__corrupt_') > 0; }
@@ -2895,7 +2897,7 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
       return null;
     }
     iframe.onload = () => {
-      try { installStorageGuard(iframe.contentWindow); installLinkPolicy(iframe.contentWindow); } catch (eG) {} try { if (window.totJournalHook) window.totJournalHook(iframe.contentWindow); } catch (eJ) {}
+      try { installStorageGuard(iframe.contentWindow); installLinkPolicy(iframe.contentWindow); } catch (eG) {} try { if (window.totJournalHook) window.totJournalHook(iframe.contentWindow); } catch (eJ) {} try { if (window.totAccHook) window.totAccHook(iframe.contentWindow); } catch (eA) {}
       try { const cw = iframe.contentWindow; cw.alert = function (m) { window.totNotify(m); }; installErrorReporter(cw, loadingId === 'idLoading' ? 'ID tool' : 'Workshop tool'); } catch (eA) {}
       const l = document.getElementById(loadingId); if (l) l.remove();
       if (onReady) { try { onReady(iframe); } catch (e) { /* ignore */ } }
@@ -2906,10 +2908,11 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
 
   function wsOk(m) { const T = window.totCan; if (!T) return true; return m === 'menu' ? (T('ws_register') || T('ws_checklist')) : m === 'files' ? T('ws_register') : m === 'checklist' ? T('ws_checklist') : m === 'exam' ? T('exam_check') : m === 'results' ? T('results_view') : m === 'retrain' ? (T('retrain') || T('exam_check')) : true; }
   function openWs(m, from) { if (!wsOk(m)) { try { showShellToast('Your position does not include this part.', 'error'); } catch (e) {} return; } wsMode = m; window.__wsFrom = from || ''; switchView('exam'); }
-  window.openWs = openWs;
+  window.openWs = openWs; window.__wsMode = function () { return wsMode; };
   /* v3.25: departments-only top bar. spaceOf(view) is the one resolver from the open screen to its space (top-bar highlight, #spaceSub, Back button);
      spaceItems(space) lists that space's screens, each gated by its own rule, followed by the department-workspace tabs from the deptWsCore registry */
   const SPACES = { academy: ['navAcademy', 'Academy'], performance: ['navPerformance', 'Performance'], fmd: ['navSchedule', 'FMD'], uniforms: ['navAppearance', 'Uniforms'], hr: ['navHr', 'HR'], office: ['navOffice', 'Office'], service: ['navService', 'Service Management'], projects: ['navProjects', 'Projects'] };
+  window.__SPACES = SPACES;   /* v3.36: the access settings list every space (also ones added later) */
   function deptSpace(d) { return d === 'appearance' ? 'uniforms' : (d === 'access' || d === 'it') ? 'office' : (SPACES[d] ? d : ''); }
   function wsPerf() { if (wsMode === 'menu' || wsMode === 'files') return false; if (wsMode === 'retrain') return ['academy', 'fmd'].indexOf(window.__wsFrom) < 0; return wsMode === 'exam' || wsMode === 'results' || window.__wsFrom === 'performance'; }   /* v3.28: the Retraining register stays in the space it was opened from */
   function spaceOf(v) { v = v || ((typeof currentView !== 'undefined') ? currentView : 'home');
@@ -2931,10 +2934,10 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
   function spaceItems(sp) {
     const cv = (typeof currentView !== 'undefined') ? currentView : 'home', I = [], perf = cv === 'exam' && wsPerf(), W = window.__dw;
     const dcur = cv === 'dept' && W && W.cur ? W.cur() : '', dtab = dcur ? W.tab() : '';
-    const add = function (ok, l, go, on, v) { if (ok) I.push({ l: l, go: go, on: !!on, v: v || '' }); };   /* v: the screen id, for the admin-only-mode lock */
+    const add = function (ok, l, go, on, v, pid) { pid = pid || (sp + '.' + pageSlug(l)); try { if (window.totAcc) ok = window.totAcc.gate(pid, ok); } catch (e) {} if (ok) I.push({ l: l, go: go, on: !!on, v: v || '', pid: pid }); };   /* v: the screen id, for the admin-only-mode lock; pid: the page id for Admin → Access to spaces and pages (v3.36) */
     const ws = function (m, from) { return function () { openWs(m, from); }; }, sv = function (v) { return function () { switchView(v); }; };
     const mb = function (id) { return function () { const b = document.getElementById(id); if (b) b.click(); }; }, rt = cv === 'exam' && wsMode === 'retrain';   /* v3.28: tools that used to be in More */
-    const dept = function (d) { ssDeptTabs(d).forEach(function (t) { add(true, t.label, function () { window.DeptOpen(d, t.id); }, dcur === d && dtab === t.id, 'dept'); }); };
+    const dept = function (d) { ssDeptTabs(d).forEach(function (t) { add(true, t.label, function () { window.DeptOpen(d, t.id); }, dcur === d && dtab === t.id, 'dept', 'dw.' + d + '.' + t.id); }); };
     if (sp === 'academy') {
       add(ssRole('academy'), '&#127968; Overview', sv('academy'), cv === 'academy', 'academy');
       add(ssCap('onboarding') && ssRole('onboarding'), '&#128203; Onboarding', sv('onboarding'), cv === 'onboarding', 'onboarding');
@@ -2971,9 +2974,13 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
     else if (sp === 'office') { [['access', '&#128273; Building access'], ['it', '&#128187; IT']].forEach(function (x) { if (!ssDeptTabs(x[0]).length) return; if (I.length) I.push({ sep: 1 }); I.push({ g: x[1] }); dept(x[0]); }); }
     /* v3.28: every space starts with its Overview and ends with its History (only when the person has something in the space) */
     if (I.some(function (x) { return x.go; })) {
-      if (sp !== 'academy') I.unshift({ l: '&#127968; Overview', go: function () { window.__space = sp; switchView('spacehome'); }, on: cv === 'spacehome' && window.__space === sp, v: '' });
-      if (window.totJournal) I.push({ l: '&#128220; History', go: function () { window.totJournal.open(sp); }, on: false, v: '' }); }
+      const g = function (pid) { try { return !window.totAcc || window.totAcc.gate(pid, true); } catch (e) { return true; } };
+      if (sp !== 'academy' && g(sp + '.overview')) I.unshift({ l: '&#127968; Overview', go: function () { window.__space = sp; switchView('spacehome'); }, on: cv === 'spacehome' && window.__space === sp, v: '', pid: sp + '.overview' });
+      if (window.totJournal && g(sp + '.history')) I.push({ l: '&#128220; History', go: function () { window.totJournal.open(sp); }, on: false, v: '', pid: sp + '.history' }); }
     return I; }
+  /* v3.36: page id from a menu label: '&#128232; Employee requests<span…>3</span>' → 'employee_requests' */
+  function pageSlug(l) { return String(l || '').replace(/<span[^>]*>[\s\S]*?<\/span>/g, '').replace(/<[^>]+>/g, '').replace(/&[#\w]+;/g, ' ').replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_+|_+$/g, '').toLowerCase().slice(0, 40) || 'page'; }
+  window.pageSlug = pageSlug;
   function spaceAny(sp) { return spaceItems(sp).some(function (x) { return x.go; }); }
   /* in admin-only mode a screen may be locked for this person (accessGate __gateHas) */
   function ssOpen(x) { try { return !x.v || !window.__gateHas || window.__gateHas(x.v); } catch (e) { return true; } }
@@ -6706,7 +6713,8 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
 /* Positions: which tabs a person sees, and how Giorgi talks. (A convenience filter inside this browser, not a security lock.) */
 (function () {
   function R() { return ROLES[getTrainerRole()] || null; }
-  function allowed(v) { /* v3.25 */ if (v === 'spacehome' || v === 'projects') return true; if (v === 'empdata') return !!(window.__emp && window.__emp.can()); if (v === 'perm') { try { return sessionStorage.getItem('totAdmin') === '1'; } catch (e) { return false; } } if (v === 'dept') return !!(window.__dwAllowed && window.__dwAllowed()); if (v === 'coach') return !!(window.__coachAllowed && window.__coachAllowed()); if (v === 'requests') return !!(window.__rqAllowed && window.__rqAllowed()); if (v === 'integrations') { try { return sessionStorage.getItem('totAdmin') === '1' && !sessionStorage.getItem('totViewAs'); } catch (e) { return false; } } if (v === 'recruiting') return !!(window.__rcAllowed && window.__rcAllowed()); if (v === 'academy') return ['onboarding', 'exam', 'id', 'logbooks'].some(function (x) { return allowed(x); }); var r = R(), ok = !r || r.views.indexOf(v) >= 0; if (ok && v !== 'home' && window.totSpaceAllows) { try { ok = window.totSpaceAllows(v) !== false; } catch (e) {} } return ok; }
+  function allowed(v) { var A = window.totAcc; return A ? A.view(v, function () { return allowed0(v); }) : allowed0(v); }   /* v3.36: Admin → Access to spaces and pages can hide or open a screen */
+  function allowed0(v) { /* v3.25 */ if (v === 'spacehome' || v === 'projects') return true; if (v === 'empdata') return !!(window.__emp && window.__emp.can()); if (v === 'perm') { try { return sessionStorage.getItem('totAdmin') === '1'; } catch (e) { return false; } } if (v === 'dept') return !!(window.__dwAllowed && window.__dwAllowed()); if (v === 'coach') return !!(window.__coachAllowed && window.__coachAllowed()); if (v === 'requests') return !!(window.__rqAllowed && window.__rqAllowed()); if (v === 'integrations') { try { return sessionStorage.getItem('totAdmin') === '1' && !sessionStorage.getItem('totViewAs'); } catch (e) { return false; } } if (v === 'recruiting') return !!(window.__rcAllowed && window.__rcAllowed()); if (v === 'academy') return ['onboarding', 'exam', 'id', 'logbooks'].some(function (x) { return allowed(x); }); var r = R(), ok = !r || r.views.indexOf(v) >= 0; if (ok && v !== 'home' && window.totSpaceAllows) { try { ok = window.totSpaceAllows(v) !== false; } catch (e) {} } return ok; }
   function isPro() { var r = R(); return !!(r && r.pro); }
   window.giorgiIsPro = isPro;
   var EMO = /[\u{1F000}-\u{1FAFF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu;
@@ -19151,7 +19159,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
     function role() { try { return getTrainerRole() || ''; } catch (e) { return ''; } }
     function adm() { try { return sessionStorage.getItem('totAdmin') === '1'; } catch (e) { return false; } }
-    function visible(s) { return adm() || !s.roles || !s.roles.length || s.roles.indexOf(role()) >= 0; }
+    function visible(s) { var f = function () { return adm() || !s.roles || !s.roles.length || s.roles.indexOf(role()) >= 0; }; return window.totAcc && !adm() ? window.totAcc.gate('custom.' + s.id, f) : f(); }   /* v3.36 */
     var css = document.createElement('style');
     css.textContent = '#csOv{position:fixed;inset:0;z-index:99993;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding:5vh 10px}#csOv.open{display:flex}#csBox{width:100%;max-width:700px;max-height:88vh;overflow:auto;background:var(--navy2,#161b2e);color:var(--text,#e8ecf8);border:1px solid var(--border,#2a3150);border-radius:14px;padding:16px}#csBox pre{white-space:pre-wrap;font:inherit;margin:8px 0 0}';
     document.head.appendChild(css);
@@ -19601,7 +19609,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     function isWork(g, dt) { var m = cyc(dt); return g === 'B' ? m >= 3 : m < 3; }
     function fmt(n) { return String(Math.round(n * 2) / 2); }
     function tl(x) { return ('0' + (Math.floor(x) % 24)).slice(-2) + ':' + (x % 1 ? '30' : '00'); }
-    function canEdit() { if (window.totSpaceRO && window.totSpaceRO()) return false; var r = ''; try { r = getTrainerRole() || ''; } catch (e) {} var a = false; try { a = sessionStorage.getItem('totAdmin') === '1'; } catch (e) {} return a || EDITORS.indexOf(r) >= 0; }
+    function canEdit() { if (window.totSpaceRO && window.totSpaceRO()) return false; var r = ''; try { r = getTrainerRole() || ''; } catch (e) {} var a = false; try { a = sessionStorage.getItem('totAdmin') === '1'; } catch (e) {} if (!a && window.totAcc) { var L = window.totAcc.lvl('fmd.schedule'); if (L) return L === 'edit'; } return a || EDITORS.indexOf(r) >= 0; }   /* v3.36: Edit on FMD → Schedule lets anyone edit it */
     function ensureTeam(re, nm, pid) {
       var f = null, old = null, mx = 0; data.teams.forEach(function (t) { if (re.test(t.name)) f = t; if (t.id === pid) old = t; var m = /^t(\d+)$/.exec(t.id); if (m) mx = Math.max(mx, +m[1]); });
       if (f) return f; if (old && /^team\s*\d+$/i.test(old.name)) { old.name = nm; return old; }
@@ -22504,7 +22512,8 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     function wide() { if (adm()) return true; var r = role(), p; if (!r || r === 'manager' || r === 'senior') return true; p = rd('totAccessPolicy'); return !!(p && p.depts && p.depts[r] === 'management'); }
     function all() { return wide(); }
     function mine() { if (adm() || !role()) return DEPTS.map(function (d) { return d.id; }); var d = ofRole(role()); return d ? [d] : []; }
-    function sees(d) { return all() || mine().indexOf(d) >= 0; }
+    function sees0(d) { return all() || mine().indexOf(d) >= 0; }   /* v3.36: before the access settings */
+    function sees(d) { var L = ''; try { L = window.totAcc ? window.totAcc.dept(d) : ''; } catch (e) {} if (L === 'none') return false; if (L) return true; return all() || mine().indexOf(d) >= 0; }   /* v3.36 */
     function board(x) { return mine().indexOf(norm(x)) >= 0; }
     /* v3.24: a synced non-admin device holds only its own department's people (everyone for managers, seniors and Management), so "x / y have read it" is only counted when everyone it was sent to is on this device */
     function knowsAll(to) { if (wide()) return true; to = Array.isArray(to) ? to : []; return to.length > 0 && to.every(board); }
@@ -22520,7 +22529,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       return out; }
     var css = document.createElement('style'); css.textContent = 'html:not(.dept-academy) #todayCard,html:not(.dept-academy) #logCard,html:not(.dept-academy) #rptCard,html:not(.dept-academy) #recCard{display:none!important}'; document.head.appendChild(css);
     function apply() { var c = document.documentElement.classList; DEPTS.forEach(function (d) { c.toggle('dept-' + d.id, sees(d.id)); }); }
-    window.__dept = { DEPTS: DEPTS, norm: norm, mine: mine, sees: sees, board: board, knowsAll: knowsAll, label: label, options: options, extra: extra, ofRole: ofRole, apply: apply, wide: wide };
+    window.__dept = { DEPTS: DEPTS, norm: norm, mine: mine, sees: sees, sees0: sees0, board: board, knowsAll: knowsAll, label: label, options: options, extra: extra, ofRole: ofRole, apply: apply, wide: wide };
     apply(); setInterval(apply, 3000);
   } catch (e) { console.warn('Departments disabled:', e); }
 })();
@@ -24007,7 +24016,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     function role() { try { return getTrainerRole() || ''; } catch (e) { return ''; } }
     function realAdmin() { try { return sessionStorage.getItem('totAdmin') === '1'; } catch (e) { return false; } }
     function adminNow() { return realAdmin() && !sessionStorage.getItem('totViewAs'); }
-    function can() { return role() === 'manager' || adminNow(); }
+    function can() { var A = window.totAcc; return A ? A.gate('fmd.employees', function () { return role() === 'manager' || adminNow(); }) : role() === 'manager' || adminNow(); }
     function toast(t, k) { try { showShellToast(t, k || 'success'); } catch (e) {} }
     function nz(x) { return String(x || '').trim().toLowerCase(); }
     function ekey(e) { return nz(e.workId) || ('n:' + nz(e.fullName)); }
@@ -24085,7 +24094,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   function adm() { try { return sessionStorage.getItem('totAdmin') === '1' && !sessionStorage.getItem('totViewAs'); } catch (e) { return false; } }
   function role() { try { return (typeof getTrainerRole === 'function' ? getTrainerRole() : '') || ''; } catch (e) { return ''; } }
   function who() { try { return (typeof getTrainerName === 'function' ? getTrainerName() : '') || (adm() ? 'Admin' : ''); } catch (e) { return ''; } }
-  function allowed() { return adm() || ['manager', 'senior', 'training_coordinator', 'hr_recruiter'].indexOf(role()) >= 0; }
+  function allowed() { var A = window.totAcc; return A ? A.gate('hr.recruiting', function () { return adm() || ['manager', 'senior', 'training_coordinator', 'hr_recruiter'].indexOf(role()) >= 0; }) : adm() || ['manager', 'senior', 'training_coordinator', 'hr_recruiter'].indexOf(role()) >= 0; }
   function rd() { try { var o = JSON.parse(localStorage.getItem(K) || 'null'); if (o && Array.isArray(o.books)) return o; } catch (e) {} return { v: 1, books: [] }; }
   function wr(o) { try { localStorage.setItem(K, JSON.stringify(o)); return true; } catch (e) { alert('NOT SAVED — browser storage is full or blocked. Download a backup.'); return false; } }
   function gAudit(act) { try { var a = JSON.parse(localStorage.getItem('auditLog') || '[]'); a.push({ id: uid(), ts: Date.now(), who: who() || 'User', role: role(), cat: 'recruiting', act: act }); localStorage.setItem('auditLog', JSON.stringify(a.slice(-5000))); } catch (e) {} }
@@ -24479,7 +24488,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   function adm() { try { return sessionStorage.getItem('totAdmin') === '1' && !sessionStorage.getItem('totViewAs'); } catch (e) { return false; } }
   function role() { try { return (typeof getTrainerRole === 'function' ? getTrainerRole() : '') || ''; } catch (e) { return ''; } }
   function who() { try { return (typeof getTrainerName === 'function' ? getTrainerName() : '') || (adm() ? 'Admin' : ''); } catch (e) { return ''; } }
-  function allowed() { return adm() || ['manager', 'senior', 'scheduling_coordinator', 'hr_recruiter'].indexOf(role()) >= 0; }
+  function allowed() { var A = window.totAcc; return A ? A.gate('fmd.employee_requests', function () { return adm() || ['manager', 'senior', 'scheduling_coordinator', 'hr_recruiter'].indexOf(role()) >= 0; }) : adm() || ['manager', 'senior', 'scheduling_coordinator', 'hr_recruiter'].indexOf(role()) >= 0; }
   function rd() { try { var a = JSON.parse(localStorage.getItem(K) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
   function wr(a) { try { localStorage.setItem(K, JSON.stringify(a)); return true; } catch (e) { alert('NOT SAVED — browser storage is full or blocked.'); return false; } }
   function gAudit(act) { try { var a = JSON.parse(localStorage.getItem('auditLog') || '[]'); a.push({ id: 'rq' + Date.now().toString(36), ts: Date.now(), who: who() || 'User', role: role(), cat: 'requests', act: act }); localStorage.setItem('auditLog', JSON.stringify(a.slice(-5000))); } catch (e) {} }
@@ -24610,7 +24619,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   function adm() { try { return sessionStorage.getItem('totAdmin') === '1' && !sessionStorage.getItem('totViewAs'); } catch (e) { return false; } }
   function role() { try { return (typeof getTrainerRole === 'function' ? getTrainerRole() : '') || ''; } catch (e) { return ''; } }
   function who() { try { return (typeof getTrainerName === 'function' ? getTrainerName() : '') || (adm() ? 'Admin' : ''); } catch (e) { return ''; } }
-  function allowed() { return adm() || ['performance_coach', 'manager', 'senior', 'training_coordinator'].indexOf(role()) >= 0; }
+  function allowed() { var A = window.totAcc; return A ? A.gate('performance.coach_board', function () { return adm() || ['performance_coach', 'manager', 'senior', 'training_coordinator'].indexOf(role()) >= 0; }) : adm() || ['performance_coach', 'manager', 'senior', 'training_coordinator'].indexOf(role()) >= 0; }
   function nz(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
   function curMonth() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
   function monthOf(r) { var m = /^(\d{4})-(\d{2})/.exec(String(r.isoDate || '')); if (m) return m[1] + '-' + m[2]; if (r.ts) { var d = new Date(+r.ts); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); } return ''; }
@@ -24751,7 +24760,8 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   function modal(html) { var ov = document.createElement('div'); ov.className = 'tkOv'; ov.style.alignItems = 'flex-start'; ov.innerHTML = '<div class="tkBox">' + html + '</div>'; document.body.appendChild(ov); ov.close = function () { ov.remove(); }; return ov; }
 
   /* ---------- header + shell ---------- */
-  function visibleTabs(d) { return TABS.filter(function (t) { try { return t.show ? t.show(d) : true; } catch (e) { return false; } }); }
+  function visibleTabs(d) { return TABS.filter(function (t) { try { if (window.totAcc && t.id !== 'overview' && t.id !== 'setup') { var L = window.totAcc.lvl('dw.' + d + '.' + t.id); if (L === 'none') return false; if (!L && DP().sees0 && !DP().sees0(d)) return false; } return t.show ? t.show(d) : true; } catch (e) { return false; } }); }   /* v3.36: a tab set to Hidden disappears; in a department opened only by the access settings, only the tabs set there show */
+  DW.tabIds = function () { return TABS.map(function (t) { return t.id; }).filter(function (x) { return x !== 'overview' && x !== 'setup'; }); };
   function deptStats(d) {
     var all = tasks().filter(function (t) { return DP().norm(t.toRole) === d; }), open = all.filter(function (t) { return !closed(t); }), td = today();
     return { all: all, open: open, mine: open.filter(isMeT).length, od: open.filter(function (t) { return t.due && t.due < td; }).length, un: open.filter(function (t) { return !assigned(t); }).length }; }
@@ -24974,7 +24984,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   function DP() { return window.__dept; }
   function T() { return window.TasksApi || null; }
   function role() { return DW.role(); }
-  function hrOk() { return adm() || !role() || DW.isMgmt() || (DP() && DP().board('hr')); }
+  function hrOk() { var A = window.totAcc; return A ? A.gate('dw.hr.life', function () { return adm() || !role() || DW.isMgmt() || (DP() && DP().board('hr')); }) : adm() || !role() || DW.isMgmt() || (DP() && DP().board('hr')); }
 
   /* ================= v3.25 ⚡ Work types (every department; replaces the HR-only "Process templates" tab, old tab id 'tpl' still opens it) =================
      Rules live in window.__wt (totProcessTpl). Admin adds / renames / deletes this department's own types and edits the steps; everyone else reads them. */
@@ -25110,7 +25120,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   var KG = 'totGameCounts', KH = 'totImportHistory';
   var SOURCES = ['Grafana (CSV export)', 'Other analytics system (CSV export)', 'Manual spreadsheet'];
   function role() { return DW.role(); }
-  function ok() { return adm() || !role() || ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'].indexOf(role()) >= 0; }   /* v3.25: Game counts live in FMD */
+  function ok() { var A = window.totAcc; return A ? A.gate('dw.fmd.games', function () { return adm() || !role() || ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'].indexOf(role()) >= 0; }) : adm() || !role() || ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'].indexOf(role()) >= 0; }   /* v3.25: Game counts live in FMD */
   function arr(k) { var a = jget(k, []); return Array.isArray(a) ? a : []; }
   function norm(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().toLowerCase(); }
 
@@ -25666,8 +25676,9 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   var KI = 'totIncidents', KH = 'totIncImports', KC = 'totIncCfg';
   function role() { return DW.role(); }
   function dept() { try { return window.__dept ? __dept.ofRole(role()) : ''; } catch (e) { return ''; } }
-  function canRead() { return adm() || !role() || ['manager', 'senior', 'service_manager', 'performance_coach'].indexOf(role()) >= 0 || dept() === 'service'; }
-  function canEdit() { if (window.totSpaceRO && window.totSpaceRO()) return false; return adm() || !role() || ['manager', 'senior', 'service_manager'].indexOf(role()) >= 0 || dept() === 'service'; }
+  var INC_P = ['dw.service.inc', 'dw.service.jira', 'dw.service.rep'];   /* v3.36 */
+  function canRead() { var A = window.totAcc, f = function () { return adm() || !role() || ['manager', 'senior', 'service_manager', 'performance_coach'].indexOf(role()) >= 0 || dept() === 'service'; }; return A ? A.gateAny(INC_P, f) : f(); }
+  function canEdit() { if (window.totSpaceRO && window.totSpaceRO()) return false; var A = window.totAcc, f = function () { return adm() || !role() || ['manager', 'senior', 'service_manager'].indexOf(role()) >= 0 || dept() === 'service'; }; return A ? A.editAny(INC_P, f) : f(); }
   window.__incOk = canRead;
   function arr(k) { var a = jget(k, []); return Array.isArray(a) ? a : []; }
   function cfg() { var c = jget(KC, {}); return c && typeof c === 'object' && !Array.isArray(c) ? c : {}; }
@@ -26046,9 +26057,9 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   var KC = 'totBonusCfg', KR = 'totBonusReviews', KM = 'totRemarks', KP = 'totMyPay';
   function role() { return DW.role(); }
   function ro() { return !!(window.totSpaceRO && window.totSpaceRO()); }
-  function canReview() { return !ro() && (adm() || ['manager', 'senior'].indexOf(role()) >= 0); }
-  function canSee() { return adm() || ['manager', 'senior'].indexOf(role()) >= 0; }
-  function canCfg() { return !ro() && (adm() || role() === 'manager'); }
+  function canReview() { if (ro()) return false; var A = window.totAcc; return A ? A.edit('dw.fmd.bonus', function () { return adm() || ['manager', 'senior'].indexOf(role()) >= 0; }) : (adm() || ['manager', 'senior'].indexOf(role()) >= 0); }
+  function canSee() { var A = window.totAcc; return A ? A.gate('dw.fmd.bonus', function () { return adm() || ['manager', 'senior'].indexOf(role()) >= 0; }) : adm() || ['manager', 'senior'].indexOf(role()) >= 0; }
+  function canCfg() { if (ro()) return false; var A = window.totAcc; return A ? A.edit('dw.fmd.bonus', function () { return adm() || role() === 'manager'; }) : (adm() || role() === 'manager'); }
   function canPay() { try { return !!(window.totPay && totPay.canPay()); } catch (e) { return false; } }
   var REM_ROLES = ['manager', 'senior', 'hr_recruiter', 'shift_lead', 'performance_coach', 'service_manager', 'scheduling_coordinator'];
   function canRemarkRead() { return adm() || REM_ROLES.indexOf(role()) >= 0; }
@@ -26309,7 +26320,8 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     function inAcc(a, m) { if (!a || typeof a !== 'object') return false; var pp = a.people || [], dd = a.depts || [], tt = a.teams || [];
       return pp.some(function (e) { return lc(e) === m.e && !!m.e; }) || dd.some(function (d) { var n = d; try { n = D() ? D().norm(d) : d; } catch (e) {} return (!!m.d && n === m.d) || !!(m.td && m.td[n]); }) || tt.some(function (t) { return !!(m.t && m.t[t]); }); }
     function hasAcc(a) { return !!a && ['people', 'depts', 'teams'].some(function (k) { return (a[k] || []).length > 0; }); }
-    function level(p, X, m, depth) { m = m || me(); if (m.all) return 3; if (!p) return 0; X = X || ix(); depth = depth || 0;
+    function level(p, X, m, depth) { var r = level0(p, X, m, depth); return !depth && r > 1 && window.totAcc && window.totAcc.ro() ? 1 : r; }   /* v3.36: Projects set to View only */
+    function level0(p, X, m, depth) { m = m || me(); if (m.all) return 3; if (!p) return 0; X = X || ix(); depth = depth || 0;
       var up = depth < 12 && p.parent && X[String(p.parent)] ? level(X[String(p.parent)], X, m, depth + 1) : 0;
       if ((m.e && (lc(p.ownerEmail) === m.e || lc(p.byEmail) === m.e)) || inAcc(p.editors, m) || up >= 3) return 3;
       if (inAcc(p.assignees, m)) return 2;
@@ -27038,6 +27050,161 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       box.insertBefore(d, cl); }
     adminPanel(); setTimeout(adminPanel, 1500);
   } catch (e) { console.warn('Settings disabled:', e); }
+})();
+</script>
+<script id="pageAccess">
+/* v3.36 Access to every space, page and board — per position and per person (Admin → 🔐 Access to spaces and pages).
+   Stored in totAccessPolicy.access (admin-only write, enforced again by the server):
+     access = { roles: { <position>: { <pageId>|'@<space>'|'*': level } }, users: { <e-mail>: { … same … } } }
+   level: 'none' (hidden) · 'view' (view only) · 'edit' (full) · 'def' (as before: the position's normal rules). Nothing set = inherit.
+   Order: person's page → person's space → person's "all spaces" → position's page → position's space → position's "all spaces" → as before.
+   Page ids: <space>.<menu label> (academy.workshop, fmd.employee_requests …), department tabs dw.<department>.<tab> (dw.fmd.board, dw.service.inc …),
+   custom spaces custom.<id>. New spaces, pages and tabs are picked up automatically from the menus. */
+(function () {
+  try {
+    var PK = 'totAccessPolicy', LV = { none: 1, view: 1, edit: 1 };
+    function adm() { try { return sessionStorage.getItem('totAdmin') === '1' && !sessionStorage.getItem('totViewAs'); } catch (e) { return false; } }
+    function viewAs() { try { return !!sessionStorage.getItem('totViewAs'); } catch (e) { return false; } }
+    function role() { try { return getTrainerRole() || ''; } catch (e) { return ''; } }
+    function email() { try { var e = localStorage.getItem('totTrainerEmail') || ''; if (!e) { var a = JSON.parse(localStorage.getItem('totAuth') || 'null'); e = (a && a.email) || ''; } return String(e).trim().toLowerCase(); } catch (e) { return ''; } }
+    function esc(x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    var pc = { raw: null, val: null };
+    function pol() { var raw = null; try { raw = localStorage.getItem(PK); } catch (e) {} if (raw !== pc.raw) { pc.raw = raw; var p = null; try { p = JSON.parse(raw || 'null'); } catch (e) {} pc.val = p && typeof p === 'object' ? p : {}; } return pc.val; }
+    function acc() { var a = pol().access; return a && typeof a === 'object' ? a : null; }
+    function dsp(d) { try { return (window.deptSpace && window.deptSpace(d)) || d; } catch (e) { return d; } }
+    function spaceOfPid(pid) { var a = String(pid).split('.'); return a[0] === 'dw' ? dsp(a[1]) : a[0]; }
+    function pick(m, pid, sp) { if (!m || typeof m !== 'object') return ''; return m[pid] || m['@' + sp] || m['*'] || ''; }
+    /* the level of one page for whoever is signed in (or for subject {role, email} in the admin preview); '' = as before */
+    function lvl(pid, subj) {
+      if (!subj && adm()) return '';
+      var A = acc(); if (!A) return '';
+      var r = subj ? subj.role : role(), em = subj ? subj.email : (viewAs() ? '' : email()), sp = spaceOfPid(pid);
+      var v = pick(em && A.users && A.users[em], pid, sp) || pick(r && A.roles && A.roles[r], pid, sp);
+      return LV[v] ? v : '';
+    }
+    function call(f) { return typeof f === 'function' ? !!f() : !!f; }
+    function gate(pid, legacy) { var L = lvl(pid); if (L === 'none') return false; if (L) return true; return call(legacy); }
+    function gateAny(pids, legacy) { var ls = pids.map(function (p) { return lvl(p); }); if (ls.some(function (v) { return v === 'view' || v === 'edit'; })) return true; if (ls.some(function (v) { return !v; })) return call(legacy); return false; }
+    function editAny(pids, legacy) { var ls = pids.map(function (p) { return lvl(p); }); if (ls.indexOf('edit') >= 0) return true; if (ls.some(function (v) { return !v; })) return call(legacy); return false; }
+    function edit(pid, legacy) { var L = lvl(pid); return L ? L === 'edit' : call(legacy); }
+    /* what each known page needs: v = the screens it opens, c = parts it uses (also on View only), e = parts that change data (only on Edit) */
+    var P = {
+      'academy.overview': { v: ['academy'] }, 'academy.onboarding': { v: ['onboarding'], c: ['onboarding'] }, 'academy.workshop': { v: ['exam'], c: ['ws_register', 'ws_checklist'] },
+      'academy.id_creation': { v: ['id'], c: ['id'] }, 'academy.logbooks': { v: ['logbooks'], c: ['logbooks'] }, 'academy.trainee_progress': { c: ['onboarding'] },
+      'academy.retraining': { v: ['exam'], c: ['retrain'] }, 'academy.retakes_notes': { c: ['results_view'] }, 'academy.who_needs_what': { c: ['results_view'] },
+      'performance.exam_evaluation': { v: ['exam'], c: ['exam_check'] }, 'performance.workshop_evaluation': { v: ['exam'], c: ['ws_checklist'] },
+      'performance.results': { v: ['exam'], c: ['results_view'], e: ['results_edit'] }, 'performance.retraining': { v: ['exam'], c: ['retrain'] },
+      'performance.videos': { v: ['exam'], c: ['videos_view'], e: ['videos_upload'] }, 'performance.send_results': { v: ['exam'], c: ['results_view'], e: ['results_send'] },
+      'performance.coach_board': { v: ['coach'] }, 'performance.coaching_hub': { c: ['results_view'] }, 'performance.who_needs_what': { c: ['results_view'] },
+      'fmd.schedule': { v: ['schedule'], c: ['fmd_view'] }, 'fmd.employees': { v: ['empdata'] }, 'fmd.employee_requests': { v: ['requests'] }, 'fmd.retraining': { v: ['exam'], c: ['retrain'] },
+      'uniforms.uniforms': { v: ['appearance'], c: ['appearance_view'], e: ['appearance_issue', 'appearance_manage'] }, 'hr.recruiting': { v: ['recruiting'] },
+      'projects.my_work': { v: ['projects'] }, 'projects.all_projects': { v: ['projects'] }, 'projects.progress': { v: ['projects'] }, 'projects.teams_departments': { v: ['projects'] },
+      'projects.data_explorer': { v: ['projects'] }, 'projects.updates': { v: ['projects'] }
+    };
+    function pidsWhere(f) { return Object.keys(P).filter(function (k) { return f(P[k]); }); }
+    /* a screen opens when one of its pages is open; it closes when all its pages are Hidden; otherwise the old rule decides */
+    /* the Workshop / evaluation screen is shared by several pages: the part being opened (wsMode) must not be Hidden */
+    var WS = { menu: ['academy.workshop'], files: ['academy.workshop'], checklist: ['academy.workshop', 'performance.workshop_evaluation'], exam: ['performance.exam_evaluation'], results: ['performance.results'], retrain: ['academy.retraining', 'performance.retraining', 'fmd.retraining'] };
+    function view(v, legacy) { if (adm()) return call(legacy); var ps = pidsWhere(function (x) { return (x.v || []).indexOf(v) >= 0; }); if (!ps.length) return call(legacy);
+      if (v === 'exam' && window.__wsMode) { var m = WS[window.__wsMode()]; if (m && !gateAny(m, true)) return false; }
+      return gateAny(ps, legacy); }
+    function cap(c, legacy) { if (adm()) return call(legacy);
+      var rel = pidsWhere(function (x) { return (x.c || []).indexOf(c) >= 0 || (x.e || []).indexOf(c) >= 0; }); if (!rel.length) return call(legacy);
+      var und = false, g = rel.some(function (p) { var L = lvl(p), inE = (P[p].e || []).indexOf(c) >= 0; if (!L) { und = true; return false; } return inE ? L === 'edit' : L !== 'none'; });
+      return g || (und && call(legacy)); }
+    /* a department board / workspace: open if any of its tabs is opened, closed if all are Hidden */
+    function dept(d) { var ids = []; try { ids = window.__dw && window.__dw.tabIds ? window.__dw.tabIds() : []; } catch (e) {} if (!ids.length) ids = ['board', 'dash', 'docs', 'wt'];
+      var ls = ids.map(function (t) { return lvl('dw.' + d + '.' + t); }); if (ls.some(function (v) { return v === 'view' || v === 'edit'; })) return 'open'; if (ls.every(function (v) { return v === 'none'; })) return 'none'; return ''; }
+    /* the page that is open right now (the highlighted item of the space's second bar) and whether it is View only */
+    var rc = { t: 0, pid: '' };
+    function curPid() { var now = Date.now(); if (now - rc.t < 250) return rc.pid; rc.t = now; rc.pid = '';
+      try { var sp = window.spaceOf ? window.spaceOf() : ''; if (sp && window.spaceItems) { var it = window.spaceItems(sp).filter(function (x) { return x.on && x.pid; })[0]; if (it) rc.pid = it.pid; } } catch (e) {}
+      return rc.pid; }
+    function ro() { if (adm() || !acc()) return false; var p = curPid(); return !!p && lvl(p) === 'view'; }
+    window.totAcc = { lvl: lvl, gate: gate, gateAny: gateAny, editAny: editAny, edit: edit, view: view, cap: cap, dept: dept, ro: ro, cur: curPid, spaceOf: spaceOfPid, PAGES: P };
+    /* parts of a tool (Detailed access) follow the page levels too: Edit gives the part, View only gives only its looking part */
+    var c0 = window.totCan; if (c0) window.totCan = function (c) { return cap(c, function () { return c0(c); }); };
+    /* View only also switches off the editing controls the modules already hide for viewers */
+    var ro0 = window.totSpaceRO; window.totSpaceRO = function () { return !!(ro0 && ro0()) || ro(); };
+
+    /* ---------- View only: a ribbon, and changes to tool data are not saved while the page is View only ---------- */
+    var st = document.createElement('style'); st.textContent = '#accRo{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:9990;display:none;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;background:rgba(15,23,42,.92);color:#e2e8f0;border:1px solid rgba(148,163,184,.35);font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.35);pointer-events:none}#accRo.on{display:flex}html.acc-ro #spaceSub button.on{box-shadow:inset 0 -2px 0 #f59e0b}';
+    document.head.appendChild(st);
+    var rib = document.createElement('div'); rib.id = 'accRo'; rib.setAttribute('role', 'status'); rib.innerHTML = '👁 <b>View only</b> · you can look, but changes here are not saved'; document.body.appendChild(rib);
+    function ribbon() { var on = ro(); rib.classList.toggle('on', on); document.documentElement.classList.toggle('acc-ro', on); }
+    setInterval(function () { try { ribbon(); } catch (e) {} }, 700);
+    var DK = {}; (window.__totDataKeys || []).forEach(function (k) { DK[k] = 1; }); ['auditLog', 'totJournal', 'totAccessPolicy'].forEach(function (k) { delete DK[k]; });
+    var warned = 0;
+    function blocked(k) { if (window.__totSyncWriting || adm()) return false; var n = String(k).replace(/^s~[^~]+~/, ''); if (!DK[n]) return false; rc.t = 0; return ro(); }
+    function warn() { var n = Date.now(); if (n - warned < 4000) return; warned = n; try { showShellToast('View only: this change was not saved. Ask the admin for editing access.', 'error'); } catch (e) {} }
+    function hook(win) { var Pr = win && win.Storage && win.Storage.prototype; if (!Pr || Pr.__totAcc) return; Pr.__totAcc = 1; var si = Pr.setItem, ri = Pr.removeItem, wls = win.localStorage;
+      Pr.setItem = function (k, v) { if (this === wls && blocked(k)) { warn(); return; } return si.apply(this, arguments); };
+      Pr.removeItem = function (k) { if (this === wls && blocked(k)) { warn(); return; } return ri.apply(this, arguments); }; }
+    hook(window); window.totAccHook = hook;
+    try { Array.prototype.forEach.call(document.querySelectorAll('iframe'), function (f) { try { if (f.contentWindow && f.contentWindow.localStorage) hook(f.contentWindow); } catch (e) {} }); } catch (e) {}
+
+    /* ---------- the page list: every space, its pages and its department tabs, read from the menus (so new ones appear by themselves) ---------- */
+    function pages() {
+      var out = [], S = window.__SPACES || {};
+      Object.keys(S).forEach(function (sp) { var it = []; try { it = window.spaceItems(sp); } catch (e) {} var seen = {}, ps = [];
+        it.forEach(function (x) { if (!x.pid || seen[x.pid] || /^dw\.[^.]+\.setup$/.test(x.pid)) return;   /* Setup is the admin's own tab */ seen[x.pid] = 1; var l = String(x.l || '').replace(/<span[^>]*>[\s\S]*?<\/span>/g, '').replace(/<[^>]+>/g, ''), t = document.createElement('textarea'); t.innerHTML = l; l = t.value.trim();
+          var m = /^dw\.([^.]+)\./.exec(x.pid); if (m && m[1] !== sp && window.__dept) l = __dept.label(m[1]) + ' · ' + l; ps.push({ pid: x.pid, label: l }); });
+        out.push({ sp: sp, label: S[sp][1], pages: ps }); });
+      var cs = []; try { cs = JSON.parse(localStorage.getItem('customSpaces') || '[]') || []; } catch (e) {}
+      if (Array.isArray(cs) && cs.length) out.push({ sp: 'custom', label: 'Custom spaces', pages: cs.filter(function (s) { return s && s.id; }).map(function (s) { return { pid: 'custom.' + s.id, label: '📄 ' + (s.title || s.id) }; }) });
+      return out; }
+    window.totAcc.pages = pages;
+
+    /* ---------- Admin → 🔐 Access to spaces and pages ---------- */
+    var panel = [].filter.call(document.querySelectorAll('.adOv'), function (o) { return o.querySelector('#adClose'); })[0], box = panel && panel.querySelector('.adBox'); if (!box) return;
+    var NAMES = { '': '', def: 'As before', none: '🚫 Hidden', view: '👁 View only', edit: '✏️ Edit' };
+    var d = document.createElement('details'); d.id = 'accSec'; d.style.cssText = 'margin-top:12px';
+    d.innerHTML = '<summary style="cursor:pointer;font-weight:600">🔐 Access to spaces and pages</summary><div id="accBody"></div>';
+    box.insertBefore(d, box.querySelector('#adClose'));
+    var who = '';
+    function users() { var u = pol().users || {}; return Object.keys(u).sort().map(function (k) { return { em: k, name: (u[k] && u[k].name) || k, role: (u[k] && u[k].role) || '' }; }); }
+    function target() { var A = acc() || {}, m = /^(r|u):(.*)$/.exec(who) || []; return { kind: m[1] || '', id: m[2] || '', map: m[1] === 'r' ? ((A.roles || {})[m[2]] || {}) : m[1] === 'u' ? ((A.users || {})[m[2]] || {}) : {} }; }
+    function opts(kind, scope, cur) { var first = scope === '*' ? (kind === 'u' ? 'Same as their position' : 'As before (normal rules of the position)') : scope === 'space' ? 'Same as "All spaces"' : 'Same as the space';
+      var o = [['', first]]; if (scope !== '*' || kind === 'u') o.push(['def', 'As before (normal rules)']); o.push(['none', '🚫 Hidden'], ['view', '👁 View only'], ['edit', '✏️ Edit']);
+      return o.map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === (cur || '') ? ' selected' : '') + '>' + x[1] + '</option>'; }).join(''); }
+    var SEL = 'padding:5px 6px;border-radius:7px;border:1px solid var(--border,#2a3150);background:var(--navy3,#10152a);color:inherit;font:inherit;font-size:12.5px;max-width:100%';
+    function subj() { var t = target(); if (t.kind === 'r') return { role: t.id, email: '' }; if (t.kind === 'u') { var u = (pol().users || {})[t.id] || {}; return { role: u.role || '', email: t.id }; } return null; }
+    /* what the chosen position / person ends up with, per space (from the settings on screen) */
+    function summary(g, s) { var ls = g.pages.map(function (p) { return lvl(p.pid, s); }); if (!ls.length) ls = [lvl(g.sp + '.x', s)];
+      if (ls.every(function (v) { return v === 'none'; })) return '<span style="color:#ef4444">space hidden</span>';
+      var k = {}; ls.forEach(function (v) { k[v || 'def'] = (k[v || 'def'] || 0) + 1; });
+      return Object.keys(k).map(function (v) { return (v === 'def' ? 'as before' : v === 'none' ? 'hidden' : v === 'view' ? 'view only' : 'edit') + ' ' + k[v]; }).join(' · '); }
+    function draw() {
+      var b = d.querySelector('#accBody'), rs = Object.keys(ROLES), us = users(), t = target(), s = subj(), A = acc() || {};
+      var h = '<div style="font-size:12px;opacity:.75;margin:8px 0">Choose a position or a person, then set each space, board and page to <b>🚫 Hidden</b> (they do not see it at all), <b>👁 View only</b> (they open it but cannot change anything) or <b>✏️ Edit</b>. <b>As before</b> keeps the normal rules of the position. A space whose pages are all hidden disappears from the top bar; Home always stays. Settings for a person come before the settings of their position. New spaces, boards and pages appear here by themselves.</div>' +
+        '<select id="accWho" style="' + SEL + ';width:100%;padding:8px"><option value="">— choose a position or a person —</option><optgroup label="Positions">' + rs.map(function (r) { var n = Object.keys((A.roles || {})[r] || {}).length; return '<option value="r:' + r + '"' + (who === 'r:' + r ? ' selected' : '') + '>' + esc(ROLES[r].label) + (n ? ' · ' + n + ' setting' + (n > 1 ? 's' : '') : '') + '</option>'; }).join('') + '</optgroup>' +
+        (us.length ? '<optgroup label="People">' + us.map(function (u) { var n = Object.keys((A.users || {})[u.em] || {}).length; return '<option value="u:' + esc(u.em) + '"' + (who === 'u:' + u.em ? ' selected' : '') + '>' + esc(u.name) + ' · ' + esc(u.em) + (u.role && ROLES[u.role] ? ' (' + esc(ROLES[u.role].label) + ')' : '') + (n ? ' · ' + n + ' setting' + (n > 1 ? 's' : '') : '') + '</option>'; }).join('') + '</optgroup>' : '') + '</select>';
+      if (t.kind) {
+        var m = t.map, gs = pages();
+        h += '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0;padding:9px 10px;border-radius:10px;background:rgba(59,130,246,.10)"><b style="flex:1;min-width:140px">🌐 All spaces</b><select class="accL" data-k="*" style="' + SEL + '">' + opts(t.kind, '*', m['*']) + '</select></div>' +
+          '<div style="font-size:12px;opacity:.7;margin:0 0 6px">Quick: <button type="button" class="adBtn" id="accOnly" style="padding:4px 10px;font-size:12px">Only the spaces I set (hide the rest)</button> <button type="button" class="adBtn" id="accClear" style="padding:4px 10px;font-size:12px;background:#555">Clear all settings</button></div>';
+        gs.forEach(function (g) {
+          h += '<details class="accSp" data-sp="' + esc(g.sp) + '" style="margin:6px 0;border:1px solid var(--border,#2a3150);border-radius:10px;padding:6px 10px"' + (d.__open && d.__open[g.sp] ? ' open' : '') + '><summary style="cursor:pointer;display:flex;flex-wrap:wrap;gap:8px;align-items:center"><b style="flex:1;min-width:140px">' + esc(g.label) + ' <span style="font-weight:400;font-size:11.5px;opacity:.7">(' + g.pages.length + ' page' + (g.pages.length === 1 ? '' : 's') + ' · ' + summary(g, s) + ')</span></b><select class="accL" data-k="@' + esc(g.sp) + '" style="' + SEL + '">' + opts(t.kind, 'space', m['@' + g.sp]) + '</select></summary>' +
+            (g.pages.length ? '<div style="margin:6px 0 2px 10px">' + g.pages.map(function (p) { var L = lvl(p.pid, s); return '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:3px 0;border-top:1px dashed rgba(148,163,184,.18)"><span style="flex:1;min-width:150px;font-size:13px">' + esc(p.label) + ' <span style="font-size:11px;opacity:.55">' + (L ? NAMES[L] : 'as before') + '</span></span><select class="accL" data-k="' + esc(p.pid) + '" style="' + SEL + '">' + opts(t.kind, 'page', m[p.pid]) + '</select></div>'; }).join('') + '</div>' : '<div style="font-size:12px;opacity:.6;margin:4px 0">No pages yet.</div>') + '</details>'; });
+        h += '<div class="adMsg" id="accMsg"></div><button class="adBtn" type="button" id="accSave">Save access</button>';
+      }
+      b.innerHTML = h; }
+    function collect() { var o = {}; d.querySelectorAll('select.accL').forEach(function (x) { if (x.value) o[x.getAttribute('data-k')] = x.value; }); return o; }
+    function store(map, act) { var t = target(); if (!t.kind) return false; var p = JSON.parse(JSON.stringify(pol())); p.access = p.access && typeof p.access === 'object' ? p.access : {}; var k = t.kind === 'r' ? 'roles' : 'users'; p.access[k] = p.access[k] || {};
+      if (Object.keys(map).length) p.access[k][t.id] = map; else delete p.access[k][t.id]; p.upd = Date.now(); p.users = p.users || {}; p.roles = p.roles || {};
+      try { localStorage.setItem(PK, JSON.stringify(p)); } catch (e) { return false; }
+      try { var a = JSON.parse(localStorage.getItem('auditLog') || '[]'); if (!Array.isArray(a)) a = []; a.push({ id: Date.now() + '-acc', ts: Date.now(), who: 'Admin', role: 'admin', cat: 'access', act: act }); localStorage.setItem('auditLog', JSON.stringify(a.slice(-5000))); } catch (e) {}
+      try { if (window.applyRoleAccess) applyRoleAccess(); } catch (e) {} return true; }
+    function tName() { var t = target(); return t.kind === 'r' ? 'position ' + ((ROLES[t.id] || {}).label || t.id) : t.id; }
+    d.addEventListener('toggle', function (e) { if (e.target === d && d.open) draw(); else if (e.target.classList && e.target.classList.contains('accSp')) { d.__open = d.__open || {}; d.__open[e.target.getAttribute('data-sp')] = e.target.open; } }, true);
+    d.addEventListener('change', function (e) { if (e.target.id === 'accWho') { who = e.target.value; draw(); } });
+    d.addEventListener('click', function (e) { var id = e.target.id; if (/^(SELECT|OPTION)$/.test(e.target.tagName) && e.target.closest('summary')) e.preventDefault();   /* choosing a level does not fold the space */
+      if (id === 'accSave') { var map = collect(), ok = store(map, 'Access to spaces and pages: ' + tName() + ' → ' + (Object.keys(map).map(function (k) { return k + '=' + map[k]; }).join(', ') || 'cleared')); draw(); var m = d.querySelector('#accMsg'); if (m) { m.style.color = ok ? '#22c55e' : '#ef4444'; m.textContent = ok ? 'Saved. It applies on their next sync (about a minute).' : 'Not saved (storage full).'; } }
+      else if (id === 'accClear') { if (confirm('Remove every access setting for ' + tName() + '?')) { store({}, 'Access to spaces and pages: ' + tName() + ' cleared'); draw(); } }
+      else if (id === 'accOnly') { var a = d.querySelector('select.accL[data-k="*"]'); if (a) a.value = 'none'; var m2 = d.querySelector('#accMsg'); if (m2) { m2.style.color = '#f59e0b'; m2.textContent = '"All spaces" is now Hidden: only spaces and pages you set to View only, Edit or As before stay visible. Press Save access.'; } }
+    });
+    window.totAcc.adminDraw = function (w) { if (w != null) who = w; d.open = true; draw(); };
+  } catch (e) { console.warn('Page access disabled:', e); }
 })();
 </script>
 <script id="uiPolish">
