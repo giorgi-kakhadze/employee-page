@@ -4,12 +4,13 @@ const fs = require('fs'), crypto = require('crypto');
 module.exports = function (codePath, opts) {
   opts = opts || {};
   const files = {};            // name -> string
-  const cache = {}, props = {}, uploads = [], mails = []; let upN = 0;
+  const cache = {}, props = {}, uploads = [], mails = [], sess = {}, driveFiles = {}; let upN = 0;
   function file(name) { return { getName: () => name, getBlob: () => ({ getDataAsString: () => files[name] }), setContent: (s) => { files[name] = s; }, getId: () => 'id-' + name, setTrashed() { delete files[name]; }, getMimeType: () => 'application/json' }; }
   const folder = { getId: () => 'folder', getFilesByName: (n) => { let done = !(n in files); return { hasNext: () => !done, next: () => { done = true; return file(n); } }; }, createFile: (n, c) => { files[n] = c; return file(n); },
     getFiles: () => { const ks = Object.keys(files); let i = 0; return { hasNext: () => i < ks.length, next: () => file(ks[i++]) }; } };
   const G = {
-    DriveApp: { getFoldersByName: () => { let d = false; return { hasNext: () => !d, next: () => { d = true; return folder; } }; }, createFolder: () => folder },
+    DriveApp: { getFoldersByName: () => { let d = false; return { hasNext: () => !d, next: () => { d = true; return folder; } }; }, createFolder: () => folder,
+      getFileById: (id) => { const f = driveFiles[id]; if (!f) throw new Error('not found'); let d = false; return { getName: () => f.name, getSize: () => f.bytes.length, getMimeType: () => f.mime, isTrashed: () => false, setTrashed() { delete driveFiles[id]; }, getParents: () => ({ hasNext: () => !d, next: () => { d = true; return folder; } }) }; } },
     CacheService: { getScriptCache: () => ({ get: (k) => cache[k] || null, put: (k, v) => { cache[k] = v; }, remove: (k) => { delete cache[k]; } }) },
     PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => props[k] || null, setProperty: (k, v) => { props[k] = v; } }) },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
@@ -22,14 +23,20 @@ module.exports = function (codePath, opts) {
     UrlFetchApp: { fetch(url, o) { o = o || {};
       /* v3.31: Google sign-in check for the employee page: a test token 'gtok:<email>' is a valid sign-in for that e-mail */
       if (/oauth2\.googleapis\.com\/tokeninfo/.test(url)) { const t = decodeURIComponent(String(url).split('id_token=')[1] || ''), em = /^gtok:(.+)$/.exec(t); return { getResponseCode: () => em ? 200 : 400, getContentText: () => JSON.stringify(em ? { aud: CID, email: em[1], email_verified: 'true', exp: String(Math.floor(Date.now() / 1000) + 3600), name: em[1] } : {}) }; }
-      if (/uploadType=resumable/.test(url)) return { getHeaders: () => ({ Location: 'https://upload.test/' + (++upN) }), getResponseCode: () => 200 }; if (o.method === 'put') { const m = /bytes (\d+)-(\d+)\/(\d+)/.exec((o.headers || {})['Content-Range'] || ''), last = m && +m[2] + 1 >= +m[3]; uploads.push({ url, range: m && m[0] }); return { getResponseCode: () => last ? 200 : 308, getContentText: () => JSON.stringify({ id: 'drive-file-' + upN }) }; } throw new Error('no network in tests'); } }
+      if (/uploadType=resumable/.test(url)) { ++upN; let meta = {}; try { meta = JSON.parse(o.payload || '{}'); } catch (e) {} sess['https://upload.test/' + upN] = { name: meta.name || '', mime: (o.headers || {})['X-Upload-Content-Type'] || '', parts: [] }; return { getHeaders: () => ({ Location: 'https://upload.test/' + upN }), getResponseCode: () => 200 }; }
+      if (o.method === 'put') { const m = /bytes (\d+)-(\d+)\/(\d+)/.exec((o.headers || {})['Content-Range'] || ''), last = m && +m[2] + 1 >= +m[3], se = sess[url], id = 'drive-file-' + String(url).split('/').pop(); uploads.push({ url, range: m && m[0] });
+        if (se) { se.parts.push(Buffer.from(o.payload || [])); if (last) driveFiles[id] = { name: se.name, mime: se.mime, bytes: Buffer.concat(se.parts) }; }
+        return { getResponseCode: () => last ? 200 : 308, getContentText: () => JSON.stringify({ id }) }; }
+      /* v3.33: downloads of stored files (Range requests) */
+      const dm = /drive\/v3\/files\/([\w-]+)\?alt=media/.exec(url); if (dm) { const f = driveFiles[dm[1]]; if (!f) return { getResponseCode: () => 404 }; const r = /bytes=(\d+)-(\d+)/.exec((o.headers || {}).Range || '') || [0, 0, f.bytes.length - 1]; return { getResponseCode: () => 206, getContent: () => f.bytes.subarray(+r[1], +r[2] + 1) }; }
+      throw new Error('no network in tests'); } }
   };
   let CID = '';
   let src = fs.readFileSync(codePath, 'utf8').replace("const ADMIN_SECRET = 'CHANGE-ME-ADMIN-KEY'", "const ADMIN_SECRET = 'ADMKEY'");
   CID = (/const GOOGLE_CLIENT_ID = '([^']*)'/.exec(src) || [])[1] || '';
   const api = new Function(...Object.keys(G), src + '; return { doPost: doPost, sh_: sh_ };')(...Object.values(G));
   return {
-    files, uploads, mails, props, cache,
+    files, uploads, mails, props, cache, driveFiles,
     post(body) { return JSON.parse(api.doPost({ postData: { contents: typeof body === 'string' ? body : JSON.stringify(body) } }).getContent()); },
     data() { return JSON.parse(files['tool-data.json'] || '{"keys":{}}'); },
     setData(d) { files['tool-data.json'] = JSON.stringify(d); },

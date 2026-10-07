@@ -10,6 +10,8 @@ Checked against `docs/platform-requirements.txt` (35 sections), using the code i
 
 "v3.26" marks onboarding templates sent to departments as live tickets (see `docs/v3_26_notes.md`).
 
+"v3.33" marks teams, restricted / shared items and files, branching tasks, workflow stages, approvals, file storage and the Progress page (see `docs/v3_33_notes.md`).
+
 "v3.32" marks Projects: shared and personal projects with access per project, sub-projects, work map, timeline tree, visual board, data explorer and updates to the people involved (see `docs/v3_32_notes.md`).
 
 "v3.31" marks bonus programs, the month review, pay by the hour and the employee page with Home / Schedule / Rotation (see `docs/v3_31_notes.md`).

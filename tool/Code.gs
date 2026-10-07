@@ -32,6 +32,9 @@
  * v3.32: projects ('totProjects', items 'totProjItems', visual board 'totProjBoard') are sent and saved per project: owner and managers manage,
  *   assigned teams / departments / people work on it, viewers read, sub-projects follow their parent. Daily e-mail digest to the people involved
  *   (installProjectDigest() for a fixed morning time) and action 'projNotify' to send an update on demand.
+ * v3.33: teams ('totTeams': managers and seniors write; a member counts for the team and its department in project access), restricted / shared
+ *   project items, board rights per project, approvals (each approver writes only their own decision; the status is computed here; a workflow stage
+ *   that needs approval is entered only after it is approved), comments on items, project files in Drive (actions 'pjFileUp' / 'pjFileGet').
  * Data lives in your Google Drive folder "Tool Data": tool-data.json (shared data) and access.json (who may use the tool).
  */
 const ADMIN_SECRET = 'CHANGE-ME-ADMIN-KEY';
@@ -223,7 +226,7 @@ function mergeAsks_(newV, oldV, em) { var n = [], o = []; try { n = JSON.parse(n
 /* v3.29 Service Management: incidents are also open to any position the admin maps to the Service Management department; performance coaches
    read them (to coach), but only service managers, managers and seniors (and the department) write them */
 const RESTRICT_DEPT = { totIncidents: ['service'], totIncImports: ['service'], totIncCfg: ['service'] };
-const WRITE_ROLES = { totBonusCfg: ['manager'],  totIncidents: ['manager', 'senior', 'service_manager'], totIncImports: ['manager', 'senior', 'service_manager'], totIncCfg: ['manager', 'senior', 'service_manager'] };
+const WRITE_ROLES = { totTeams: ['manager', 'senior'], totBonusCfg: ['manager'],  totIncidents: ['manager', 'senior', 'service_manager'], totIncImports: ['manager', 'senior', 'service_manager'], totIncCfg: ['manager', 'senior', 'service_manager'] };
 function roleOk_(name, role, dept) { var r = RESTRICT[name]; if (!r || r.indexOf(role) >= 0) return true; var d = RESTRICT_DEPT[name]; return !!(d && dept && d.indexOf(dept) >= 0); }
 function writeOk_(name, role, dept) { var r = WRITE_ROLES[name]; if (!r || r.indexOf(role) >= 0) return true; var d = RESTRICT_DEPT[name]; return !!(d && dept && d.indexOf(dept) >= 0); }
 /* v2.4: detailed access. The admin ticks parts per position in the tool (Admin > Detailed access); the policy keeps policy.roles[role].caps.
@@ -258,8 +261,11 @@ const DEL_KEEP_DAYS = 180, AUDIT_MAX = 20000, JOURNAL_MAX = 8000;
 function low_(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
 /* who is asking: the admin key sees everything; everybody else is described by their position and department */
 function ctx_(cur, em, admin) {
-  var cache = {}, c = { all: !!admin, em: em, name: '', dept: '', cache: cache };
-  c.idx = function (pre, name) { var k = pre + name; if (!cache[k]) { var o = {}, a = jp_(cur.keys[k] && cur.keys[k].v, []); (Array.isArray(a) ? a : []).forEach(function (x) { if (x && x.id != null) o[String(x.id)] = x; }); cache[k] = o; } return cache[k]; };
+  var cache = {}, c = { all: !!admin, adm: !!admin, em: em, name: '', dept: '', cache: cache };
+  c.idx = function (pre, name) { var k = pre + name; if (!cache[k]) { var o = {}, a = jp_(cur.keys[k] && cur.keys[k].v, []); (Array.isArray(a) ? a : []).forEach(function (x) { if (x && x.id != null) o[String(x.id)] = x; }); Object.defineProperty(o, '__pre', { value: pre }); cache[k] = o; } return cache[k]; };
+  /* v3.33: the teams this person belongs to (member or lead) and the departments of those teams, per site */
+  c.tm = function (pre) { var k = pre + 'totTeams#me'; if (!cache[k]) { var o = { t: {}, d: {} }, a = jp_(cur.keys[pre + 'totTeams'] && cur.keys[pre + 'totTeams'].v, []);
+    (Array.isArray(a) ? a : []).forEach(function (t) { if (!t || t.id == null || !em) return; if ((Array.isArray(t.members) ? t.members : []).map(low_).indexOf(em) >= 0 || low_(t.lead) === em) { o.t[String(t.id)] = 1; if (t.dept) o.d[String(t.dept)] = 1; } }); cache[k] = o; } return cache[k]; };
   c.dels = function (k) { return (cur.del || {})[k] || {}; };   /* v3.32: ids deleted from a key (projects removed with their items) */
   if (admin) return c;
   var p = policy_(cur), u = (p.users || {})[em] || {}, depts = p.depts || {}, role = String(u.role || '');
@@ -296,6 +302,7 @@ function cmVis_(x, c, pre) {
   if (x.kind === 'task') return taskVis_(c.idx(pre, 'totTasks')[String(x.ref)], c);
   if (x.kind === 'ann' || x.kind === 'ack') return annVis_(c.idx(pre, 'totAnnouncements')[String(x.ref)], c);
   if (x.kind === 'proj') return pjLevel_(c.idx(pre, 'totProjects')[String(x.ref)], c, c.idx(pre, 'totProjects'), 0) >= 1;   /* v3.32 project discussion: everyone who can open the project */
+  if (x.kind === 'pitem') return pjRecLevel_('totProjItems', c.idx(pre, 'totProjItems')[String(x.ref)], c, c.idx(pre, 'totProjects')) >= 1;   /* v3.33 comments on one item: whoever can open that item */
   return false;   /* unknown kinds stay private to their author */
 }
 function recVis_(name, x, c, pre) { if (PROJ_KEYS.indexOf(name) >= 0) return pjRecLevel_(name, x, c, c.idx(pre, 'totProjects')) >= 1; return name === 'totTasks' ? taskVis_(x, c) : name === 'totCases' ? caseVis_(x, c, pre) : name === 'totAnnouncements' ? annVis_(x, c) : cmVis_(x, c, pre); }
@@ -323,41 +330,73 @@ function scopedPush_(name, newV, oldV, c, pre, del) {
    items, break it down into their own sub-projects); viewers only read. Visibility 'members' = only those people; 'org' = everyone may read;
    'inherit' (sub-projects) = whoever can read the parent. Whoever manages a project also manages every sub-project below it. Levels: 0 none, 1 read, 2 work, 3 manage. */
 const PROJ_KEYS = ['totProjects', 'totProjItems', 'totProjBoard'];
-const PJ_ACCESS = ['ownerEmail', 'ownerName', 'byEmail', 'parent', 'visibility', 'editors', 'assignees', 'viewers'];
-function pjIn_(a, c) { if (!a || typeof a !== 'object') return false; var pp = Array.isArray(a.people) ? a.people : [], dd = Array.isArray(a.depts) ? a.depts : [];
-  return pp.some(function (e) { return low_(e) === c.em; }) || (!!c.dept && dd.some(function (d) { return c.dOf(d) === c.dept; })); }
+const PJ_ACCESS = ['ownerEmail', 'ownerName', 'byEmail', 'parent', 'visibility', 'editors', 'assignees', 'viewers', 'boardEdit', 'stage', 'stages', 'gateApprovers'];   /* v3.33: board rights and the workflow stage are managers' too */
+/* v3.33: an access list holds people (e-mails), departments and teams; a team member counts for the team and for the team's department */
+function pjIn_(a, c, pre) { if (!a || typeof a !== 'object') return false; var pp = Array.isArray(a.people) ? a.people : [], dd = Array.isArray(a.depts) ? a.depts : [], tt = Array.isArray(a.teams) ? a.teams : [], m = pre != null && c.tm ? c.tm(pre) : { t: {}, d: {} };
+  return pp.some(function (e) { return low_(e) === c.em; }) || dd.some(function (d) { var n = c.dOf(d); return (!!c.dept && n === c.dept) || !!m.d[n]; }) || tt.some(function (t) { return !!m.t[String(t)]; }); }
+function pjHas_(a) { return !!a && typeof a === 'object' && ['people', 'depts', 'teams'].some(function (k) { return Array.isArray(a[k]) && a[k].length > 0; }); }
 function pjLevel_(p, c, ix, depth) {
   if (c.all) return 3; if (!p || typeof p !== 'object') return 0;
   var up = (depth || 0) < 12 && p.parent != null && p.parent !== '' && ix[String(p.parent)] ? pjLevel_(ix[String(p.parent)], c, ix, (depth || 0) + 1) : 0;
-  if (low_(p.ownerEmail) === c.em || low_(p.byEmail) === c.em || pjIn_(p.editors, c) || up >= 3) return 3;
-  if (pjIn_(p.assignees, c)) return 2;
-  if (pjIn_(p.viewers, c) || p.visibility === 'org' || (p.visibility !== 'members' && p.parent && up >= 1)) return 1;
+  if (low_(p.ownerEmail) === c.em || low_(p.byEmail) === c.em || pjIn_(p.editors, c, ix.__pre) || up >= 3) return 3;
+  if (pjIn_(p.assignees, c, ix.__pre)) return 2;
+  if (pjIn_(p.viewers, c, ix.__pre) || p.visibility === 'org' || (p.visibility !== 'members' && p.parent && up >= 1)) return 1;
   return 0;
 }
-/* a work item / board shape belongs to a project (pid); a person assigned to one item may update that item even without rights on the project */
+/* a work item / board shape belongs to a project (pid); a person assigned to one item may update that item even without rights on the project.
+   v3.33: the board follows the project's boardEdit ('work' default, 'managers' = only managers draw, 'all' = viewers draw too); an item can be
+   restricted (only the listed people / departments / teams, the project managers, its assignee and its creator see it) or shared beyond the project
+   (share: read, or work with share.edit); approvers always see the approval asked of them. */
 function pjRecLevel_(name, x, c, ix) { if (c.all) return 3; if (!x) return 0; if (name === 'totProjects') return pjLevel_(x, c, ix, 0);
-  var l = pjLevel_(ix[String(x.pid)], c, ix, 0); return name === 'totProjItems' && low_(x.assigneeEmail) === c.em ? Math.max(l, 2) : l; }
+  var p = ix[String(x.pid)], l = pjLevel_(p, c, ix, 0), pre = ix.__pre;
+  if (name === 'totProjBoard') { var be = p && p.boardEdit; return be === 'managers' && l < 3 ? Math.min(l, 1) : be === 'all' && l >= 1 ? Math.max(l, 2) : l; }
+  var asg = low_(x.assigneeEmail) === c.em, mine = asg || low_(x.byEmail) === c.em;
+  if (pjHas_(x.restrict) && l < 3 && !mine) l = pjIn_(x.restrict, c, pre) ? Math.max(l, 1) : 0;   /* the people it is restricted to always read it */
+  if (pjIn_(x.share, c, pre)) l = Math.max(l, x.share.edit ? 2 : 1);
+  if (asg) l = Math.max(l, 2);
+  if (x.kind === 'approval' && (Array.isArray(x.approvers) ? x.approvers : []).map(low_).indexOf(c.em) >= 0) l = Math.max(l, 1);
+  return l; }
+/* v3.33 approvals: the status is worked out here from the approvers' decisions; each person can only write their own decision */
+function pjApprSt_(z) { var ap = (Array.isArray(z.approvers) ? z.approvers : []).map(low_), ds = z.decisions || {}, v = ap.map(function (e) { return ds[e] && ds[e].d; });
+  if (v.indexOf('rejected') >= 0) return 'rejected'; if (v.indexOf('changes') >= 0) return 'changes'; if (!ap.length) return 'pending';
+  return (z.rule === 'any' ? v.indexOf('approved') >= 0 : v.every(function (d) { return d === 'approved'; })) ? 'approved' : 'pending'; }
+function pjDec_(d) { return d && typeof d === 'object' && ['approved', 'rejected', 'changes'].indexOf(d.d) >= 0 ? { d: d.d, note: String(d.note || '').slice(0, 1000), who: String(d.who || '').slice(0, 80), ts: Math.min(+d.ts || Date.now(), Date.now() + 60000) } : null; }
+function pjApprove_(x, y, c, l) { var ap = (Array.isArray(x.approvers) ? x.approvers : []).map(low_), me = ap.indexOf(c.em) >= 0, z = l >= 2 && y && typeof y === 'object' ? y : JSON.parse(JSON.stringify(x)), d = {}, keep = Array.isArray(z.approvers) ? z.approvers.map(low_) : ap;
+  Object.keys(x.decisions || {}).forEach(function (e) { if (keep.indexOf(e) >= 0) d[e] = x.decisions[e]; });   /* approvers taken off lose their decision */
+  if (c.all && y && y.decisions) Object.keys(y.decisions).forEach(function (e) { var q = pjDec_(y.decisions[e]); if (q) d[low_(e)] = q; });
+  else if (me && y && y.decisions && y.decisions[c.em] !== undefined) { var q = pjDec_(y.decisions[c.em]); if (q) d[c.em] = q; else delete d[c.em]; }
+  if (!c.all && l < 3) ['approvers', 'rule', 'ref', 'byEmail', 'by', 'pid'].forEach(function (f) { if (x[f] === undefined) delete z[f]; else z[f] = x[f]; });   /* only managers change who approves and the rule */
+  if (!c.all && l < 3) { d = {}; Object.keys(x.decisions || {}).forEach(function (e) { d[e] = x.decisions[e]; }); if (me && y && y.decisions && y.decisions[c.em] !== undefined) { var q2 = pjDec_(y.decisions[c.em]); if (q2) d[c.em] = q2; else delete d[c.em]; } }
+  z.decisions = d; z.kind = 'approval'; z.status = pjApprSt_(z); return z; }
 /* merge a save record by record (like scopedPush_), with edit rights: readers cannot change, people who work on a project cannot change its access
    settings, items never move to another project, only managers delete projects; new top-level projects must be owned by the person saving them and
    new sub-projects / items / shapes need work rights on their project */
 function projPush_(name, newV, oldV, c, pre, del) {
   var n = jp_(newV, null), o = jp_(oldV, []), now = Date.now(), P = name === 'totProjects'; if (!Array.isArray(n)) return null; if (!Array.isArray(o)) o = [];
-  var ix = {}, base = c.idx(pre, 'totProjects'); Object.keys(base).forEach(function (k) { ix[k] = base[k]; });
+  var ix = {}, base = c.idx(pre, 'totProjects'); Object.keys(base).forEach(function (k) { ix[k] = base[k]; }); Object.defineProperty(ix, '__pre', { value: pre });
   var inN = {}, seen = {}, out = [], lvl = function (x) { return pjRecLevel_(name, x, c, ix); };
   n.forEach(function (x) { if (x && x.id != null) inN[String(x.id)] = x; });
   var gone = P ? {} : c.dels(pre + 'totProjects');   /* items and shapes of a deleted project are removed with it */
   o.forEach(function (x) { var id = x && x.id != null ? String(x.id) : null; if (id == null) { out.push(x); return; } seen[id] = 1;
     if (!P && x && gone[String(x.pid)]) { del[id] = now; return; }
     var l = lvl(x), y = inN[id]; if (l < 1) { out.push(x); return; }
-    if (y !== undefined) { if (l < 2 || !y || typeof y !== 'object') { out.push(x); return; }
+    if (y !== undefined) { if (!P && name === 'totProjItems' && x.kind === 'approval') { if (l < 2 && (x.approvers || []).map(low_).indexOf(c.em) < 0) { out.push(x); return; } var z = pjApprove_(x, y, c, l); z.pid = x.pid; z.id = x.id; out.push(z); return; }
+      if (l < 2 || !y || typeof y !== 'object') { out.push(x); return; }
+      if (!P && name === 'totProjItems' && !(c.all || l >= 3 || low_(x.byEmail) === c.em)) ['restrict', 'share'].forEach(function (f) { if (x[f] === undefined) delete y[f]; else y[f] = x[f]; });   /* item access: project managers and the item's creator */
+      if (P && l >= 3 && !c.adm && (+y.stage || 0) > (+x.stage || 0)) {   /* managers too; only the admin key skips the gate */
+        var tg = (Array.isArray(x.stages) ? x.stages : [])[+y.stage], its = c.idx(pre, 'totProjItems');   /* a stage that needs approval is entered only after it is approved */
+        var G = (x.gateApprovers && Array.isArray(x.gateApprovers.people) && x.gateApprovers.people.length ? x.gateApprovers.people : [x.ownerEmail]).map(low_).filter(Boolean);   /* every gate approver must be on the request */
+        if (tg && tg.gate && !Object.keys(its).some(function (k) { var a = its[k], ap = a && Array.isArray(a.approvers) ? a.approvers.map(low_) : []; return a && a.kind === 'approval' && String(a.pid) === String(x.id) && a.ref === 'stage:' + (+y.stage) && a.status === 'approved' && G.every(function (e) { return ap.indexOf(e) >= 0; }); })) y.stage = x.stage; }
       if (P && l < 3) PJ_ACCESS.forEach(function (f) { if (x[f] === undefined) delete y[f]; else y[f] = x[f]; });
       if (P && String(y.parent || '') !== String(x.parent || '') && y.parent && pjLevel_(ix[String(y.parent)], c, ix, 0) < 2) y.parent = x.parent;   /* move only under a project you work on */
       if (!P) y.pid = x.pid; y.id = x.id; out.push(y); return; }
     if (P ? l >= 3 : l >= 2) { del[id] = now; return; }
     out.push(x); });
   n.forEach(function (x) { var id = x && x.id != null ? String(x.id) : null; if (id == null || seen[id] || del[id] || typeof x !== 'object') return; seen[id] = 1;
-    var ok = P ? (x.parent != null && x.parent !== '' ? pjLevel_(ix[String(x.parent)], c, ix, 0) >= 2 : (c.all || low_(x.ownerEmail) === c.em)) : pjLevel_(ix[String(x.pid)], c, ix, 0) >= 2;
-    if (!ok) return; if (P) ix[id] = x; out.push(x); });
+    var ok = P ? (x.parent != null && x.parent !== '' ? pjLevel_(ix[String(x.parent)], c, ix, 0) >= 2 : (c.all || low_(x.ownerEmail) === c.em)) : name === 'totProjBoard' ? pjRecLevel_(name, x, c, ix) >= 2 : pjLevel_(ix[String(x.pid)], c, ix, 0) >= 2;   /* v3.33 the board follows its drawing rights */
+    if (!ok) return; if (P) ix[id] = x;
+    if (!P && name === 'totProjItems' && x.kind === 'approval') { x.decisions = {}; x.status = pjApprSt_(x); }   /* a new approval starts with no decisions */
+    out.push(x); });
   return JSON.stringify(out);
 }
 /* ----- v3.32 project updates by e-mail, only to the people involved (owner, managers, assigned people and the members of assigned departments,
@@ -365,13 +404,13 @@ function projPush_(name, newV, oldV, c, pre, del) {
    on demand: action 'projNotify' from the project page (work rights needed). Readers (viewers) are not e-mailed. ----- */
 function pjPeople_(cur) { var p = policy_(cur), us = p.users || {}, depts = p.depts || {}, dOf = function (x) { x = String(x || ''); return DEPT_IDS.indexOf(x) >= 0 ? x : (depts[x] || DEPT_DEF[x] || x); };
   return { name: function (e) { var u = us[low_(e)]; return u && u.name ? String(u.name) : String(e || ''); }, inDept: function (d) { d = dOf(d); return Object.keys(us).filter(function (k) { return us[k] && dOf(us[k].role) === d; }); } }; }
-function pjInvolved_(p, items, who) { var set = {}, add = function (e) { e = low_(e); if (/^[^@\s]+@[^@\s]+$/.test(e)) set[e] = 1; };
-  add(p.ownerEmail); [p.editors, p.assignees].forEach(function (a) { if (!a) return; (a.people || []).forEach(add); (a.depts || []).forEach(function (d) { who.inDept(d).forEach(add); }); });
-  (items || []).forEach(function (it) { if (it && String(it.pid) === String(p.id)) add(it.assigneeEmail); });
+function pjInvolved_(p, items, who, teams) { var set = {}, add = function (e) { e = low_(e); if (/^[^@\s]+@[^@\s]+$/.test(e)) set[e] = 1; }, tm = {}; (Array.isArray(teams) ? teams : []).forEach(function (t) { if (t && t.id != null) tm[String(t.id)] = t; });
+  add(p.ownerEmail); [p.editors, p.assignees].forEach(function (a) { if (!a) return; (a.people || []).forEach(add); (a.depts || []).forEach(function (d) { who.inDept(d).forEach(add); }); (a.teams || []).forEach(function (t) { t = tm[String(t)]; if (t) { add(t.lead); (t.members || []).forEach(add); } }); });
+  (items || []).forEach(function (it) { if (!it || String(it.pid) !== String(p.id)) return; add(it.assigneeEmail); if (it.kind === 'approval' && it.status !== 'approved' && it.status !== 'rejected') (it.approvers || []).forEach(add); });
   (Array.isArray(p.mute) ? p.mute : []).forEach(function (e) { delete set[low_(e)]; }); return Object.keys(set); }
 const PJ_ST = { todo: 'To do', doing: 'In progress', blocked: 'BLOCKED', help: 'NEEDS HELP', waiting: 'WAITING', review: 'In review', done: 'Done', planned: 'Planned', active: 'Active', cancelled: 'Cancelled' };
 function pjSummary_(p, items, since, all) {
-  var td = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd'), its = items.filter(function (i) { return i && String(i.pid) === String(p.id); }), mine = its.filter(function (i) { return ['note', 'update', 'doc', 'link'].indexOf(i.kind) < 0; });
+  var td = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd'), its = items.filter(function (i) { return i && String(i.pid) === String(p.id); }), mine = its.filter(function (i) { return ['note', 'update', 'doc', 'link', 'file', 'approval'].indexOf(i.kind) < 0; }), soon = Utilities.formatDate(new Date(Date.now() + 2 * 86400000), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   var done = mine.filter(function (i) { return i.status === 'done'; }).length, L = [];
   var kids = all.filter(function (q) { return q && String(q.parent) === String(p.id); });
   L.push('■ ' + String(p.title || 'Project') + ' — ' + (PJ_ST[p.status] || p.status || 'Active') + (p.due ? ' · due ' + p.due : '') + ' · ' + done + '/' + mine.length + ' items done' + (kids.length ? ' · ' + kids.length + ' sub-project(s)' : ''));
@@ -381,10 +420,12 @@ function pjSummary_(p, items, since, all) {
   hp.forEach(function (i) { L.push('  🙋 Needs help: ' + nm(i) + (i.help ? ' — ' + String(i.help).slice(0, 200) : '')); });
   wt.forEach(function (i) { L.push('  ⏳ Waiting' + (i.waitingFor ? ' for ' + String(i.waitingFor).slice(0, 120) : '') + ': ' + nm(i) + (i.waitSince ? ' (' + Math.max(0, Math.round((Date.now() - +i.waitSince) / 86400000)) + ' days)' : '')); });
   od.forEach(function (i) { L.push('  ⏰ Overdue (due ' + i.due + '): ' + nm(i)); });
+  var ds = mine.filter(function (i) { return i.status !== 'done' && i.due && i.due >= td && i.due <= soon; }); ds.forEach(function (i) { L.push('  📅 Due soon (' + i.due + '): ' + nm(i)); });
+  var ap = its.filter(function (i) { return i.kind === 'approval' && (i.status === 'pending' || i.status === 'changes'); }); ap.forEach(function (i) { var n = (i.approvers || []).length, ok = Object.keys(i.decisions || {}).filter(function (e) { return i.decisions[e].d === 'approved'; }).length; L.push('  ✔ Approval ' + (i.status === 'changes' ? 'sent back for changes' : 'waiting') + ': ' + String(i.title || '') + ' (' + ok + '/' + n + ' approved)'); });
   var ch = []; (p.hist || []).forEach(function (h) { if (h && +h.ts > since) ch.push(h); }); its.forEach(function (i) { (i.hist || []).forEach(function (h) { if (h && +h.ts > since) ch.push({ ts: h.ts, who: h.who, act: String(h.act || '') + ': ' + String(i.title || '') }); }); });
   kids.forEach(function (q) { (q.hist || []).forEach(function (h) { if (h && +h.ts > since) ch.push({ ts: h.ts, who: h.who, act: String(h.act || '') + ' (sub-project ' + String(q.title || '') + ')' }); }); });
   ch.sort(function (a, b) { return (+a.ts || 0) - (+b.ts || 0); }).slice(-25).forEach(function (h) { L.push('  • ' + Utilities.formatDate(new Date(+h.ts), Session.getScriptTimeZone(), 'dd MMM HH:mm') + ' ' + String(h.who || '') + ': ' + String(h.act || '').slice(0, 200)); });
-  return { text: L.join('\n'), changes: ch.length, alerts: bl.length + hp.length + od.length };
+  return { text: L.join('\n'), changes: ch.length, alerts: bl.length + hp.length + od.length + ds.length + ap.length };
 }
 function projDigest_(cur, force) {
   var Pr = PropertiesService.getScriptProperties(), day = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
@@ -393,7 +434,7 @@ function projDigest_(cur, force) {
   Object.keys(cur.keys || {}).forEach(function (k) { var q = parseKey_(k); if (!q || q.name !== 'totProjects') return; var pre = k.slice(0, k.length - q.name.length);
     var all = jp_(cur.keys[k].v, []), items = jp_(cur.keys[pre + 'totProjItems'] && cur.keys[pre + 'totProjItems'].v, []); if (!Array.isArray(all)) return; if (!Array.isArray(items)) items = [];
     all.forEach(function (p) { if (!p || p.digest === 'off' || p.status === 'done' || p.status === 'cancelled') return; var s = pjSummary_(p, items, since, all); if (!s.changes && !s.alerts) return;
-      pjInvolved_(p, items, who).forEach(function (e) { (per[e] = per[e] || []).push(s.text); }); }); });
+      pjInvolved_(p, items, who, jp_(cur.keys[pre + 'totTeams'] && cur.keys[pre + 'totTeams'].v, [])).forEach(function (e) { (per[e] = per[e] || []).push(s.text); }); }); });
   Object.keys(per).forEach(function (e) { try { MailApp.sendEmail(e, 'Projects: your daily update (' + per[e].length + ')', 'Hello ' + who.name(e) + ',\n\nWhat changed in your projects in the last 24 hours, and what is blocked, needs help or is overdue:\n\n' + per[e].join('\n\n') + '\n\nOpen the tool > Projects for details. You receive this because you own, manage or work on these projects.'); sent++; } catch (x) {} });
   return sent;
 }
@@ -404,10 +445,43 @@ function projNotify_(cur, cx, b, me) {
   var ck = CacheService.getScriptCache(), rk = 'pn:' + sh_(pre + '|' + p.id); if (ck.get(rk)) return { error: 'An update for this project was sent less than a minute ago.' };
   var items = jp_(cur.keys[pre + 'totProjItems'] && cur.keys[pre + 'totProjItems'].v, []), all = jp_(cur.keys[pre + 'totProjects'].v, []), who = pjPeople_(cur);
   if (!Array.isArray(items)) items = []; var days = Math.min(30, Math.max(1, +b.days || 7)), s = pjSummary_(p, items, Date.now() - days * 86400000, Array.isArray(all) ? all : []);
-  var to = pjInvolved_(p, items, who).filter(function (e) { return e !== cx.em; }), note = String(b.note || '').slice(0, 2000), from = cx.all ? 'The admin' : who.name(cx.em);
+  var to = pjInvolved_(p, items, who, jp_(cur.keys[pre + 'totTeams'] && cur.keys[pre + 'totTeams'].v, [])).filter(function (e) { return e !== cx.em; }), note = String(b.note || '').slice(0, 2000), from = cx.all ? 'The admin' : who.name(cx.em);
   if (!to.length) return { ok: true, sent: 0 };
   var n = 0; to.slice(0, 80).forEach(function (e) { try { MailApp.sendEmail(e, 'Project update: ' + String(p.title || '').slice(0, 80), 'Hello ' + who.name(e) + ',\n\n' + from + ' sent an update' + (note ? ':\n\n' + note : '.') + '\n\nSummary (changes of the last ' + days + ' days):\n\n' + s.text + '\n\nOpen the tool > Projects for details.'); n++; } catch (x) {} });
   ck.put(rk, '1', 60); return { ok: true, sent: n };
+}
+/* ----- v3.33 project files: uploaded to the tool's Drive folder (private), named "pjfile-<project id>-…" by the server. Upload needs work rights on the
+   project; download goes through the item that holds the file, so its access rules (project, restricted / shared item) decide who gets it. ----- */
+function pjPre_(b, me) { var site = String(b.site || 'main').replace(/[^a-z0-9-]/g, ''); if (me && me.sites.indexOf(site) < 0) return null; return site === 'main' ? '' : 's~' + site + '~'; }
+const PJ_FILE_MAX = 26214400, PJ_CH = 1572864;
+function pjFileUp_(b, cx, me) {
+  var pre = pjPre_(b, me); if (pre == null) return { error: 'not allowed' };
+  var ix = cx.idx(pre, 'totProjects'), p = ix[String(b.pid || '')]; if (!p || pjLevel_(p, cx, ix, 0) < 2) return { error: 'not allowed' };
+  var up = String(b.up || '').replace(/[^\w]/g, '').slice(0, 40), i = +b.i, n = +b.n, size = +b.size, cache = CacheService.getScriptCache();
+  if (!up || !(size > 0) || !(n >= 1) || !(i >= 0) || i >= n) return { error: 'bad upload' }; if (size > PJ_FILE_MAX) return { error: 'The file is larger than 25 MB.' };
+  var mime = String(b.mime || 'application/octet-stream').replace(/[^\w.+\/-]/g, '').slice(0, 100) || 'application/octet-stream', loc = cache.get('pf:' + up);
+  if (!loc) { if (i !== 0) return { error: 'upload session lost, start again' };
+    var nm = 'pjfile-' + String(p.id).replace(/[^\w-]/g, '') + '-' + String(b.name || 'file').replace(/[\\/:*?"<>|]/g, '_').slice(0, 100);
+    var ir = UrlFetchApp.fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id', { method: 'post', contentType: 'application/json; charset=UTF-8', headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken(), 'X-Upload-Content-Type': mime, 'X-Upload-Content-Length': String(size) }, payload: JSON.stringify({ name: nm, parents: [folder_().getId()] }), muteHttpExceptions: true });
+    loc = ir.getHeaders().Location || ir.getHeaders().location; if (!loc) return { error: 'drive refused the upload' }; cache.put('pf:' + up, loc, 21000); }
+  var bytes = Utilities.base64Decode(String(b.data || '')), s0 = i * PJ_CH, e0 = s0 + bytes.length - 1;
+  var pr = UrlFetchApp.fetch(loc, { method: 'put', contentType: mime, headers: { 'Content-Range': 'bytes ' + s0 + '-' + e0 + '/' + size }, payload: bytes, muteHttpExceptions: true }), code = pr.getResponseCode();
+  if (code === 308) return { ok: true };
+  if (code === 200 || code === 201) { cache.remove('pf:' + up); return { ok: true, fileId: JSON.parse(pr.getContentText()).id }; }
+  return { error: 'drive error ' + code };
+}
+function pjFileGet_(b, cx, me) {
+  var pre = pjPre_(b, me); if (pre == null) return { error: 'not allowed' };
+  var it = cx.idx(pre, 'totProjItems')[String(b.id || '')]; if (!it || !it.fileId) return { error: 'gone' };
+  if (pjRecLevel_('totProjItems', it, cx, cx.idx(pre, 'totProjects')) < 1) return { error: 'not allowed' };
+  var fid = String(it.fileId); if (!/^[\w-]+$/.test(fid)) return { error: 'bad id' };
+  var f; try { f = DriveApp.getFileById(fid); } catch (x) { return { error: 'gone' }; } if (f.isTrashed()) return { error: 'gone' };
+  if (String(f.getName()).indexOf('pjfile-' + String(it.pid).replace(/[^\w-]/g, '') + '-') !== 0) return { error: 'not allowed' };   /* only files uploaded to this project */
+  var inF = false, ps = f.getParents(), f0 = folder_().getId(); while (ps.hasNext()) { if (ps.next().getId() === f0) inF = true; } if (!inF) return { error: 'not allowed' };
+  var size = f.getSize(), i = Math.max(0, +b.i || 0), s0 = i * PJ_CH; if (size && s0 >= size) return { error: 'bad range' };
+  var rr = UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/' + fid + '?alt=media', { headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken(), Range: 'bytes=' + s0 + '-' + (Math.min(size, s0 + PJ_CH) - 1) }, muteHttpExceptions: true });
+  if (rr.getResponseCode() >= 300) return { error: 'drive error ' + rr.getResponseCode() };
+  return { ok: true, n: Math.max(1, Math.ceil(size / PJ_CH)), mime: f.getMimeType(), name: String(it.fileName || it.title || 'file'), data: Utilities.base64Encode(rr.getContent()) };
 }
 /* Run ONCE from the Apps Script editor to send the daily project digest every morning even when nobody saves. */
 function projDigestRun() { var cur = readJ_(file_(DATA, '{"keys":{}}'), { keys: {} }); cur.keys = cur.keys || {}; return projDigest_(cur, false); }
@@ -514,6 +588,8 @@ function doPost(e) {
     }
     var cx = ctx_(cur, em, admin);   /* v3.23 who is asking, for record-level filtering */
     if (act === 'projNotify') return out_(projNotify_(cur, cx, b, me));   /* v3.32 */
+    if (act === 'pjFileUp') return out_(pjFileUp_(b, cx, me));   /* v3.33 */
+    if (act === 'pjFileGet') return out_(pjFileGet_(b, cx, me));
     if (act === 'pull') {
       if (admin) return out_({ keys: cur.keys, updatedAt: cur.updatedAt || 0 });
       var res = { keys: {}, updatedAt: cur.updatedAt || 0 };
@@ -560,5 +636,5 @@ function doPost(e) {
 
 
 /* v2.91: evaluation videos are deleted after 62 days. Run installVideoCleanup() ONCE from the Apps Script editor to check daily. */
-function cleanVideos_() { var cut = Date.now() - 62 * 86400000, it = folder_().getFiles(); while (it.hasNext()) { var f = it.next(); if (/^video\//.test(f.getMimeType()) && f.getDateCreated().getTime() < cut) f.setTrashed(true); } }
+function cleanVideos_() { var cut = Date.now() - 62 * 86400000, it = folder_().getFiles(); while (it.hasNext()) { var f = it.next(); if (/^video\//.test(f.getMimeType()) && String(f.getName()).indexOf('pjfile-') !== 0 && f.getDateCreated().getTime() < cut) f.setTrashed(true); } }
 function installVideoCleanup() { ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'cleanVideos_') ScriptApp.deleteTrigger(t); }); ScriptApp.newTrigger('cleanVideos_').timeBased().everyDays(1).create(); }
