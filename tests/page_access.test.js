@@ -111,7 +111,7 @@ const TOP = { navAcademy: 'academy', navPerformance: 'performance', navSchedule:
   const mTop = await top(M); ok('the manager still sees every space', ['academy', 'performance', 'fmd', 'uniforms', 'hr', 'office', 'service', 'projects'].every(s => mTop.indexOf(s) >= 0), mTop.join(','));
   ok('the version is up to date', await M.evaluate(() => window.TOT_VERSION) === '3.37');
   const gi = await M.evaluate(async () => { openGiorgiChat(); await new Promise(r => setTimeout(r, 200)); giorgiChat.ask('how do I hide a space or give view only access'); await new Promise(r => setTimeout(r, 1700)); const rows = [...document.querySelectorAll('#giorgiChat .gc-row')]; return rows[rows.length - 1].textContent; });
-  ok('Giorgi explains where to set access', /Access to spaces and pages/.test(gi), gi.slice(0, 80));
+  ok('Giorgi explains where to set access', /Access management/.test(gi) && /spaces and pages/.test(gi), gi.slice(0, 80));
   await M.context().close();
 
   console.log('7. The admin always sees everything; a person can be cleared');
