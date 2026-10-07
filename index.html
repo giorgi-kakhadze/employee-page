@@ -8,7 +8,7 @@
 @media(prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b2030;--tx:#e8ebf2;--mut:#98a0b3;--bd:#2a3145;--ac:#6b8ff0}}
 *{box-sizing:border-box}body{margin:0;font:16px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--tx)}
 main{max-width:760px;margin:0 auto;padding:20px 16px 48px}
-h1{font-size:1.4rem;margin:0 0 4px}h2{font-size:1.1rem;margin:24px 0 10px}h3{font-size:1rem;margin:0 0 6px}
+h1,.mut,.row>div,.card b{min-width:0;overflow-wrap:anywhere}h1{font-size:1.4rem;margin:0 0 4px}h2{font-size:1.1rem;margin:24px 0 10px}h3{font-size:1rem;margin:0 0 6px}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px 16px;margin-bottom:12px}
 .mut{color:var(--mut);font-size:.9rem}.row{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
 .big{font-size:1.6rem;font-weight:700}
@@ -50,6 +50,7 @@ var tok = null, D = null, tab = 'home', refreshT = null, DEMO = /[?&]demo\b/.tes
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function $(id){return document.getElementById(id)}
 function err(m){$('err').textContent=m}
+function say(m){if(!$('app').hidden){var t=$('toast');if(!t){t=document.createElement('div');t.id='toast';t.setAttribute('role','status');t.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);max-width:90vw;padding:10px 16px;border-radius:10px;background:var(--tx);color:var(--bg);z-index:9;font-size:.9rem;box-shadow:0 6px 20px rgba(0,0,0,.3)';document.body.appendChild(t)}t.textContent=m;t.hidden=false;clearTimeout(t._h);t._h=setTimeout(function(){t.hidden=true},4000)}else err(m)}
 function configured(){return /^https:\/\/script\.google\.com\/.+\/exec$/.test(SERVER_URL)}
 function init(){
   if(DEMO){D=demoData();show();return}
@@ -67,15 +68,16 @@ function call(body){
 }
 function signedOut(m){tok=null;if(refreshT){clearInterval(refreshT);refreshT=null}$('app').hidden=true;$('login').hidden=false;err(m)}
 function load(silent){
-  if(!silent)err('Loading...');
+  if(!silent&&$('app').hidden)err('Loading...');
   call({action:'me'}).then(function(j){
-    if(j.error){if(j.error==='sign-in invalid')return signedOut(ERRS[j.error]);if(!silent)err(ERRS[j.error]||j.error);return}
-    D=j;show()}).catch(function(){if(!silent)err('Could not reach the server. Please try again.')});
+    if(j.error){if(j.error==='sign-in invalid')return signedOut(ERRS[j.error]);if(!silent)say(ERRS[j.error]||j.error);return}
+    D=j;show()}).catch(function(){if(!silent)say('Could not reach the server. Please try again.')});
 }
 
 /* ---------- helpers ---------- */
 var SH={morning:'Morning',afternoon:'Afternoon',night:'Night'},OFF={rest:'Day off',vacation:'Vacation',sick:'Sick leave',unpaid:'Unpaid leave'};
 var RT={swap:'Swap a shift',giveaway:'Give away a shift',annual:'Vacation / annual leave',sick:'Sick leave',dayoff:'Day off',payq:'Question about my pay'},RS={pending:'Waiting for a decision',approved:'Approved',rejected:'Declined',cancelled:'Cancelled'};
+function rtl(t){return Object.prototype.hasOwnProperty.call(RT,t)?RT[t]:'Request'}function rsl(t){return Object.prototype.hasOwnProperty.call(RS,t)?RS[t]:String(t||'')}
 function hh(n){n=((n%24)+24)%24;return String(Math.floor(n)).padStart(2,'0')+':'+(n%1?'30':'00')}
 function cellTxt(v){v=String(v||'').trim();if(!v)return '-';if(/^\d+$/.test(v))return 'Table '+v;if(/^(b|brk|break)$/i.test(v))return 'Break';if(/^(off|x|-)$/i.test(v))return 'Off';return v}
 function dLabel(d,long){var dt=new Date(d+'T12:00:00');return isNaN(dt)?esc(d):dt.toLocaleDateString(undefined,{weekday:long?'long':'short',day:'numeric',month:'short'})}
@@ -88,16 +90,22 @@ function mistakes(){
   var m={};(D.evaluations||[]).forEach(function(e){lostOf(e).forEach(function(c){var k=(e.game||'Evaluation')+'|'+c.name;var x=m[k]=m[k]||{game:e.game||'Evaluation',name:c.name,n:0,last:'',lastTs:0};x.n++;if((e.ts||0)>=x.lastTs){x.lastTs=e.ts||0;x.last=e.date}})});
   return Object.keys(m).map(function(k){return m[k]}).sort(function(a,b){return b.n-a.n||b.lastTs-a.lastTs});
 }
-function workDays(){return ((D.schedule&&D.schedule.days)||[]).filter(function(y){return SH[y.s]&&y.d>=today()})}
+function ended(y){if(y.d!==today()||y.f==null||y.t==null)return false;var f=+y.f,t=+y.t;if(t<=f)t+=24;var m=new Date(y.d+'T00:00:00');return Date.now()>=m.getTime()+t*36e5}
+function workDays(){return ((D.schedule&&D.schedule.days)||[]).filter(function(y){return SH[y.s]&&y.d>=today()&&!ended(y)})}
 
 /* ---------- pages (v3.31: three buttons: Home, Schedule, Rotation. Everything here is read-only; the only thing an employee can do is send requests) ---------- */
 var TABS=[['home','&#127968; Home'],['schedule','&#128197; Schedule'],['rotation','&#128260; Rotation']],openEv=null,openPay=false;
 var RK={positive:['&#128077;','Positive feedback','work'],remark:['&#128221;','Remark','leave'],violation:['&#9888;','Violation','bad'],disciplinary:['&#9940;','Disciplinary case','bad'],note:['&#128466;','Note','off']};
 function money(v,c){return (Math.round((+v||0)*100)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+' '+esc(c||'')}
 function monthName(ym){var dt=new Date(ym+'-01T12:00:00');return isNaN(dt)?esc(ym):dt.toLocaleDateString(undefined,{month:'long',year:'numeric'})}
-function payNow(){var p=D.pay||[],y=today().slice(0,7);return p.filter(function(x){return x.ym===y})[0]||null}
-function payLast(){var p=D.pay||[],y=today().slice(0,7);return p.filter(function(x){return x.ym<y})[0]||null}
+function normPay(x){if(!x)return null;var T=x.totals=x.totals||{};['shifts','hours','total','earned','leave','planned','plannedShifts','plannedHours'].forEach(function(k){if(T[k]==null)T[k]=0});x.days=x.days||[];x.upTo=x.upTo||today();x.bonus=x.bonus||[];x.extra=x.extra||[];return x}
+function payNow(){var p=D.pay||[],y=today().slice(0,7);return normPay(p.filter(function(x){return x&&x.ym===y})[0]||null)}
+function payLast(){var p=D.pay||[],y=today().slice(0,7);return normPay(p.filter(function(x){return x&&x.ym<y})[0]||null)}
+var DRAFT=null,NODRAFT=false;
+function keepDraft(){if(NODRAFT){NODRAFT=false;DRAFT=null;return}var f=['rqT','rqDay','rqW','rqF','rqTo','rqN'],o={},any=false;f.forEach(function(i){var e=$(i);if(e){o[i]=e.value;if(i!=='rqT'&&i!=='rqDay'&&e.value)any=true}});if(o.rqT!==undefined)DRAFT={v:o,any:any}}
+function restoreDraft(){if(!DRAFT)return;var o=DRAFT.v;['rqT','rqDay','rqW','rqF','rqTo','rqN'].forEach(function(i){var e=$(i);if(e&&o[i]!=null&&i!=='rqT')e.value=o[i]});var t=$('rqT');if(t&&o.rqT){t.value=o.rqT;t.dispatchEvent(new Event('change'));['rqDay','rqW','rqF','rqTo','rqN'].forEach(function(i){var e=$(i);if(e&&o[i]!=null)e.value=o[i]})}}
 function show(){
+  keepDraft();
   $('login').hidden=true;var a=$('app');a.hidden=false;if(!TABS.some(function(t){return t[0]===tab}))tab='home';
   var h=(DEMO?'<div class="banner"><b>Demo data.</b> This page is not connected to the server. Nothing you do here is sent anywhere.</div>':'')+
     '<div class="row"><div><h1>Hello, '+esc((D.profile&&D.profile.nickname)||D.name||D.email)+'</h1><div class="mut">'+esc(D.email)+'</div></div><span><button onclick="load()">&#8635; Refresh</button> <button onclick="location.reload()">Sign out</button></span></div>'+
@@ -106,7 +114,7 @@ function show(){
   a.querySelector('nav').onclick=function(e){var b=e.target.closest('button');if(b){tab=b.getAttribute('data-t');show();window.scrollTo(0,0)}};
   var P={home:pHome,schedule:pSchedule,rotation:pRotation};
   $('pg').innerHTML=(P[tab]||pHome)();
-  if(tab==='schedule')wireRequests();
+  if(tab==='schedule'){wireRequests();restoreDraft()}
   [].forEach.call(document.querySelectorAll('[data-go]'),function(x){x.onclick=function(){var g=x.getAttribute('data-go');if(g.charAt(0)==='#'){var el=document.querySelector(g);if(el)el.scrollIntoView({behavior:'smooth'});return}tab=g;show();window.scrollTo(0,0)}});
   [].forEach.call(document.querySelectorAll('[data-ev]'),function(x){x.onclick=function(){var i=+x.getAttribute('data-ev');openEv=openEv===i?null:i;show();var el=document.getElementById('ev'+i);if(el)el.scrollIntoView({block:'nearest'})}});
   var ps=document.getElementById('payShifts');if(ps)ps.onclick=function(){openPay=!openPay;show();var el=document.getElementById('paycard');if(el)el.scrollIntoView({block:'start'})};
@@ -121,7 +129,7 @@ function pHome(){
     tile('#paycard',pn?money(pn.totals.total,pn.cur):pl?money(pl.totals.total,pl.cur):'-',pn?'Earned so far in '+monthName(pn.ym).split(' ')[0]:pl?'Salary for '+monthName(pl.ym):'Salary not published yet','hl')+
     tile('#paycard',pn?pn.totals.shifts+' · '+pn.totals.hours+' h':'-','Shifts · hours this month')+
     tile('#evals',last?(last.total==null?'-':esc(last.total)+'%'):'-',last?'Last evaluation: '+esc(last.game||''):'No evaluation shared yet')+
-    tile('#mistakes',mi.length+incM,'Mistakes (points lost + incidents this month)')+
+    tile('#mistakes',mi.length+incM,'Mistakes (criteria with points lost + incidents this month)')+
     tile('#remarks',bad,'Violations & disciplinary',bad?'warnT':'')+
     tile('#remarks',good,'Positive feedback',good?'okT':'')+
     tile('#games',gm?gm.toLocaleString():'-','Games this month')+
@@ -195,7 +203,7 @@ function pRequests(){
     '<div id="rqRange" hidden><div class="row" style="flex-wrap:nowrap"><div style="flex:1"><label>From</label><input id="rqF" type="date"></div><div style="flex:1"><label>To</label><input id="rqTo" type="date"></div></div></div>'+
     '<label id="rqNL">Note (optional)</label><textarea id="rqN" rows="2" maxlength="500"></textarea><div id="rqE" class="err"></div><button class="pri" id="rqGo">Send request</button></div>';
   h+='<h2 id="myreq">My requests</h2>'+(rq.length?rq.map(function(r){var cls=r.status==='approved'?'work':r.status==='rejected'?'bad':r.status==='pending'?'leave':'off';
-    return '<div class="card"><div class="row"><b>'+esc(RT[r.type]||r.type)+'</b><span class="'+cls+'">'+esc(RS[r.status]||r.status)+'</span></div><div class="mut">'+(r.type==='payq'?'':esc(r.from)+(r.to&&r.to!==r.from?' → '+esc(r.to):'')+(r.shift?' · '+esc(SH[r.shift]||r.shift):'')+(r.withName?' · with '+esc(r.withName):'')+' · ')+'sent '+when(r.created)+'</div>'+
+    return '<div class="card"><div class="row"><b>'+esc(rtl(r.type))+'</b><span class="'+cls+'">'+esc(rsl(r.status))+'</span></div><div class="mut">'+(r.type==='payq'?'':esc(r.from)+(r.to&&r.to!==r.from?' → '+esc(r.to):'')+(r.shift?' · '+esc(SH[r.shift]||r.shift):'')+(r.withName?' · with '+esc(r.withName):'')+' · ')+'sent '+when(r.created)+'</div>'+
       (r.note?'<div class="fb">'+esc(r.note)+'</div>':'')+(r.decisionNote?'<div class="fb" style="border-color:var(--warn)">'+esc(r.decisionNote)+'</div>':'')+(r.status==='pending'?'<div style="margin-top:8px"><button data-cx="'+esc(r.id)+'">Cancel request</button></div>':'')+'</div>'}).join(''):'<div class="card mut">You have not sent any requests.</div>');
   return h;
 }
@@ -209,7 +217,7 @@ function wireRequests(){
     else if(v==='payq'){b.from=b.to=today();if(!b.note){e.textContent='Write your question.';return}}
     else{b.from=$('rqF').value;b.to=$('rqTo').value||b.from;if(!b.from){e.textContent='Choose the first day.';return}if(b.to<b.from){e.textContent='The end date is before the start date.';return}}
     this.disabled=true;e.textContent='Sending...';var btn=this;
-    call(b).then(function(j){btn.disabled=false;if(j.error){if(j.error==='sign-in invalid')return signedOut(ERRS[j.error]);e.textContent=j.error;return}D.requests=j.requests;show()}).catch(function(){btn.disabled=false;e.textContent='Could not reach the server. Nothing was sent.'});
+    call(b).then(function(j){btn.disabled=false;if(j.error){if(j.error==='sign-in invalid')return signedOut(ERRS[j.error]);e.textContent=j.error;return}D.requests=j.requests;NODRAFT=true;show()}).catch(function(){btn.disabled=false;e.textContent='Could not reach the server. Nothing was sent.'});
   };
   [].forEach.call(document.querySelectorAll('[data-cx]'),function(x){x.onclick=function(){if(!confirm('Cancel this request?'))return;x.disabled=true;
     call({action:'reqCancel',id:x.getAttribute('data-cx')}).then(function(j){if(j.error){x.disabled=false;if(j.error==='sign-in invalid')return signedOut(ERRS[j.error]);alert(j.error);return}D.requests=j.requests;show()}).catch(function(){x.disabled=false;alert('Could not reach the server.')})}});

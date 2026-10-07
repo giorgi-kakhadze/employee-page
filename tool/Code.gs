@@ -54,7 +54,7 @@ const RESTRICT = { totBonusCfg: ['manager', 'senior'], totBonusReviews: ['manage
 /* v2.2 employee self-service: paste your Web client ID from Google Cloud (APIs & Services > Credentials > OAuth client ID > Web application). Leave as is to keep the feature off. */
 const GOOGLE_CLIENT_ID = '121975980339-fu9nd124kov2g6j94qiofOrkjkhbkee6.apps.googleusercontent.com';
 const ADMIN_ONLY_WRITE = ['totUniqRules', 'totAccessPolicy', 'totSites', 'wsCustomConfig', 'totEvalKinds', 'totEvalCfgBackups', 'totProcessTpl', 'totIntegrations', 'totDeptCfg', 'totAccessGrants'];   /* v3.19: evaluation setup, kinds, backups, process templates and integration settings can only be written with the admin key */
-const MAX_TRIES = 8, LOCK_SECONDS = 900, KEEP_BACKUPS = 14;
+const MAX_KEYS = 1200, MAX_TRIES = 8, LOCK_SECONDS = 900, KEEP_BACKUPS = 14;
 
 function folder_() { var it = DriveApp.getFoldersByName(FOLDER); return it.hasNext() ? it.next() : DriveApp.createFolder(FOLDER); }
 function file_(name, init) { var f = folder_(), it = f.getFilesByName(name); return it.hasNext() ? it.next() : f.createFile(name, init, 'application/json'); }
@@ -84,19 +84,22 @@ function verifyGoogle_(tok) {
 function me_(tok) {
   if (GOOGLE_CLIENT_ID.indexOf('CHANGE-ME') === 0) return { error: 'not configured' };
   var g = verifyGoogle_(tok); if (!g) return { error: 'sign-in invalid' };
-  var K = (readJ_(file_(DATA, '{"keys":{}}'), { keys: {} }).keys) || {}, out = { email: g.email, name: '', evaluations: [] }, found = 0, mypre = null, myWid = '';
+  var K = (readJ_(file_(DATA, '{"keys":{}}'), { keys: {} }).keys) || {}, out = { email: g.email, name: '', evaluations: [] }, found = 0, mypre = null, myWid = '', myUniq = false, inactive = false;
   Object.keys(K).forEach(function (k) {
     var tail = 'employeeDataSource'; if (k.slice(-tail.length) !== tail || !parseKey_(k) || parseKey_(k).name !== tail) return;
     var pre = k.slice(0, k.length - tail.length);
     var hit = jp_(K[k] && K[k].v, []).filter(function (e) { return e && String(e.email || (e.ext && e.ext.email) || '').trim().toLowerCase() === g.email; });
     if (hit.length !== 1) return;
     var e = hit[0], wid = String(e.workId || '').trim().toLowerCase(); found++; out.name = e.fullName || e.nickname || out.name; mypre = pre; myWid = wid;
+    var nmL = String(e.fullName || e.nickname || '').trim().toLowerCase(), all0 = jp_(K[k] && K[k].v, []);
+    myUniq = !!nmL && all0.filter(function (x) { return x && String(x.fullName || x.nickname || '').trim().toLowerCase() === nmL; }).length === 1;   /* v3.39: a name only identifies someone when nobody else has it */
+    inactive = /^(terminated|retired)$/i.test(String(e.status || '').trim());   /* v3.39 */
     var x0 = e.ext || {}; out.profile = { name: String(e.fullName || '').slice(0, 80), nickname: String(e.nickname || '').slice(0, 40), workId: String(e.workId || '').slice(0, 30), status: String(e.status || '').slice(0, 30), position: String(x0.position || '').slice(0, 60), team: String(x0.team || '').slice(0, 40), shift: String(x0.shift || '').slice(0, 30), startDate: String(x0.startDate || '').slice(0, 20), phone: String(x0.phone || '').slice(0, 30), manager: String(x0.manager || x0.lineManager || '').slice(0, 80), email: g.email, games: String(x0.games || '').split(/[,;\/]+/).map(function (t) { return t.trim().slice(0, 40); }).filter(Boolean).slice(0, 30) };
     var share = jp_(K[pre + 'evalShare'] && K[pre + 'evalShare'].v, {}), res = jp_(K[pre + 'evalResults'] && K[pre + 'evalResults'].v, []);
     /* v3.11: the employee's own retraining rows (date, reason, status only; trainer names, comments and signatures are never sent) */
     var nm = String(e.fullName || e.nickname || '').trim().toLowerCase(), rt = jp_(K[pre + 'totRetrain'] && K[pre + 'totRetrain'].v, {});
     (rt.sessions || []).forEach(function (se) { (se.rows || []).forEach(function (row) {
-      if (!row || !((wid && String(row.wid || '').trim().toLowerCase() === wid) || (nm && String(row.name || '').trim().toLowerCase() === nm))) return;
+      var rw = String(row.wid || '').trim().toLowerCase(); if (!row || !(rw ? (wid && rw === wid) : (myUniq && nm && String(row.name || '').trim().toLowerCase() === nm))) return;   /* v3.39: a row with a work ID belongs to that ID only */
       var at = String(row.attend || '').toLowerCase();
       (out.retraining = out.retraining || []).push({ date: String(row.date || '').slice(0, 20), reason: String(row.reason || '').slice(0, 200), status: at === 'yes' ? 'Completed' : at === 'no' ? 'Missed' : 'Scheduled' });
     }); });
@@ -119,9 +122,11 @@ function me_(tok) {
     if (rx) out.rotation = { group: String(m.group || ''), shift: String(m.shift || ''), days: rx.filter(rel).slice(0, 28).map(function (d) { return { d: d.d, s: String(d.s || ''), f: d.f == null ? null : +d.f, c: (Array.isArray(d.c) ? d.c : []).slice(0, 48).map(function (c) { return String(c || '').slice(0, 40); }) }; }) };
   });
   if (!found) return { error: 'no employee found for this email' };
+  if (found > 1) return { error: 'This e-mail is on more than one employee list. Ask your manager.' };   /* v3.39: same rule as sending a request */
+  if (inactive) return { error: 'This account is no longer active. Ask your manager.' };   /* v3.39: terminated and retired employees no longer see pay, evaluations or requests */
   /* v3.22: this employee's own game counts (imported from Grafana/CSV in the tool), last 12 months only; matched by work ID, or by exact full name when the row has no ID */
   var gcE = K[mypre + 'totGameCounts'], gcAll = jp_(gcE && gcE.v, []), cut = Utilities.formatDate(new Date(Date.now() - 366 * 86400000), Session.getScriptTimeZone(), 'yyyy-MM'), myNm = String(out.name || '').trim().toLowerCase();
-  if (Array.isArray(gcAll)) out.gameCounts = gcAll.filter(function (r) { if (!r || String(r.period || '').slice(0, 7) < cut) return false; var rid = String(r.empId || '').trim().toLowerCase(); return myWid ? rid === myWid : (!rid && myNm && String(r.name || '').trim().toLowerCase() === myNm); })
+  if (Array.isArray(gcAll)) out.gameCounts = gcAll.filter(function (r) { if (!r || String(r.period || '').slice(0, 7) < cut) return false; var rid = String(r.empId || '').trim().toLowerCase(); return rid ? (!!myWid && rid === myWid) : (myUniq && !!myNm && String(r.name || '').trim().toLowerCase() === myNm); })
     .map(function (r) { return { game: String(r.game || '').slice(0, 60), period: String(r.period || '').slice(0, 10), count: +r.count || 0 }; }).sort(function (a, b) { return b.period.localeCompare(a.period); }).slice(0, 300);
   /* v3.16: this employee's own requests (never anyone else's) */
   out.requests = reqList_(K[mypre + 'totEmpRequests'], g.email).slice(0, 40);
@@ -129,7 +134,7 @@ function me_(tok) {
      cases / positive feedback that staff chose to show, and own service incidents */
   var py = jp_(K[mypre + 'totMyPay'] && K[mypre + 'totMyPay'].v, {}), pm = (py.byEmail || {})[g.email];
   if (pm && pm.months) out.pay = Object.keys(pm.months).sort().reverse().slice(0, 6).map(function (k) { return pm.months[k]; });
-  var mineRec = function (x) { var w = String(x.workId || x.empId || '').trim().toLowerCase(), n = String(x.name || '').trim().toLowerCase(); return myWid ? (w ? w === myWid : n === myNm) : (!!myNm && n === myNm); };
+  var mineRec = function (x) { var w = String(x.workId || x.empId || '').trim().toLowerCase(), n = String(x.name || '').trim().toLowerCase(); return w ? (!!myWid && w === myWid) : (myUniq && !!myNm && n === myNm); };   /* v3.39: never by name when the record has an ID, or when the name is shared */
   out.remarks = jp_(K[mypre + 'totRemarks'] && K[mypre + 'totRemarks'].v, []).filter(function (x) { return x && x.share !== false && mineRec(x); })
     .map(function (x) { return { date: String(x.date || '').slice(0, 10), kind: String(x.kind || 'note').slice(0, 20), title: String(x.title || '').slice(0, 120), text: String(x.text || '').slice(0, 2000), by: String(x.by || '').slice(0, 60) }; })
     .sort(function (a, b) { return b.date.localeCompare(a.date); }).slice(0, 60);
@@ -158,19 +163,22 @@ function empOf_(K, email) {
   });
   return n === 1 ? found : null;
 }
-function isoOk_(v) { return /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) && !isNaN(new Date(v + 'T12:00:00Z').getTime()); }
+function isoOk_(v) { v = String(v || ''); if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false; var d = new Date(v + 'T12:00:00Z'); return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v; }   /* v3.39: 2027-02-30 is not a date */
 function dayDiff_(a, b) { return Math.round((new Date(b + 'T12:00:00Z') - new Date(a + 'T12:00:00Z')) / 86400000); }
 function reqNew_(b) {
   var g = verifyGoogle_(String(b.idToken || '')); if (!g) return { error: 'sign-in invalid' };
   var df = file_(DATA, '{"keys":{}}'), cur = readJ_(df, { keys: {} }); cur.keys = cur.keys || {};
   var ep = empOf_(cur.keys, g.email); if (!ep) return { error: 'no employee found for this email' };
-  var type = String(b.type || ''); if (!REQ_TYPES[type]) return { error: 'bad type' };
+  if (/^(terminated|retired)$/i.test(String(ep.e.status || '').trim())) return { error: 'This account is no longer active. Ask your manager.' };
+  var type = String(b.type || ''); if (!Object.prototype.hasOwnProperty.call(REQ_TYPES, type)) return { error: 'bad type' };   /* v3.39: not 'constructor' or 'toString' */
   var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd'), from = String(b.from || ''), to = String(b.to || from);
   if (!isoOk_(from) || !isoOk_(to)) return { error: 'Enter valid dates.' };
   if (dayDiff_(from, to) < 0) return { error: 'The end date is before the start date.' };
   if (dayDiff_(from, to) > 60) return { error: 'A request can cover at most 60 days.' };
-  if (dayDiff_(today, from) < (type === 'sick' ? -14 : 0) || dayDiff_(today, from) > 400) return { error: type === 'sick' ? 'Sick leave can be reported up to 14 days back.' : 'Choose a date from today onward (within the next 13 months).' };
-  var shift = String(b.shift || '').replace(/[^\w \-:]/g, '').slice(0, 30), withName = type === 'swap' ? String(b.withName || '').replace(/[<>]/g, '').slice(0, 80) : '';
+  if (dayDiff_(today, from) < (type === 'sick' ? -14 : 0) || dayDiff_(today, from) > (type === 'sick' ? 1 : 400)) return { error: type === 'sick' ? 'Sick leave can be reported from 14 days back up to tomorrow.' : 'Choose a date from today onward (within the next 13 months).' };   /* v3.39: sick leave is not booked months ahead */
+  var shift = String(b.shift || '').replace(/[^\w \-:]/g, '').slice(0, 30), withName = type === 'swap' ? Array.from(String(b.withName || '').trim()).slice(0, 80).join('') : '';   /* v3.39: the tool escapes every field, so text is kept as typed */
+  if (type === 'swap' && withName.length < 2) return { error: 'Pick the colleague you swap with.' };
+  if (type === 'payq' && !String(b.note || '').trim()) return { error: 'Write your question.' };
   if (type === 'swap' || type === 'giveaway') {
     to = from;   /* one shift = one day */
     var mine = false;
@@ -181,10 +189,11 @@ function reqNew_(b) {
     });
     if (!mine) return { error: 'That date is not a working day in the schedule that was sent to you.' };
   }
-  var note = String(b.note || '').replace(/[<>]/g, '').slice(0, 500), key = ep.pre + 'totEmpRequests', old = cur.keys[key], arr = jp_(old && old.v, []); if (!Array.isArray(arr)) arr = [];
+  var note = Array.from(String(b.note || '').trim()).slice(0, 500).join(''), key = ep.pre + 'totEmpRequests', old = cur.keys[key], arr = jp_(old && old.v, []); if (!Array.isArray(arr)) arr = [];
   var mineOpen = arr.filter(function (r) { return r && String(r.email || '').toLowerCase() === g.email && r.status === 'pending'; });
   if (mineOpen.length >= 10) return { error: 'You already have 10 open requests. Wait for a decision or cancel one.' };
-  if (mineOpen.some(function (r) { return r.type === type && r.from === from && r.to === to; })) return { error: 'You already sent this request.' };
+  if (mineOpen.some(function (r) { return r.type === type && r.from === from && r.to === to && (type === 'payq' ? String(r.note || '') === note : type !== 'swap' || String(r.with || '').toLowerCase() === withName.toLowerCase()); })) return { error: 'You already sent this request.' };
+  if ((type === 'swap' || type === 'giveaway') && mineOpen.some(function (r) { return (r.type === 'swap' || r.type === 'giveaway') && r.from === from; })) return { error: 'You already have an open swap or give-away for that shift. Cancel it first.' };   /* v3.39 */
   var now = Date.now(), nm = String(ep.e.fullName || ep.e.nickname || '').slice(0, 80);
   arr.push({ id: 'er' + now.toString(36) + Math.random().toString(36).slice(2, 6), workId: String(ep.e.workId || '').slice(0, 30), name: nm, email: g.email, type: type, from: from, to: to, with: withName, shift: shift, note: note, status: 'pending', created: now, u: now, src: 'employee', hist: [{ ts: now, who: nm, act: 'submitted' }] });
   if (arr.length > 3000) { arr = arr.filter(function (r) { return r.status === 'pending'; }).concat(arr.filter(function (r) { return r.status !== 'pending'; }).slice(-2000)); }
@@ -213,8 +222,8 @@ function cleared_(em) { try { CacheService.getScriptCache().remove('f:' + em.sli
 function parseKey_(k) {
   k = String(k || ''); if (k.length > 90) return null;
   var m = /^s~([a-z0-9-]{1,30})~([A-Za-z0-9_.:-]{1,60})$/.exec(k);
-  if (m) return { site: m[1], name: m[2] };
-  return /^[A-Za-z0-9_.:-]{1,60}$/.test(k) ? { site: 'main', name: k } : null;
+  if (m) return m[2] in Object.prototype ? null : { site: m[1], name: m[2] };   /* v3.39: not 'constructor', '__proto__', 'toString' … (they broke the rule tables and poisoned every pull) */
+  return /^[A-Za-z0-9_.:-]{1,60}$/.test(k) && !(k in Object.prototype) ? { site: 'main', name: k } : null;
 }
 function policy_(cur) { try { var e = cur.keys.totAccessPolicy; var p = e && JSON.parse(e.v); return p && typeof p === 'object' ? p : { users: {}, roles: {} }; } catch (x) { return { users: {}, roles: {} }; } }
 function whoIs_(cur, em) { var p = policy_(cur), u = (p.users || {})[em]; if (!u || !u.role) return { role: '', sites: [] };   /* v2.1: an approved account with no role yet receives no site data */
@@ -362,18 +371,26 @@ function scopedPull_(name, v, c, pre) { var all = name === 'totChannels' || name
   var a = jp_(v, null); if (!Array.isArray(a)) return all ? v : '[]'; return all ? v : JSON.stringify(a.filter(function (x) { return x && recVis_(name, x, c, pre); })); }
 /* merge a save record by record: records this person cannot see are kept untouched; a visible record missing from the save counts as deleted only if
    this person may delete it; new records are accepted only if this person can see them; deleted ids are remembered so they never come back */
+const REC_AUTHOR = { totTasks: ['fromEmail', 'fromName', 'fromRole'], totCases: ['byEmail', 'by'], totAnnouncements: ['fromEmail', 'fromName', 'fromRole'], totComments: ['email', 'who'] };
 function scopedPush_(name, newV, oldV, c, pre, del) {
   if (name === 'totChannels' || name === 'totMessages') return chatPush_(name, newV, oldV, c, pre, del);   /* v3.38 */
   if (PROJ_KEYS.indexOf(name) >= 0) return projPush_(name, newV, oldV, c, pre, del);   /* v3.32 */
   var n = jp_(newV, null), o = jp_(oldV, []), now = Date.now(); if (!Array.isArray(n)) return null; if (!Array.isArray(o)) o = [];
   var inN = {}, seen = {}, out = [], vis = function (x) { return recVis_(name, x, c, name === 'totCases' ? null : pre) && (name !== 'totTasks' || taskEd_(x, c)); };   /* v3.25: linked-ticket case visibility is read-only; v3.36: View-only boards */
   n.forEach(function (x) { if (x && x.id != null) inN[String(x.id)] = x; });
+  var AU = REC_AUTHOR[name] || [];
   o.forEach(function (x) { var id = x && x.id != null ? String(x.id) : null; if (id == null) { out.push(x); return; } seen[id] = 1;
     if (!vis(x)) { out.push(x); return; }
-    if (inN[id] !== undefined) { out.push(inN[id]); return; }
+    if (inN[id] !== undefined) { var y = inN[id];
+      if (!c.all && y && typeof y === 'object' && x && typeof x === 'object') {   /* v3.39: the author never changes; announcements and comments are changed by their author only */
+        if ((name === 'totAnnouncements' || name === 'totComments') && !recOwner_(name, x, c)) { out.push(x); return; }
+        AU.forEach(function (f) { if (x[f] === undefined) delete y[f]; else y[f] = x[f]; }); }
+      out.push(y); return; }
     if (recOwner_(name, x, c)) { del[id] = now; return; }
     out.push(x); });
-  n.forEach(function (x) { var id = x && x.id != null ? String(x.id) : null; if (id == null || seen[id] || del[id]) return; seen[id] = 1; if (vis(x)) out.push(x); });
+  n.forEach(function (x) { var id = x && x.id != null ? String(x.id) : null; if (id == null || seen[id] || del[id]) return; seen[id] = 1;
+    if (x && typeof x === 'object' && !c.all && AU.length && x[AU[0]] && low_(x[AU[0]]) !== c.em) return;   /* v3.39: a new record is written under the sender's own e-mail, never under someone else's */
+    if (vis(x)) out.push(x); });
   return JSON.stringify(out);
 }
 /* ===== v3.38 COMMUNITY: channels and direct chats for staff (people with a position in the tool; never the employee page).
@@ -386,7 +403,7 @@ function scopedPush_(name, newV, oldV, c, pre, del) {
      managers start new posts (anyone in it may reply and react). One's own messages can be edited or removed; managers may remove any message in a channel
      (not in direct chats). Reactions are records of their own, added and removed only by their owner. ===== */
 /* each channel or chat keeps its newest CHAT_KEEP messages (and their replies' reactions); older ones are dropped so the shared file stays small */
-const CHAT_KEEP = 1500;
+const CHAT_KEEP = 1500, CHAT_BURST = 60;
 function chatTrim_(a) { var by = {}; a.forEach(function (x) { if (x && x.kind !== 'react' && x.ch != null) (by[x.ch] = by[x.ch] || []).push(x); }); var drop = {};
   Object.keys(by).forEach(function (k) { var l = by[k]; if (l.length <= CHAT_KEEP) return; l.sort(function (p, q) { return (+p.ts || 0) - (+q.ts || 0); }).slice(0, l.length - CHAT_KEEP).forEach(function (x) { drop[String(x.id)] = 1; }); });
   if (!Object.keys(drop).length) return a; return a.filter(function (x) { return !(x && (drop[String(x.id)] || (x.kind === 'react' && drop[String(x.ref)]))); }); }
@@ -400,10 +417,12 @@ function chVis_(x, c) { if (!x || typeof x !== 'object') return false; if (c.adm
 function msgVis_(x, c, pre) { if (!x || typeof x !== 'object') return false; if (c.adm) return true; if (pre == null) return false; return chVis_(c.idx(pre, 'totChannels')[String(x.ch)], c); }
 function chatPush_(name, newV, oldV, c, pre, del) {
   var n = jp_(newV, null), o = jp_(oldV, []), now = Date.now(), C = name === 'totChannels'; if (!Array.isArray(n)) return null; if (!Array.isArray(o)) o = [];
-  var chs = {}, base = c.idx(pre, 'totChannels'); Object.keys(base).forEach(function (k) { chs[k] = base[k]; });
+  var newMsgs = 0, chs = {}, base = c.idx(pre, 'totChannels'); Object.keys(base).forEach(function (k) { chs[k] = base[k]; });
   var inN = {}, seen = {}, out = [], mine = function (x) { return !!c.em && low_(x.email) === c.em; };
   var chOf = function (x) { return chs[String(x && x.ch)]; }, canSee = function (x) { return C ? chVis_(x, c) : chVis_(chOf(x), c); };
+  var mid = {}; o.forEach(function (y) { if (y && y.id != null) mid[String(y.id)] = y; }); n.forEach(function (y) { if (y && y.id != null && !mid[String(y.id)]) mid[String(y.id)] = y; });
   var canPost = function (x) { var ch = chOf(x); if (!ch || !chVis_(ch, c) || ch.archived) return false; if (!mine(x) && !c.adm) return false;
+    if (x.parent) { var pm = mid[String(x.parent)]; if (!pm || String(pm.ch) !== String(x.ch) || pm.parent || pm.kind === 'react') return false; }   /* a reply needs a post in the same channel */
     if (x.kind === 'react') return !!x.ref; return !(ch.kind !== 'dm' && ch.mode === 'announce' && !x.parent && !chMgr_(c) && low_(ch.byEmail) !== c.em); };
   n.forEach(function (x) { if (x && x.id != null) inN[String(x.id)] = x; });
   o.forEach(function (x) { var id = x && x.id != null ? String(x.id) : null; if (id == null) { out.push(x); return; } seen[id] = 1;
@@ -415,7 +434,7 @@ function chatPush_(name, newV, oldV, c, pre, del) {
       if (!mayEdit || !y || typeof y !== 'object') { out.push(x); return; }
       if (x.kind === 'dm') { y.members = x.members; y.kind = 'dm'; } else y.kind = 'ch'; y.byEmail = x.byEmail; y.id = x.id; chs[id] = y; out.push(y); return; }
     var ch = chOf(x), mod = ch && ch.kind !== 'dm' && chMgr_(c);
-    if (y === undefined) { if (mine(x) || mod) { del[id] = now; return; } out.push(x); return; }
+    if (y === undefined) { if (ch && ch.archived) { out.push(x); return; } if (mine(x) || mod) { del[id] = now; return; } out.push(x); return; }   /* an archived channel is read only, deletes included */
     if (!y || typeof y !== 'object' || x.kind === 'react') { out.push(x); return; }
     if (mine(x)) { if (ch && ch.archived) { out.push(x); return; } ['email', 'by', 'ch', 'ts', 'kind', 'parent'].forEach(function (f) { y[f] = x[f]; }); y.id = x.id; out.push(y); return; }
     if (mod && y.del && !x.del) { var z = JSON.parse(JSON.stringify(x)); z.del = { by: String(y.del.by || '').slice(0, 80), ts: now }; z.text = ''; out.push(z); return; }   /* a manager removes a message */
@@ -424,7 +443,9 @@ function chatPush_(name, newV, oldV, c, pre, del) {
     if (C) { if (x.kind === 'dm') { var mm = (Array.isArray(x.members) ? x.members : []).map(low_).filter(Boolean); if (!(c.adm || (mm.indexOf(c.em) >= 0 && low_(x.byEmail) === c.em)) || mm.length < 2 || mm.length > 20) return; x.members = mm; }
       else { if (!chMgr_(c)) return; x.kind = 'ch'; }
       chs[id] = x; out.push(x); return; }
-    if (!canPost(x)) return; x.text = String(x.text || '').slice(0, 4000); out.push(x); });
+    if (!c.adm && ++newMsgs > CHAT_BURST) return;   /* v3.39: one save adds at most 60 messages, so nobody can push the history out */
+    if (!canPost(x)) return; x.text = String(x.text || '').slice(0, 4000); x.ts = Math.min(+x.ts || now, now);   /* a message is never dated in the future */
+    out.push(x); });
   if (!C) out = chatTrim_(out);
   return JSON.stringify(out);
 }
@@ -506,8 +527,8 @@ function projPush_(name, newV, oldV, c, pre, del) {
    people with an item assigned). Daily digest of the last 24 hours: sent once a day on the first save (or by the trigger installProjectDigest());
    on demand: action 'projNotify' from the project page (work rights needed). Readers (viewers) are not e-mailed. ----- */
 function pjPeople_(cur) { var p = policy_(cur), us = p.users || {}, depts = p.depts || {}, dOf = function (x) { x = String(x || ''); return DEPT_IDS.indexOf(x) >= 0 ? x : (depts[x] || DEPT_DEF[x] || x); };
-  return { name: function (e) { var u = us[low_(e)]; return u && u.name ? String(u.name) : String(e || ''); }, inDept: function (d) { d = dOf(d); return Object.keys(us).filter(function (k) { return us[k] && dOf(us[k].role) === d; }); } }; }
-function pjInvolved_(p, items, who, teams) { var set = {}, add = function (e) { e = low_(e); if (/^[^@\s]+@[^@\s]+$/.test(e)) set[e] = 1; }, tm = {}; (Array.isArray(teams) ? teams : []).forEach(function (t) { if (t && t.id != null) tm[String(t.id)] = t; });
+  return { known: function (e) { var u = us[low_(e)]; return !!(u && u.role); }, name: function (e) { var u = us[low_(e)]; return u && u.name ? String(u.name) : String(e || ''); }, inDept: function (d) { d = dOf(d); return Object.keys(us).filter(function (k) { return us[k] && dOf(us[k].role) === d; }); } }; }
+function pjInvolved_(p, items, who, teams) { var set = {}, add = function (e) { e = low_(e); if (/^[^@\s]+@[^@\s]+$/.test(e) && who.known(e)) set[e] = 1; }, tm = {};   /* v3.39: only people in the access list are e-mailed, never an address typed into a project */ (Array.isArray(teams) ? teams : []).forEach(function (t) { if (t && t.id != null) tm[String(t.id)] = t; });
   add(p.ownerEmail); [p.editors, p.assignees].forEach(function (a) { if (!a) return; (a.people || []).forEach(add); (a.depts || []).forEach(function (d) { who.inDept(d).forEach(add); }); (a.teams || []).forEach(function (t) { t = tm[String(t)]; if (t) { add(t.lead); (t.members || []).forEach(add); } }); });
   (items || []).forEach(function (it) { if (!it || String(it.pid) !== String(p.id)) return; add(it.assigneeEmail); if (it.kind === 'approval' && it.status !== 'approved' && it.status !== 'rejected') (it.approvers || []).forEach(add); });
   (Array.isArray(p.mute) ? p.mute : []).forEach(function (e) { delete set[low_(e)]; }); return Object.keys(set); }
@@ -619,7 +640,9 @@ function backup_(df) {
 function doPost(e) {
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
-    var b = JSON.parse(e.postData.contents), act = b.action, admin = b.admin === ADMIN_SECRET;
+    var b = null; try { b = JSON.parse(e.postData.contents); } catch (x) {}
+    if (!b || typeof b !== 'object' || Array.isArray(b)) return out_({ error: 'bad request' });   /* v3.39 */
+    var act = b.action, admin = b.admin === ADMIN_SECRET;
     var af = file_(ACCESS, '{"users":{}}'), acc = readJ_(af, { users: {} }); acc.users = acc.users || {};
     var em = String(b.email || '').trim().toLowerCase();
     function saveAcc() { af.setContent(JSON.stringify(acc)); }
@@ -628,7 +651,8 @@ function doPost(e) {
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em) || !b.pwHash) return out_({ error: 'invalid' });
       if (acc.users[em]) { if (acc.users[em].ph !== sh_(b.pwHash)) { failed_(em); return out_({ status: 'bad', exists: true }); }   /* v2.1: only the owner of the password learns the status */
         return out_({ status: acc.users[em].status, exists: true }); }
-      if (Object.keys(acc.users).length >= 500) return out_({ error: 'full' });
+      var rqc = CacheService.getScriptCache(), rqn = +(rqc.get('rq:n') || 0); if (rqn >= 30) return out_({ error: 'busy' }); rqc.put('rq:n', String(rqn + 1), 600);   /* v3.39: at most 30 new requests per 10 minutes, so nobody can flood the owner's mail */
+      if (Object.keys(acc.users).filter(function (k) { return acc.users[k] && acc.users[k].status === 'pending'; }).length >= 100 || Object.keys(acc.users).length >= 500) return out_({ error: 'full' });   /* only waiting requests fill the list */
       acc.users[em] = { name: String(b.name || '').slice(0, 80), ph: sh_(b.pwHash), status: 'pending', at: Date.now() }; saveAcc();
       try { MailApp.sendEmail(Session.getEffectiveUser().getEmail(), 'Tool access request: ' + em, (b.name || '') + ' (' + em + ') asked for access.\nOpen the tool > admin space > Access requests to approve or deny.'); } catch (x) {}
       return out_({ status: 'pending' });
@@ -701,6 +725,7 @@ function doPost(e) {
         var p = parseKey_(k), en = cur.keys[k]; if (!p || !en) return;
         if (k === 'totAccessPolicy') { res.keys[k] = redactPolicy_(en, em, cx); return; }
         if (k === 'totSites') { res.keys[k] = en; return; }
+        if (p.name === 'totIntegrations') return;   /* v3.39: flow trigger URLs are secrets; only the admin key reads them */
         if (p.name === 'totAccessGrants') { res.keys[k] = redactGrants_(en, em); return; }
         if (p.name === 'totAccessAsks') { res.keys[k] = mineAsks_(en, em); return; }
         if (me.sites.indexOf(p.site) < 0 || !keyOk_(cur, em, me, cx, p.name, 'read')) return;
@@ -720,6 +745,7 @@ function doPost(e) {
         if (!p || !n || typeof n.v !== 'string' || n.v.length > 4500000) { denied.push(k); return; }
         if (!admin && (ADMIN_ONLY_WRITE.indexOf(k) >= 0 || ADMIN_ONLY_WRITE.indexOf(p.name) >= 0 || me.sites.indexOf(p.site) < 0 || !keyOk_(cur, em, me, cx, p.name, 'write'))) { denied.push(k); return; }
         var o = cur.keys[k], t = Math.min(+n.t || now, now + 60000), pre = k.slice(0, k.length - p.name.length);
+        if (!admin && !o && Object.keys(cur.keys).length >= MAX_KEYS) { denied.push(k); return; }   /* v3.39: staff cannot create unlimited keys */
         if (!admin && p.name === 'totJournal') { var jv = auditPush_(n.v, o && o.v, cx, JOURNAL_MAX); if (jv == null) { denied.push(k); return; } cur.keys[k] = { v: jv, t: Math.max(now, (+(o && o.t) || 0) + 1) }; changed = true; return; }   /* v3.28 add-only */
         if (!admin && p.name === 'auditLog') { var av = auditPush_(n.v, o && o.v, cx); if (av == null) { denied.push(k); return; } cur.keys[k] = { v: av, t: Math.max(now, (+(o && o.t) || 0) + 1) }; changed = true; return; }   /* v3.23 add-only, never a conflict */
         if (o && n.bt != null && (+o.t || 0) > (+n.bt || 0)) { conflicts.push(k); return; }   /* somebody saved after this device last read it */
@@ -735,7 +761,8 @@ function doPost(e) {
       return out_({ ok: true, conflicts: conflicts, denied: denied });
     }
     return out_({ error: 'unknown' });
-  } finally { lock.releaseLock(); }
+  } catch (ex) { try { Logger.log('doPost: ' + (ex && ex.stack || ex)); } catch (x) {} return out_({ error: 'server error' }); }   /* v3.39: never an HTML error page */
+  finally { lock.releaseLock(); }
 }
 
 

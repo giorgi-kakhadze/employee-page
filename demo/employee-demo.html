@@ -7,7 +7,7 @@
 @media(prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b2030;--tx:#e8ebf2;--mut:#98a0b3;--bd:#2a3145;--ac:#6b8ff0}}
 *{box-sizing:border-box}body{margin:0;font:16px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--tx)}
 main{max-width:760px;margin:0 auto;padding:20px 16px 48px}
-h1{font-size:1.4rem;margin:0 0 4px}h2{font-size:1.1rem;margin:24px 0 10px}h3{font-size:1rem;margin:0 0 6px}
+h1,.mut,.row>div,.card b{min-width:0;overflow-wrap:anywhere}h1{font-size:1.4rem;margin:0 0 4px}h2{font-size:1.1rem;margin:24px 0 10px}h3{font-size:1rem;margin:0 0 6px}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px 16px;margin-bottom:12px}
 .mut{color:var(--mut);font-size:.9rem}.row{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
 .big{font-size:1.6rem;font-weight:700}
@@ -231,9 +231,9 @@ function demoData(){
   var T={morning:[8,16],afternoon:[16,24],night:[0,8]},cyc=P([['morning','morning','afternoon','afternoon','rest','rest'],['night','night','night','rest','rest','morning','morning'],['afternoon','afternoon','afternoon','rest','morning','morning','rest']]),off=R(7),days=[];
   for(i=0;i<21;i++){var s1=cyc[(i+off)%cyc.length];if(i===6+R(6))s1=P(['vacation','sick','rest']);days.push({d:d(i),s:s1,f:T[s1]?T[s1][0]:null,t:T[s1]?T[s1][1]:null})}
   var rot=[];days.filter(function(x){return T[x.s]}).slice(0,3).forEach(function(x){var c=[];var t=1+R(8);for(var k=0;k<16;k++){if(k%5===4){c.push('b');t=1+R(8)}else c.push(String(t))}rot.push({d:x.d,s:x.s,f:x.f,c:c})});
-  var y=today().slice(0,7),dn=new Date().getDate(),pd=[],tot2={shifts:0,hours:0,earned:0},dr=9+R(5),nr=dr+3;
-  for(var k2=1;k2<=dn;k2++){var ds=y+'-'+String(k2).padStart(2,'0'),sh=cyc[(k2+off)%cyc.length];if(sh==='rest')continue;var hrs=Math.random()<.08?4+R(3):8,rate=sh==='night'?nr:dr,mult=Math.random()<.04?2:1,amt=rate*hrs*mult;pd.push({d:ds,k:sh==='night'?'night':'day',s:sh,h:hrs,act:hrs!==8,rate:rate,mult:mult,amt:amt});tot2.shifts++;tot2.hours+=hrs;tot2.earned+=amt}
-  var lm=new Date();lm.setDate(1);lm.setMonth(lm.getMonth()-1);var ly=iso(lm).slice(0,7),lv=1+R(5),lb=lv*50,le=1500+R(700),ll=R(2)*88;
+  var rf=0,y=today().slice(0,7),dn=new Date().getDate(),pd=[],tot2={shifts:0,hours:0,earned:0},dr=9+R(5),nr=dr+3;
+  for(var k2=1;k2<=dn;k2++){var ds=y+'-'+String(k2).padStart(2,'0'),sh=cyc[(((k2-dn+off)%cyc.length)+cyc.length)%cyc.length];if(sh==='rest')continue;   /* same position in the cycle as the schedule above, so a day cannot be worked in one list and off in the other */var hrs=Math.random()<.08?4+R(3):8,rate=sh==='night'?nr:dr,mult=Math.random()<.04?2:1,amt=rate*hrs*mult;pd.push({d:ds,k:sh==='night'?'night':'day',s:sh,h:hrs,act:hrs!==8,rate:rate,mult:mult,amt:amt});tot2.shifts++;tot2.hours+=hrs;tot2.earned+=amt}
+  var lm=new Date();lm.setDate(1);lm.setMonth(lm.getMonth()-1);var lsh=18+R(5),ly=iso(lm).slice(0,7),lv=1+R(5),lb=lv*50,le=1500+R(700),ll=R(2)*88;
   var gc=[];games.forEach(function(g){gc.push({game:g,period:y,count:200+R(1200)},{game:g,period:ly,count:400+R(1400)})});
   var email=(first+'.'+last).toLowerCase()+'@example.com',wid='W'+(1000+R(9000));
   return{email:email,name:name,profile:{name:name,nickname:P(['Ace','Sunny','Max','Lucky','Star','Kiki','Leo','Mimi','Nini','Gio']),workId:wid,status:P(['Employed','Employed','Probation']),position:pos,team:'Team '+P(['Red','Blue','Green','Gold']),shift:'Rotating',manager:P(['Nino Kapanadze','Levan Gelashvili','Mia Manager']),startDate:d(-(120+R(900))),phone:'+995 555 '+(10+R(89))+' '+(10+R(89))+' '+(10+R(89)),email:email,games:games},
@@ -241,8 +241,8 @@ function demoData(){
     retraining:evals.some(function(e){return e.total<85})?[{date:d(2+R(10)),reason:(evals.filter(function(e){return e.total<85})[0].improve[0]||'Procedure')+' on '+evals.filter(function(e){return e.total<85})[0].game,status:'Scheduled'}]:[],
     gameCounts:gc,incidents:inc,remarks:rem,
     pay:[{ym:y,unit:'hour',cur:'GEL',final:false,upTo:today(),days:pd,bonus:[],extra:[],totals:{shifts:tot2.shifts,hours:tot2.hours,earned:tot2.earned,leave:0,bonus:0,total:tot2.earned,plannedShifts:6+R(6),plannedHours:72,planned:600+R(400)}},
-      {ym:ly,unit:'hour',cur:'GEL',final:true,upTo:ly+'-28',days:[],bonus:[{name:pos.indexOf('VIP')>=0?'VIP quality bonus':'Quality bonus',type:'Performance',level:lv,of:5,amount:lb}],extra:[],totals:{shifts:18+R(5),hours:150+R(20),earned:le,leave:ll,bonus:lb,total:le+ll+lb,plannedShifts:0,plannedHours:0,planned:0}}],
-    schedule:{days:days},rotation:{days:rot},requests:Math.random()<.6?[{id:'d1',type:P(['annual','swap','dayoff']),from:d(10+R(10)),to:d(12+R(10)),status:P(['pending','approved']),created:Date.now()-864e5,note:'Family event',decisionNote:''}]:[]};
+      {ym:ly,unit:'hour',cur:'GEL',final:true,upTo:ly+'-28',days:[],bonus:[{name:pos.indexOf('VIP')>=0?'VIP quality bonus':'Quality bonus',type:'Performance',level:lv,of:5,amount:lb}],extra:[],totals:{shifts:lsh,hours:lsh*8-R(10),earned:le,leave:ll,bonus:lb,total:le+ll+lb,plannedShifts:0,plannedHours:0,planned:0}}],
+    schedule:{days:days},rotation:{days:rot},requests:(rf=10+R(10),Math.random()<.6)?[{id:'d1',type:P(['annual','swap','dayoff']),from:d(rf),to:d(rf+R(3)),status:P(['pending','approved']),created:Date.now()-864e5,note:'Family event',decisionNote:''}]:[]};
 }
 function demoCall(b){
   if(b.action==='me')return D;
