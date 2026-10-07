@@ -3,7 +3,7 @@ const path = require('path'), tool = process.argv[2] || path.join(__dirname, '..
 const gas = require('./fakegas')(code); require('./seed')(gas);
 let fails = 0; function ok(n, c, x) { if (!c) fails++; console.log((c ? '  ✅ ' : '  ❌ ') + n + (x ? '  → ' + x : '')); }
 const DEPT_BTN = { navAcademy: 'academy', navPerformance: 'performance', navSchedule: 'fmd', navAppearance: 'uniforms', navHr: 'hr', navOffice: 'office', navService: 'service' };
-const UTIL = ['navHome', 'navTasks', 'bellBtn', 'searchBtn', 'sitePill', 'psPill', 'tdBadge', 'spPill'];   /* utilities and the injected pills */
+const UTIL = ['navHome', 'navProjects', 'navTasks', 'bellBtn', 'searchBtn', 'sitePill', 'psPill', 'tdBadge', 'spPill'];   /* utilities, the cross-department Projects (v3.32) and the injected pills */
 const GONE = ['navDept', 'navRecruiting', 'navRequests', 'navCoach', 'navEmpdata', 'navIntegrations', 'navPerm'];
 (async () => {
   const H = await require('./harness')(tool, gas);

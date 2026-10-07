@@ -16,6 +16,7 @@ node tests/overview_history.test.js
 node tests/service_mgmt.test.js
 node tests/unique_names.test.js
 node tests/bonus_pay.test.js
+node tests/projects.test.js
 ```
 
 - `sync_privacy.test.js`: what each person receives (tickets, cases, comments, announcements, audit log), writes from people who see only part of the list, deleting, forged pushes, two people saving at once, HR case progress.
@@ -31,5 +32,6 @@ node tests/bonus_pay.test.js
 - `service_mgmt.test.js`: the Service Management department (🚨 Service, position Service manager): its Overview and second bar; the Jira CSV import (date formats, column guessing from Jira headers, Check, employee matching by Work ID / name / screen name, re-import updates by Jira key and keeps the follow-up note, undo); logging an incident by hand; reports and CSV; the journal; who receives incidents on the server (coaches read only, HR and shift leads nothing, a position mapped to the department yes); the person 360 view.
 - `unique_names.test.js`: one nickname / one full name per person in Onboarding (typing, paste, import) and the employee file; repeated names get a number ("Georgi Kakadze 1"); the same person moving groups is not a duplicate; only the admin can switch the rules off (admin space, Settings), and the server refuses the setting from anyone else; the duplicate finder.
 - `bonus_pay.test.js`: pay per hour with actual hours (left early); bonus programs with levels per position; the month review (numbers, levels, hours, remarks shown or internal, final); the profile Month tab; pay statements; the server rules for bonus, review, pay and remark data; 'me' returns only the employee's own statement, shown remarks, incidents and evaluation comments; new request types; the employee page with Home / Schedule / Rotation, read-only.
+- `projects.test.js`: projects per person (assigned departments and people, viewers, private and open projects); sub-projects; what the server refuses (viewer edits, access changes by assigned people, forged owners, deleting without rights); item assignees; the board and project discussion; bell notifications only for the people involved; the daily digest and on-demand e-mail updates; the pages (My work, All projects, Data explorer filters by any field including own fields, work map, timeline, board, items, access, Updates); creating through the forms; deleting a project with its items.
 
 Each prints one line per check and exits with code 1 if any check fails.

@@ -4,7 +4,7 @@ const fs = require('fs'), crypto = require('crypto');
 module.exports = function (codePath, opts) {
   opts = opts || {};
   const files = {};            // name -> string
-  const cache = {}, props = {}, uploads = []; let upN = 0;
+  const cache = {}, props = {}, uploads = [], mails = []; let upN = 0;
   function file(name) { return { getName: () => name, getBlob: () => ({ getDataAsString: () => files[name] }), setContent: (s) => { files[name] = s; }, getId: () => 'id-' + name, setTrashed() { delete files[name]; }, getMimeType: () => 'application/json' }; }
   const folder = { getId: () => 'folder', getFilesByName: (n) => { let done = !(n in files); return { hasNext: () => !done, next: () => { done = true; return file(n); } }; }, createFile: (n, c) => { files[n] = c; return file(n); },
     getFiles: () => { const ks = Object.keys(files); let i = 0; return { hasNext: () => i < ks.length, next: () => file(ks[i++]) }; } };
@@ -17,7 +17,7 @@ module.exports = function (codePath, opts) {
       formatDate: (d, tz, p) => { const s = new Date(d).toISOString(); return p === 'yyyy-MM' ? s.slice(0, 7) : s.slice(0, 10); }, base64Decode: (s) => Buffer.from(s, 'base64'), base64Encode: (b) => Buffer.from(b).toString('base64') },
     Session: { getScriptTimeZone: () => 'UTC', getEffectiveUser: () => ({ getEmail: () => 'owner@x.com' }) },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (s) => ({ setMimeType() { return this; }, getContent: () => s }) },
-    MailApp: { sendEmail() {} }, ScriptApp: { getOAuthToken: () => 'test-token' },
+    MailApp: { sendEmail(to, subject, body) { mails.push({ to, subject, body }); } },   /* v3.32: kept so tests can check who was e-mailed */ ScriptApp: { getOAuthToken: () => 'test-token' },
     /* v3.28: Drive's resumable video upload, enough for the tool's chunked uploads: start → Location, PUT chunks → 308 until the last → 200 { id } */
     UrlFetchApp: { fetch(url, o) { o = o || {};
       /* v3.31: Google sign-in check for the employee page: a test token 'gtok:<email>' is a valid sign-in for that e-mail */
@@ -29,7 +29,7 @@ module.exports = function (codePath, opts) {
   CID = (/const GOOGLE_CLIENT_ID = '([^']*)'/.exec(src) || [])[1] || '';
   const api = new Function(...Object.keys(G), src + '; return { doPost: doPost, sh_: sh_ };')(...Object.values(G));
   return {
-    files, uploads,
+    files, uploads, mails, props, cache,
     post(body) { return JSON.parse(api.doPost({ postData: { contents: typeof body === 'string' ? body : JSON.stringify(body) } }).getContent()); },
     data() { return JSON.parse(files['tool-data.json'] || '{"keys":{}}'); },
     setData(d) { files['tool-data.json'] = JSON.stringify(d); },
