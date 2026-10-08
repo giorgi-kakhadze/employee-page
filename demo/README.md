@@ -76,3 +76,7 @@ The people below are in the access list (positions and departments) so that Assi
 * **Upload:** Home → Employee Data Source → ⬆️ Import Excel / CSV. Then FMD → Schedule → Roster: set **"Set 1 starts a 3-day work block on"** to a date (for example today), add a few tables to each team (Setup → Tables), press **Generate whole shift**.
 * **Shufflers** have their own team called **Shufflers** (presenters are in Team One, Two and Three): Setup → Tables → Shufflers → tick **Zone rotation** → **Split tables into zones**.
 * `PTF-demo-backup-with-rotation.json` (made by `build-rotation-demo.js`): the big demo company with a ready-made week of rotation for every shift (restore it with More → Restore from backup).
+
+## Full demo backup (rotation + chat)
+
+`PTF-demo-backup-full.json` = the demo company (about 1000 staff and employees) + a full week of rotation for all three shifts (presenters on tables, shufflers on zones) + Community: 8 channels and 8 direct/group chats with threads, reactions, pins and announcements. Restore it with Home → Backup → Import → *Replace*, then open FMD → Schedule and Community. Built by `add-chat-to-demo.py` from `PTF-demo-backup-with-rotation.json`.
