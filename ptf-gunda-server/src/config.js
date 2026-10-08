@@ -25,6 +25,7 @@ function load(e) {
     entra: { tenant: e.ENTRA_TENANT_ID || '', clientId: e.ENTRA_CLIENT_ID || '', clientSecret: e.ENTRA_CLIENT_SECRET || '', adminRole: e.ENTRA_ADMIN_ROLE || 'PTF.Admin', adminGroup: e.ENTRA_ADMIN_GROUP_ID || '', allowedDomains: list(e.PTF_ALLOWED_DOMAINS) },
     bootstrapAdmins: list(e.PTF_BOOTSTRAP_ADMINS),
     devLogin: bool(e.PTF_DEV_LOGIN, false),
+    tvIps: list(e.PTF_TV_IPS),   // optional: only these addresses (or address prefixes) may open lobby screens
     trustProxy: bool(e.PTF_TRUST_PROXY, !!e.PTF_FRONTDOOR_ID),
     frontDoorId: e.PTF_FRONTDOOR_ID || '',
     mail: { transport: e.PTF_MAIL || (prod ? 'graph' : 'log'), from: e.PTF_MAIL_FROM || '', tenant: e.ENTRA_TENANT_ID || '', clientId: e.GRAPH_CLIENT_ID || e.ENTRA_CLIENT_ID || '', clientSecret: e.GRAPH_CLIENT_SECRET || e.ENTRA_CLIENT_SECRET || '' },

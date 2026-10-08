@@ -45,4 +45,7 @@ function handle(b, id, cur) {
 }
 /* the daily project e-mail (07:00) */
 function runDigest(cur, id) { ENV.id = id || { email: '', name: '' }; ENV.state = { cur: cur }; return projDigest_(cur, false); }
-return { handle: handle, runDigest: runDigest, siteWanted_: siteWanted_, parseKey_: parseKey_, whoIs_: whoIs_, ctx_: ctx_, policy_: policy_ };
+/* the public lobby-screen answer: no sign-in, a secret token (see tv_ above) */
+function tv(b, cur) { ENV.id = { email: '', name: '' }; ENV.state = { cur: cur }; return tv_(b); }
+function tvToken(token, cur) { var h = tvFind_(cur.keys, token); return h ? { site: h.site, pre: h.pre, id: h.s.id } : null; }
+return { tv: tv, tvToken: tvToken, handle: handle, runDigest: runDigest, siteWanted_: siteWanted_, parseKey_: parseKey_, whoIs_: whoIs_, ctx_: ctx_, policy_: policy_ };

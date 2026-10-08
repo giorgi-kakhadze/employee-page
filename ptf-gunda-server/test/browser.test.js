@@ -80,6 +80,18 @@ const DEMO = path.join(__dirname, '..', '..', 'demo', 'PTF-demo-backup.json');
   const frames = A.frames().filter((f) => f !== A.mainFrame()); ok('embedded tools (iframes) were created and see the shared in-memory data', frames.length === 0 || (await Promise.all(frames.map((f) => f.evaluate(() => { try { return localStorage.length; } catch (e) { return -1; } })))).every((n) => n > 0), frames.length);
   ok('and still nothing is in the real browser storage', (await realStorage(A)) === 0);
 
+  section('4b. Lobby screens from the tool');
+  await A.evaluate(() => { switchView('schedule'); }); await A.waitForTimeout(500);
+  await A.evaluate(() => { const b = document.querySelector('#scheduleView [data-sub="tv"]'); if (b) b.click(); }); await A.waitForTimeout(400);
+  await A.evaluate(() => document.querySelector('#scheduleView [data-tva="add"]').click()); await A.waitForTimeout(400);
+  const tvLink = await A.evaluate(() => document.querySelector('#scheduleView input[readonly]').value);
+  ok('a new screen gets a link on the server\'s own address', tvLink.startsWith(S.base + '/tv/') && /\/tv\/[A-Za-z0-9]{32}$/.test(tvLink), tvLink);
+  await A.waitForTimeout(3500);
+  const tvr = await fetch(tvLink); ok('the link opens the screen page without signing in', tvr.status === 200 && /Rotation screen/.test(await tvr.text()));
+  const tvj = await (await fetch(tvLink.replace('/tv/', '/api/tv?t='))).json(); ok('and the data answer is valid (a rotation or "none made yet")', tvj.ok === true);
+  ok('the token reached the server through the normal save', /totTvScreens/.test(Object.keys(S.state.cur.keys).join()) && JSON.parse(S.state.cur.keys.totTvScreens.v)[0].token === tvLink.slice(-32));
+  A.errs.length = 0;
+
   section('5. The employee page');
   const E = await open(emp.ext.email, false, '/');
   ok('an employee without a staff position is shown the employee page', /My work page|Hello/.test(await E.evaluate(() => document.body.textContent)), E.url());

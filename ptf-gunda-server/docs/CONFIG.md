@@ -25,5 +25,6 @@ All settings are environment variables (App Service → Configuration). `.env.ex
 | `PTF_FRONTDOOR_ID` | recommended | accept only requests carrying this `X-Azure-FDID` |
 | `PTF_RPC_PER_MIN` | no (600) | requests per person per minute |
 | `PTF_AUTH_PER_MIN` | no (30) | sign-in requests per address per minute |
+| `PTF_TV_IPS` | no | lobby screens (`/tv/<token>`) may only be opened from these addresses or address prefixes, comma separated (for example `203.0.113.7,10.20.`); empty = any |
 | `PTF_METRICS` | no | `fast` prints metrics every 5 s |
 | `PORT` | no (8080) | listen port |

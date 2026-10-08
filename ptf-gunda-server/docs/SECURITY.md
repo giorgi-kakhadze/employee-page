@@ -45,6 +45,15 @@ What protects the data, and **where each claim is tested**. "Tested" means an au
 | Backups | PostgreSQL point-in-time restore (35 days), plus a daily JSON export (14 kept) | export: code; PITR: **not verifiable here** |
 | Concurrent saves cannot overwrite each other | "save only if nobody saved in between" is checked under a database lock across instances | `test/postgres.test.js` sections 2–3 |
 
+### Lobby screens (no sign-in by design)
+| Control | How | Evidence |
+|---|---|---|
+| Only a valid token works | 32-character random token; malformed, unknown or switched-off tokens get "not found"; deleting a screen or "New link" kills the old link at once | `test/tv.test.js` sections 3 and 5 |
+| Nothing but the rotation leaves | names (shortened by default), tables, zones, times; no e-mail, Work ID, pay | `test/tv.test.js` section 1 |
+| Tokens are secret | the screen list is readable and writable only by managers, seniors, coordinators and shift leads | `test/tv.test.js` section 4, `tests/tv_screens.test.js` |
+| Slow down abuse | 240 requests per minute per address, 8 live channels per address; optional `PTF_TV_IPS` list | `test/tv.test.js` section 6 |
+| Not an access path | a screen token does nothing on the staff API | `test/tv.test.js` section 3 |
+
 ### Audit
 Every sign-in, sign-out, refused save, refused request (CSRF, origin), failed sign-in, denied tool access and every video or project-file download is written to a table where each row contains a hash of the previous one. `GET /api/admin/audit?verify=1` (admin only) checks the chain and reports the first broken row. Tested: `test/server.test.js` section 11 (a changed row is found, and where) and `test/postgres.test.js` section 5 (one valid chain written by two instances).
 Not in the trail (to keep it readable): ordinary saves. Set `cfg.auditEveryPush` in code if you want one line per save. Record-level history stays in the tool's own change journal.

@@ -53,7 +53,7 @@ rep("function snap(why, force) {\n  var data = dump()", "function snap(why, forc
 rep('title="All data is stored in this browser on this computer"><span class="status-dot" style="background:var(--green);box-shadow:0 0 6px var(--green);"></span> Data saved locally</span>', 'title="All data is stored on the company server. Nothing is kept on this computer."><span class="status-dot" style="background:var(--green);box-shadow:0 0 6px var(--green);"></span> Saved on the server</span>');
 rep("if (pct >= 60) html += '<div class=\"hs-item warn\"><span>Browser storage</span>", "if (false) html += '<div class=\"hs-item warn\"><span>Browser storage</span>");
 fs.writeFileSync(path.join(out, 'tool.html'), s);
-fs.copyFileSync(path.join(__dirname, 'shim.js'), path.join(out, 'shim.js')); fs.copyFileSync(path.join(__dirname, 'pre.js'), path.join(out, 'pre.js'));
+fs.copyFileSync(path.join(root, 'tool', 'PTF-tv.html'), path.join(out, 'tv.html')); fs.copyFileSync(path.join(__dirname, 'shim.js'), path.join(out, 'shim.js')); fs.copyFileSync(path.join(__dirname, 'pre.js'), path.join(out, 'pre.js'));
 
 /* ---------- employee page ---------- */
 let e = fs.readFileSync(path.join(root, 'index.html'), 'utf8');

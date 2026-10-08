@@ -58,7 +58,7 @@ const FOLDER = 'Tool Data', DATA = 'tool-data.json', ACCESS = 'access.json';
 /* Who may see the pay settings stored inside the schedule (admin always may). */
 const PAY_ROLES = ['manager'];   /* v2.1: matches the tool, where only the Manager sees the Pay tab (was also senior and scheduling_coordinator) */
 /* Data only these roles may read or write (admin always may). Key name without the site prefix. */
-const RESTRICT = { totBonusCfg: ['manager', 'senior'], totBonusReviews: ['manager', 'senior'], totMyPay: ['manager'], totRemarks: ['manager', 'senior', 'hr_recruiter', 'shift_lead', 'performance_coach', 'service_manager', 'scheduling_coordinator'], totIncidents: ['manager', 'senior', 'service_manager', 'performance_coach'], totIncImports: ['manager', 'senior', 'service_manager', 'performance_coach'], totIncCfg: ['manager', 'senior', 'service_manager', 'performance_coach'], totRecruitment: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totWorkbooks: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totEmpRequests: ['manager', 'senior', 'scheduling_coordinator', 'hr_recruiter'], totGameCounts: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'], totImportHistory: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'], totLifecycle: ['manager', 'senior', 'hr_recruiter'], totMySchedules: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'] };   /* v2.3: per-person 28-day schedules, written only by schedule editors */
+const RESTRICT = { totBonusCfg: ['manager', 'senior'], totBonusReviews: ['manager', 'senior'], totMyPay: ['manager'], totRemarks: ['manager', 'senior', 'hr_recruiter', 'shift_lead', 'performance_coach', 'service_manager', 'scheduling_coordinator'], totIncidents: ['manager', 'senior', 'service_manager', 'performance_coach'], totIncImports: ['manager', 'senior', 'service_manager', 'performance_coach'], totIncCfg: ['manager', 'senior', 'service_manager', 'performance_coach'], totRecruitment: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totWorkbooks: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totEmpRequests: ['manager', 'senior', 'scheduling_coordinator', 'hr_recruiter'], totGameCounts: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'], totImportHistory: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'], totLifecycle: ['manager', 'senior', 'hr_recruiter'], totMySchedules: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'], totTvScreens: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'] };   /* v3.40: the lobby-screen links (secret tokens) are seen only by people who edit the schedule */   /* v2.3: per-person 28-day schedules, written only by schedule editors */
 /* v2.2 employee self-service: paste your Web client ID from Google Cloud (APIs & Services > Credentials > OAuth client ID > Web application). Leave as is to keep the feature off. */
 const GOOGLE_CLIENT_ID = 'sso';
 const ADMIN_ONLY_WRITE = ['totUniqRules', 'totAccessPolicy', 'totSites', 'wsCustomConfig', 'totEvalKinds', 'totEvalCfgBackups', 'totProcessTpl', 'totIntegrations', 'totDeptCfg', 'totAccessGrants'];   /* v3.19: evaluation setup, kinds, backups, process templates and integration settings can only be written with the admin key */
@@ -139,6 +139,49 @@ function me_(tok) {
     .sort(function (a, b) { return b.date.localeCompare(a.date); }).slice(0, 60);
   out.evaluations.sort(function (a, b) { return b.ts - a.ts; });
   if (out.retraining) out.retraining = out.retraining.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); }).slice(0, 30);
+  return out;
+}
+
+
+/* ===== v3.40 lobby screens ("📺 Screens" in FMD → Schedule). A TV in the lobby has no sign-in: it opens a link that holds a long secret token.
+   tv_ answers with ONLY the rotation of that screen's scope (names, tables / zones, times): no e-mail, no pay, nothing else. ===== */
+function tvName_(n, mode) { n = String(n || '').trim().replace(/\s+/g, ' '); if (mode === 'full' || !n) return n; var p = n.split(' '); if (mode === 'first') return p[0]; return p.length > 1 ? p[0] + ' ' + p[p.length - 1].charAt(0) + '.' : n; }
+function tvFind_(K, token) {
+  token = String(token || ''); if (!/^[A-Za-z0-9_-]{24,80}$/.test(token)) return null; var tail = 'totTvScreens', hit = null;
+  Object.keys(K).forEach(function (k) {
+    if (hit || k.slice(-tail.length) !== tail) return; var q = parseKey_(k); if (!q || q.name !== tail) return;
+    var a = jpc_(K[k] && K[k].v, []); if (!Array.isArray(a)) return;
+    a.forEach(function (s) { if (!hit && s && s.on !== false && typeof s.token === 'string' && s.token.length === token.length && s.token === token) hit = { s: s, pre: k.slice(0, k.length - tail.length), site: q.site }; });
+  }); return hit;
+}
+function tvDay_(ds, off) { var d = new Date(ds + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + off); return d.toISOString().slice(0, 10); }
+function tv_(b) {
+  var K = (readJ_(file_(DATA, '{"keys":{}}'), { keys: {} }).keys) || {}, hit = tvFind_(K, b && b.token); if (!hit) return { error: 'not found' };
+  var s = hit.s, ds = /^\d{4}-\d{2}-\d{2}$/.test(String(b.d || '')) ? String(b.d) : Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd'), hr = isFinite(+b.h) && +b.h >= 0 && +b.h < 24 ? +b.h : (+Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH') + +Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'mm') / 60);
+  var S = jpc_(K[hit.pre + 'totSchedule'] && K[hit.pre + 'totSchedule'].v, {}), days = (S && S.days) || {}, cfg = (S && S.cfg) || {}, DEF = { morning: 8, afternoon: 16, night: 0 }, order = ['morning', 'afternoon', 'night'];
+  var win = function (sh, sk) { var rows = (sh && sh.rows) || [], L = 0; rows.forEach(function (r) { L = Math.max(L, +r.len || 0); }); L = L || (+((cfg.lens || {})[sk]) > 0 ? +cfg.lens[sk] : (+cfg.len > 0 ? +cfg.len : 8)); var st = sh && sh.start != null ? +sh.start : (cfg.starts && cfg.starts[sk] != null ? +cfg.starts[sk] : DEF[sk]); return { s: st, L: L }; };
+  var pick = null, want = String(s.shift || 'auto');
+  if (order.indexOf(want) >= 0) { var d0 = days[ds] && days[ds].shifts && days[ds].shifts[want]; if (d0) pick = { d: ds, k: want, sh: d0 }; }
+  else {
+    var cands = [[ds, hr], [tvDay_(ds, -1), hr + 24]];
+    cands.forEach(function (c) { if (pick) return; var dd = days[c[0]]; if (!dd || !dd.shifts) return; order.forEach(function (k) { if (pick || !dd.shifts[k]) return; var w = win(dd.shifts[k], k), el = c[1] - w.s; if (el >= 0 && el < w.L) pick = { d: c[0], k: k, sh: dd.shifts[k] }; }); });
+    if (!pick) { var best = null; order.forEach(function (k) { var dd = days[ds], sh = dd && dd.shifts && dd.shifts[k]; if (!sh) return; var w = win(sh, k); if (w.s > hr && (!best || w.s < best.w.s)) best = { d: ds, k: k, sh: sh, w: w }; }); pick = best; }
+    if (!pick) { var last = null; order.forEach(function (k) { var dd = days[ds], sh = dd && dd.shifts && dd.shifts[k]; if (!sh) return; var w = win(sh, k); if (!last || w.s > last.w.s) last = { d: ds, k: k, sh: sh, w: w }; }); pick = last; }
+  }
+  var teams = (S.teams || []).map(function (t) { return { id: String(t.id), name: String(t.name || '').slice(0, 40) }; }), tf = Array.isArray(s.teams) ? s.teams.map(String) : [], pf = Array.isArray(s.pos) ? s.pos.map(String) : [];
+  var posOf = {}; ((S.roster && S.roster.people) || []).forEach(function (p) { if (p && p.name) posOf[String(p.name).trim().toLowerCase()] = String(p.pos || ''); });
+  var out = { ok: true, screen: { name: String(s.name || '').slice(0, 60), title: String(s.title || '').slice(0, 80), view: s.view === 'full' ? 'full' : 'now', zoom: Math.max(0.5, Math.min(3, +s.zoom || 1)), names: s.names === 'full' || s.names === 'first' ? s.names : 'short', ahead: Math.max(1, Math.min(12, +s.ahead || 4)), rowsPer: Math.max(0, Math.min(40, +s.rowsPer || 0)), u: +s.u || 0 }, now: { d: ds, h: hr }, teams: [], rows: [], zones: {}, updated: +(K[hit.pre + 'totSchedule'] && K[hit.pre + 'totSchedule'].t) || 0 };
+  if (!pick) { out.empty = true; return out; }
+  var w2 = win(pick.sh, pick.k); out.date = pick.d; out.shift = pick.k; out.start = w2.s; out.len = w2.L;
+  var zc = (cfg.zoneTeams || {}), seenT = {};
+  (pick.sh.rows || []).forEach(function (r) {
+    if (!r || !String(r.name || '').trim()) return; var tid = String(r.t || ''); if (tf.length && tf.indexOf(tid) < 0) return;
+    var pid = posOf[String(r.name).trim().toLowerCase()] || ''; if (pf.length && pf.indexOf(pid) < 0) return;
+    var n = Math.max(1, Math.min(48, Math.round((+r.len || w2.L) * 2))), c = []; for (var i = 0; i < n; i++) c.push(String((r.cells || [])[i] || '').trim().slice(0, 24));
+    out.rows.push({ n: tvName_(r.name, out.screen.names), t: tid, p: pid, f: Math.max(0, +r.from || 0), c: c }); seenT[tid] = 1;
+    if (zc[tid] && zc[tid].on && !out.zones[tid]) { var zl = (pick.sh.zones && pick.sh.zones[tid]) || ((cfg.zones || {})[pick.k] || {})[tid] || []; out.zones[tid] = zl.map(function (z) { return { n: String(z.n).slice(0, 12), t: (z.t || []).slice(0, 60).map(function (x) { return +x || 0; }) }; }); }
+  });
+  out.teams = teams.filter(function (t) { return seenT[t.id]; }); if (seenT['']) out.teams.push({ id: '', name: 'No team' });
   return out;
 }
 
@@ -240,7 +283,7 @@ function mergeAsks_(newV, oldV, em) { var n = [], o = []; try { n = JSON.parse(n
 /* v3.29 Service Management: incidents are also open to any position the admin maps to the Service Management department; performance coaches
    read them (to coach), but only service managers, managers and seniors (and the department) write them */
 const RESTRICT_DEPT = { totIncidents: ['service'], totIncImports: ['service'], totIncCfg: ['service'] };
-const WRITE_ROLES = { totTeams: ['manager', 'senior'], totBonusCfg: ['manager'],  totIncidents: ['manager', 'senior', 'service_manager'], totIncImports: ['manager', 'senior', 'service_manager'], totIncCfg: ['manager', 'senior', 'service_manager'] };
+const WRITE_ROLES = { totTvScreens: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'], totTeams: ['manager', 'senior'], totBonusCfg: ['manager'],  totIncidents: ['manager', 'senior', 'service_manager'], totIncImports: ['manager', 'senior', 'service_manager'], totIncCfg: ['manager', 'senior', 'service_manager'] };
 function roleOk_(name, role, dept) { var r = RESTRICT[name]; if (!r || r.indexOf(role) >= 0) return true; var d = RESTRICT_DEPT[name]; return !!(d && dept && d.indexOf(dept) >= 0); }
 function writeOk_(name, role, dept) { var r = WRITE_ROLES[name]; if (!r || r.indexOf(role) >= 0) return true; var d = RESTRICT_DEPT[name]; return !!(d && dept && d.indexOf(dept) >= 0); }
 /* v2.4: detailed access. The admin ticks parts per position in the tool (Admin > Detailed access); the policy keeps policy.roles[role].caps.
@@ -614,7 +657,7 @@ function auditPush_(newV, oldV, c, max) {
   return JSON.stringify(o);
 }
 
-var KNOWN_NAMES = ["totTombstones","evalResults","traineeNotes","coachingActions","auditLog","customSpaces","idPrintHistory","employeeHistory","totJournal","totTeams","totProjects","totProjItems","totProjBoard","totChannels","totMessages","totBonusCfg","totBonusReviews","totRemarks","totMyPay","totUniqRules","totIncidents","totIncImports","totIncCfg","totAccessPolicy","totEmpRemovals","totTasks","totAnnouncements","totComments","totSites","totOnboardingHier","employeeDataSource","logbookDescriptions","logbookCustomGames","logbookSettings","totAppearance","totAppearanceDept","wsCustomConfig","idCardSizeSettings","idCompanyLogoSettings","idCardBarcodeSettings","idCardFreeLayout","idCompanyLogo","idCardFreeLayoutEnabled","totWorkshopFiles","totOnboardingFiles","totSchedule","totRetrain","totRecruitment","evalShare","evalVideos","evalPhotos","totMySchedules","totCases","totWorkbooks","totIntegrations","totEmpRequests","totProcessTpl","totEvalKinds","totEvalCfgBackups","totDeptCfg","totDeptDocs","totLifecycle","totGameCounts","totImportHistory","totAccessGrants","totAccessAsks"];
+var KNOWN_NAMES = ["totTombstones","evalResults","traineeNotes","coachingActions","auditLog","customSpaces","idPrintHistory","employeeHistory","totJournal","totTeams","totProjects","totProjItems","totProjBoard","totChannels","totMessages","totBonusCfg","totBonusReviews","totRemarks","totMyPay","totUniqRules","totIncidents","totIncImports","totIncCfg","totAccessPolicy","totEmpRemovals","totTasks","totAnnouncements","totComments","totSites","totOnboardingHier","employeeDataSource","logbookDescriptions","logbookCustomGames","logbookSettings","totAppearance","totAppearanceDept","wsCustomConfig","idCardSizeSettings","idCompanyLogoSettings","idCardBarcodeSettings","idCardFreeLayout","idCompanyLogo","idCardFreeLayoutEnabled","totWorkshopFiles","totOnboardingFiles","totSchedule","totRetrain","totRecruitment","evalShare","evalVideos","evalPhotos","totMySchedules","totCases","totWorkbooks","totIntegrations","totEmpRequests","totProcessTpl","totEvalKinds","totEvalCfgBackups","totDeptCfg","totDeptDocs","totLifecycle","totGameCounts","totImportHistory","totAccessGrants","totAccessAsks","totTvScreens"];
 /* ===== server handler (hand-written; the permission rules above and the pull / push body below are from Code.gs) ===== */
 var FULL_KEYS = ['totAccessPolicy', 'totAccessGrants', 'totSites'];   /* when one of these changed, what each person may see changed too: send everything */
 var GLOBAL_NAMES = ['totAccessPolicy', 'totAccessGrants', 'totAccessAsks', 'totSites'];   /* shared by all locations (stored under their plain names) */
@@ -713,7 +756,10 @@ function handle(b, id, cur) {
 }
 /* the daily project e-mail (07:00) */
 function runDigest(cur, id) { ENV.id = id || { email: '', name: '' }; ENV.state = { cur: cur }; return projDigest_(cur, false); }
-return { handle: handle, runDigest: runDigest, siteWanted_: siteWanted_, parseKey_: parseKey_, whoIs_: whoIs_, ctx_: ctx_, policy_: policy_ };
+/* the public lobby-screen answer: no sign-in, a secret token (see tv_ above) */
+function tv(b, cur) { ENV.id = { email: '', name: '' }; ENV.state = { cur: cur }; return tv_(b); }
+function tvToken(token, cur) { var h = tvFind_(cur.keys, token); return h ? { site: h.site, pre: h.pre, id: h.s.id } : null; }
+return { tv: tv, tvToken: tvToken, handle: handle, runDigest: runDigest, siteWanted_: siteWanted_, parseKey_: parseKey_, whoIs_: whoIs_, ctx_: ctx_, policy_: policy_ };
 
 
 };

@@ -191,7 +191,7 @@ function pRotation(){
     var c=e.c||[],grp=[],i,v;for(i=0;i<c.length;i++){v=cellTxt(c[i]);if(grp.length&&grp[grp.length-1].v===v)grp[grp.length-1].to=i+1;else grp.push({v:v,from:i,to:i+1})}
     h+='<div class="card"><b>'+dLabel(e.d,true)+'</b><div class="mut">'+esc(SH[e.s]||e.s)+(e.f!=null?' &middot; starts '+hh(e.f):'')+'</div>';
     if(!grp.length||e.f==null)h+='<div class="mut">No table plan for this day.</div>';
-    grp.forEach(function(g){var tb=/^Table/.test(g.v);h+='<div class="day"><span>'+hh(e.f+g.from/2)+' - '+hh(e.f+g.to/2)+'</span><span class="'+(tb?'work':'off')+'">'+esc(g.v)+'</span></div>'});
+    grp.forEach(function(g){var tb=/^(Table|Zone)/.test(g.v);h+='<div class="day"><span>'+hh(e.f+g.from/2)+' - '+hh(e.f+g.to/2)+'</span><span class="'+(tb?'work':'off')+'">'+esc(g.v)+'</span></div>'});
     h+='</div>'});
   return h;
 }

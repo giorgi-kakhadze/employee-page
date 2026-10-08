@@ -66,6 +66,8 @@ async function createApp(cfg, opts) {
     } };
   const ipOf = (req) => { if (cfg.trustProxy) { const x = String(req.headers['x-azure-clientip'] || req.headers['x-forwarded-for'] || '').split(',')[0].trim(); if (x) return /^\d+\.\d+\.\d+\.\d+:\d+$/.test(x) ? x.replace(/:\d+$/, '') : x; } return req.socket.remoteAddress || ''; };
   const sse = new Set(); let sseTimer = null, ssePending = false;
+  const tvSse = new Set(); let tvTimer = null; const tvSites = new Set();
+  state.on((ev) => { for (const k of ev.keys || []) { const q = rules.parseKey_(k); if (q && (q.name === 'totSchedule' || q.name === 'totTvScreens')) tvSites.add(q.site); } if (!tvSites.size || tvTimer) return; tvTimer = setTimeout(() => { tvTimer = null; const s = new Set(tvSites); tvSites.clear(); for (const r of tvSse) { if (!s.has(r._site)) continue; try { r.write('data: {"changed":1}\n\n'); } catch (e) {} } }, 300); });
   const sseSites = new Set(); let sseAll = false;   // which locations changed since the last notice
   state.on((ev) => { for (const k of ev.keys || []) { const q = rules.parseKey_(k); if (!q) continue; if (['totAccessPolicy', 'totAccessGrants', 'totAccessAsks', 'totSites'].indexOf(q.name) >= 0) sseAll = true; else sseSites.add(q.site); }
     ssePending = true; if (sseTimer) return; sseTimer = setTimeout(() => { sseTimer = null; if (!ssePending) return; ssePending = false; const m = 'data: {"seq":' + state.seq + '}\n\n', all = sseAll, sites = new Set(sseSites); sseAll = false; sseSites.clear(); for (const r of sse) { if (!all && !sites.has(r._site)) continue; try { r.write(m); } catch (e) {} } }, 400); });
@@ -123,6 +125,20 @@ async function createApp(cfg, opts) {
 
     if (p === '/healthz') { let ok = true; try { await db.q('SELECT 1 AS x'); } catch (e) { ok = false; } return U.sendJson(req, res, ok ? 200 : 503, { ok }); }
     if (p === '/static/shim.js' || p === '/static/pre.js') { if (sendAsset(req, res, p.slice(8))) return; }
+
+    /* ---- lobby screens: no sign-in, a long secret token in the link; they get the rotation of their scope and nothing else ---- */
+    if (m === 'GET' && (p.startsWith('/tv/') || p === '/api/tv' || p === '/api/tv-events')) {
+      if (cfg.tvIps.length && !cfg.tvIps.some((x) => ip === x || ip.startsWith(x))) { audit.log('tv', 'tv.refused', 'address not allowed', ip); res.writeHead(403); return res.end(); }
+      if (!limit('tv:' + ip, 240, 60e3)) { res.writeHead(429, { 'Retry-After': '30' }); return res.end(); }
+      const tok = p.startsWith('/tv/') ? p.slice(4).replace(/\/$/, '') : String(url.searchParams.get('t') || '');
+      const known = /^[A-Za-z0-9_-]{24,80}$/.test(tok) ? rules.tvToken(tok, state.cur) : null;
+      if (!known) { audit.log('tv', 'tv.unknown', '', ip); if (p.startsWith('/tv/')) return page(res, 404, 'Screen not found', 'This screen link is not valid. Ask your coordinator for a new one.'); return U.sendJson(req, res, 404, { error: 'not found' }, { 'Cache-Control': 'no-store' }); }
+      if (p.startsWith('/tv/')) { if (limit('tvopen:' + tok + ip, 1, 600e3)) audit.log('tv', 'tv.open', known.id, ip); return sendAsset(req, res, 'tv.html', { 'Cache-Control': 'no-store' }) || page(res, 503, 'Not built', 'Run npm run build.'); }
+      if (p === '/api/tv') { const r = rules.tv({ token: tok, d: url.searchParams.get('d'), h: url.searchParams.get('h') }, state.cur); return U.sendJson(req, res, r.error ? 404 : 200, r, { 'Cache-Control': 'no-store' }); }
+      if ([...tvSse].filter((r) => r._ip === ip).length >= 8 || tvSse.size >= 1500) { res.writeHead(429); return res.end(); }
+      res._ip = ip; res._site = known.site; res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
+      res.write('retry: 5000\n\ndata: {"hello":1}\n\n'); tvSse.add(res); const thb = setInterval(() => { try { res.write(': hb\n\n'); } catch (e) {} }, 25000); req.on('close', () => { clearInterval(thb); tvSse.delete(res); }); return;
+    }
 
     /* ---- sign-in ---- */
     if (p === '/auth/login' && m === 'GET') {
@@ -245,7 +261,7 @@ async function createApp(cfg, opts) {
   return {
     server, state, sessions, audit, mail, files, rules, env, cfg, stats, reloadAssets: loadAssets,
     listen: (port, host) => new Promise((r) => server.listen(port === undefined ? cfg.port : port, host || '0.0.0.0', () => r(server.address().port))),
-    async close() { timers.forEach(clearInterval); for (const r of sse) { try { r.end(); } catch (e) {} } sse.clear(); await new Promise((r) => server.close(r)); server.closeAllConnections && server.closeAllConnections(); await audit.flush(); await mail.flushQueue(); await state.close(); }
+    async close() { timers.forEach(clearInterval); for (const r of sse) { try { r.end(); } catch (e) {} } sse.clear(); for (const r of tvSse) { try { r.end(); } catch (e) {} } tvSse.clear(); await new Promise((r) => server.close(r)); server.closeAllConnections && server.closeAllConnections(); await audit.flush(); await mail.flushQueue(); await state.close(); }
   };
 }
 module.exports = { createApp };
