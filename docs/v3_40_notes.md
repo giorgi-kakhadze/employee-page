@@ -80,3 +80,7 @@ Give everyone the new `tool/PTF-pass-to-floor-Gunda.html`, **deploy the new `Cod
 - The Rotation tab now shows zones clearly on a phone: a big "Zone C" badge, the table numbers of the zone as large chips, hours per block, a NOW marker for the current slot, and breaks in a separate colour. Tables show as a big "Table 12".
 - Code.gs: rotation cells sent to the employee page may now be 160 characters long (was 40), so a zone with all its table numbers is not cut off. The Server Edition rules are regenerated from Code.gs.
 - Demo: `demo/employee-demo.html` has Game presenter / Shuffler buttons.
+
+## Lobby screens: "Everything at once" view (many teams on one TV)
+- New choice under Screens → Show: **Everything at once: all teams, right now**. One block per team; each person with the table they are on now and the next one in small grey; breaks in orange. Teams with zone rotation (shufflers) show a block per zone with the people in it and every table number of the zone. Text shrinks automatically until everything fits one screen (about 170 people on a 1920×1080 TV: 10 teams + shufflers). Tip: set names to "first name only" for the most room.
+- Code.gs `tv_` accepts view `board`; Server Edition rebuilt.

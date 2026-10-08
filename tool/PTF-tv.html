@@ -24,6 +24,10 @@ td.c small{display:block;font-size:.5em;font-weight:500;color:var(--mut);margin-
 td.c.tb{color:#bfdbfe}td.c.zn{color:#c7f9cc;background:#12301f}td.c.br{color:var(--warn);font-weight:500;background:#2a2312}td.c.of{color:#4b5878;font-weight:400}
 td.c.cur{box-shadow:inset 0 0 0 .5vh var(--ok)}
 tr.th td{background:transparent;color:var(--ac);font-size:calc(2.4vh*var(--z));font-weight:700;padding:1vh 1vw 0;border:0}
+#bb{display:grid;gap:1vh .8vw;align-content:start}#bb.one .pl{grid-template-columns:1fr}
+.tb2{background:var(--card);border-radius:1.2vh;padding:.8vh .7vw;min-width:0}.tb2 h2{margin:0 0 .5vh;color:var(--ac);font-size:calc(2.4vh*var(--bs,1));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tb2 h2 small{color:var(--mut);font-weight:500;font-size:.7em}
+.pl{display:grid;grid-template-columns:1fr 1fr;gap:.35vh .5vw}.pp{display:flex;justify-content:space-between;align-items:baseline;gap:.4vw;padding:.2vh .5vw;border-radius:.8vh;background:#0e1830;font-size:calc(1.9vh*var(--bs,1));white-space:nowrap;overflow:hidden}.pp span:first-child{overflow:hidden;text-overflow:ellipsis}.pp b{color:#bfdbfe;font-size:1.15em}.pp i{color:var(--mut);font-style:normal;font-size:.7em;margin-left:.3em}.pp.br b{color:var(--warn);font-weight:500;font-size:.85em}.pp.nb{opacity:.45}
+.zl{margin:.3vh 0;padding:.3vh .5vw;border-radius:.8vh;background:#12301f;font-size:calc(1.9vh*var(--bs,1))}.zl b{color:#c7f9cc}.zl small{color:#86c99a;margin-left:.4vw}.zl div{color:#e6fff0}.zl.br{background:#2a2312}.zl.br b{color:var(--warn)}
 #pg{position:fixed;right:1.5vw;bottom:1vh;color:var(--mut);font-size:2vh}
 #msg{display:flex;height:100%;align-items:center;justify-content:center;text-align:center;font-size:4vh;color:var(--mut);padding:0 8vw}
 #off{position:fixed;left:0;right:0;bottom:0;background:#7f1d1d;color:#fff;text-align:center;padding:.8vh;font-size:2.2vh;display:none}
@@ -60,6 +64,22 @@ tr.th td{background:transparent;color:var(--ac);font-size:calc(2.4vh*var(--z));f
     if(/^\d+$/.test(v))return{k:'tb',a:v,b:'',key:v};if(/^(b|brk|break)$/i.test(v))return{k:'br',a:'Break',b:'',key:'B'};if(/^(off|x|-|—|\?)$/i.test(v))return{k:'of',a:'',b:''};return{k:'tb',a:v,b:'',key:v};
   }
   function rng(L){return L.slice().sort(function(a,b){return a-b}).join(', ')}   /* every table number is written out */
+  /* "Everything at once": one block per team, every person with the table they are on right now (and the next one small); zone teams list who is in which zone. Text shrinks until all teams fit one screen. */
+  function drawBoard(cur){
+    var S=D.screen||{},rows=D.rows,teams=D.teams||[],blocks=[],ci=Math.max(0,cur),tot=0;
+    teams.forEach(function(t){var R=rows.filter(function(r){return r.t===t.id}).sort(function(a,b){return a.n.localeCompare(b.n)});if(!R.length)return;var Z=(D.zones||{})[t.id],h='';tot+=R.length;
+      var cl=function(r,i){var v=String(i<r.c.length?r.c[i]:'').trim();return /^(off|x|-|—|\?)$/i.test(v)?'':v};
+      if(Z&&Z.length){var by={},on=0;R.forEach(function(r){var v=cl(r,ci);if(!v)return;on++;var k=/^Z:(.+)$/.exec(v);k=k?k[1]:'B';(by[k]=by[k]||[]).push(r.n)});
+        Z.forEach(function(q){var L=by[String(q.n)]||[];h+='<div class="zl"><b>Zone '+esc(q.n)+'</b>'+(q.t&&q.t.length?'<small>tables '+esc(rng(q.t))+'</small>':'')+'<div>'+(L.length?esc(L.join(', ')):'<span style="opacity:.4">–</span>')+'</div></div>'});
+        if(by.B)h+='<div class="zl br"><b>Break</b><div>'+esc(by.B.join(', '))+'</div></div>'}
+      else{h+='<div class="pl">';R.forEach(function(r){var v=cl(r,ci),nx=cl(r,ci+2),c=cellOf(v,r),n2=cellOf(nx,r);if(!v){h+='<div class="pp nb"><span>'+esc(r.n)+'</span><span>off</span></div>';return}
+          h+='<div class="pp'+(c.k==='br'?' br':'')+'"><span>'+esc(r.n)+'</span><span><b>'+esc(c.k==='br'?'Break':c.a)+'</b>'+(nx&&nx!==v?'<i>→ '+esc(n2.k==='br'?'B':n2.a)+'</i>':'')+'</span></div>'});h+='</div>'}
+      blocks.push('<div class="tb2"><h2>'+esc(t.name)+' <small>'+R.length+'</small></h2>'+h+'</div>')});
+    var n=blocks.length,cols=n<=2?n:n<=3?3:n<=6?3:n<=8?4:n<=10?5:6,bd=$('bd'),bs=1.35;
+    bd.innerHTML='<div id="bb" class="" style="grid-template-columns:repeat('+Math.max(1,cols)+',1fr)">'+blocks.join('')+'</div>';
+    var bb=$('bb');for(;bs>.35;bs-=.05){document.documentElement.style.setProperty('--bs',(bs*(S.zoom||1)).toFixed(2));if(bb.offsetHeight<=bd.clientHeight-2)break}
+    $('pg').textContent='';
+  }
   function draw(){
     if(!D)return;var S=D.screen||{},z=zl||S.zoom||1;
     document.documentElement.style.setProperty('--z',z);document.documentElement.style.setProperty('--hz',Math.min(z,1.4));document.documentElement.style.setProperty('--nz',Math.max(1,Math.min(1.6,z)));
@@ -67,6 +87,7 @@ tr.th td{background:transparent;color:var(--ac);font-size:calc(2.4vh*var(--z));f
     if(D.empty||!D.rows||!D.rows.length){$('su').textContent='';msg(D.empty?'No rotation has been made for this time yet.':'Nobody in this rotation right now.');return}
     var SHN={morning:'Morning shift',afternoon:'Afternoon shift',night:'Night shift'};$('su').textContent=(SHN[D.shift]||D.shift)+' · '+D.date;
     var N=nowParts(),el=N.h-D.start;if(D.date!==N.d&&el<0)el+=24;if(el<0&&D.date===N.d)el=-1;var cur=Math.floor(el*2),maxS=0;D.rows.forEach(function(r){maxS=Math.max(maxS,r.c.length)});
+    if(S.view==='board'){drawBoard(cur);return}
     var from=0,to=maxS;if(S.view!=='full'){from=Math.max(0,cur);to=Math.min(maxS,from+S.ahead*2);if(cur<0){from=0;to=Math.min(maxS,S.ahead*2)}}
     var rows=D.rows.slice(),tord={};(D.teams||[]).forEach(function(t,i){tord[t.id]=i});rows.sort(function(a,b){return(tord[a.t]||0)-(tord[b.t]||0)||a.n.localeCompare(b.n)});
     var multi=(D.teams||[]).length>1,per=S.rowsPer||0;
