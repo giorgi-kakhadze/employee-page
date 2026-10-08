@@ -47,11 +47,15 @@ rep("if (n > 4200000) a.push('Browser storage on the admin device", "if (false &
 
 /* 5b. the tool's automatic "rolling backups" copy ALL data into the browser's IndexedDB (and optionally a folder on the laptop): not allowed here. The server keeps the backups. */
 rep("var dbp = new Promise(function (res, rej) { if (!window.indexedDB) { rej(); return; }", "var dbp = new Promise(function (res, rej) { if (true) { rej(); return; }");
-rep("function snap(why, force) {\n  var data = dump()", "function snap(why, force) {\n  if (window.TOT_EDITION === 'server') return Promise.resolve(false);   /* nothing is copied to this computer */\n  var data = dump()");
+rep("function snap(why, force) { if (window.__totOut) return Promise.resolve(false);\n  var data = dump()", "function snap(why, force) { if (window.__totOut) return Promise.resolve(false);\n  if (window.TOT_EDITION === 'server') return Promise.resolve(false);   /* nothing is copied to this computer */\n  var data = dump()");
 
 /* 6. wording that was about the laptop */
 rep('title="All data is stored in this browser on this computer"><span class="status-dot" style="background:var(--green);box-shadow:0 0 6px var(--green);"></span> Data saved locally</span>', 'title="All data is stored on the company server. Nothing is kept on this computer."><span class="status-dot" style="background:var(--green);box-shadow:0 0 6px var(--green);"></span> Saved on the server</span>');
 rep("if (pct >= 60) html += '<div class=\"hs-item warn\"><span>Browser storage</span>", "if (false) html += '<div class=\"hs-item warn\"><span>Browser storage</span>");
+/* 6b. Sign out: nothing is kept on the laptop, so signing out = save what is waiting, end the server session (and Microsoft's), and the next person signs in with their own account */
+{ const a = s.indexOf('<script id="signOutScript">'), b = s.indexOf('</script>', a); if (a < 0 || b < 0) throw new Error('build: signOutScript not found');
+  s = s.slice(0, a) + '<script id="signOutScript">(function(){window.totSignOut=function(){if(window.__totOut)return;if(!confirm("Sign out?\\n\\nYour changes are saved first. The next person can then sign in with their own Microsoft account on this computer."))return;window.__totOut=false;var o=document.createElement("div");o.style.cssText="position:fixed;inset:0;z-index:2147483000;background:#0e1220;color:#e8ecf8;display:flex;align-items:center;justify-content:center;font:18px Arial,sans-serif;text-align:center";o.innerHTML="<div><div style=\\"font-size:42px\\">&#128682;</div><div style=\\"margin-top:8px\\">Saving your changes…</div></div>";document.body.appendChild(o);try{if(window.totSyncNow)window.totSyncNow()}catch(e){}var t0=Date.now();(function w(){var d=false;try{d=window.__ptfDirty&&window.__ptfDirty()}catch(e){}if(d&&Date.now()-t0<10000)return setTimeout(w,300);window.__totOut=true;window.__ptfDirty=function(){return false};location.href="/auth/logout"})()}})();' + s.slice(b);
+}
 fs.writeFileSync(path.join(out, 'tool.html'), s);
 fs.copyFileSync(path.join(root, 'tool', 'PTF-tv.html'), path.join(out, 'tv.html')); fs.copyFileSync(path.join(__dirname, 'shim.js'), path.join(out, 'shim.js')); fs.copyFileSync(path.join(__dirname, 'pre.js'), path.join(out, 'pre.js'));
 
@@ -66,7 +70,7 @@ erep("  if(!configured()){err('This page is not set up yet: the Apps Script web 
 erep("  body.idToken=tok;\n  return fetch(SERVER_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)}).then(function(r){return r.json()});",
      "  return fetch(SERVER_URL,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-PTF-CSRF':CSRF},body:JSON.stringify(body)}).then(function(r){if(r.status===401||r.status===403)return{error:'sign-in invalid'};return r.json()});");
 erep("function signedOut(m){tok=null;", "function signedOut(m){tok=null;if(!DEMO){location.href='/auth/login?to=/employee';return}");
-erep('<button onclick="location.reload()">Sign out</button>', '<button onclick="location.href=&quot;/auth/logout&quot;">Sign out</button>');
+erep('<button onclick="signOut()">Sign out</button>', '<button onclick="location.href=&quot;/auth/logout&quot;">Sign out</button>');
 erep("'This Google account is not on the employee list.", "'Your Microsoft account is not on the employee list.");
 fs.writeFileSync(path.join(out, 'employee.html'), e);
 console.log('public/tool.html ' + Math.round(s.length / 1024) + ' KB, public/employee.html ' + Math.round(e.length / 1024) + ' KB');

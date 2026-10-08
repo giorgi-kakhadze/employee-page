@@ -62,6 +62,7 @@ function call(body){
   if(!configured())return Promise.reject(new Error('not configured'));
   return fetch(SERVER_URL,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-PTF-CSRF':CSRF},body:JSON.stringify(body)}).then(function(r){if(r.status===401||r.status===403)return{error:'sign-in invalid'};return r.json()});
 }
+function signOut(){tok=null;D=null;try{if(window.google&&google.accounts&&google.accounts.id)google.accounts.id.disableAutoSelect()}catch(e){}try{sessionStorage.clear()}catch(e){}location.reload()}
 function signedOut(m){tok=null;if(!DEMO){location.href='/auth/login?to=/employee';return}if(refreshT){clearInterval(refreshT);refreshT=null}$('app').hidden=true;$('login').hidden=false;err(m)}
 function load(silent){
   if(!silent&&$('app').hidden)err('Loading...');

@@ -1156,6 +1156,7 @@ html:not(.is-admin) #edsClearBtn,html:not(.is-admin) button[onclick*="restorePre
     <button class="icon-btn music-quick-btn" type="button" id="musicQuickBtn" title="Background music" aria-label="Play or pause background music" aria-pressed="false">
       <span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>
     </button>
+    <button class="icon-btn" type="button" id="signOutBtn" title="Sign out: save, then leave this computer clean for the next person" onclick="totSignOut()" aria-label="Sign out">&#128682; <span class="btn-label">Sign out</span></button>
     <button class="icon-btn" type="button" id="helpBtn" title="Help &amp; shortcuts for the current screen" onclick="openHelpGuide()" aria-label="Help">? <span class="btn-label">Help</span></button>
     <div class="more-wrap">
       <button class="icon-btn" type="button" id="moreMenuBtn" title="More options" aria-haspopup="true" aria-expanded="false" onclick="toggleMoreMenu(event)">⋯ <span class="btn-label">More</span></button>
@@ -1168,6 +1169,7 @@ html:not(.is-admin) #edsClearBtn,html:not(.is-admin) button[onclick*="restorePre
         <button type="button" class="more-menu-item" role="menuitem" id="navPerm" style="display:none" onclick="closeMoreMenu(); switchView('perm')"><span class="tab-icon">&#128272;</span> Permissions</button>
         <button type="button" class="more-menu-item" role="menuitem" id="moreSpaces" style="display:none" onclick="closeMoreMenu(); if (window.totSpacesManage) totSpacesManage();">📁 Manage spaces</button>
         <button type="button" class="more-menu-item" role="menuitem" onclick="document.getElementById('importFileInput').click(); closeMoreMenu();">⬆️ Restore from backup</button>
+        <button type="button" class="more-menu-item" role="menuitem" onclick="closeMoreMenu(); totSignOut();">&#128682; Sign out</button>
         <div class="more-menu-sep"></div>
         <div class="more-menu-meta" id="moreStorageMeta">Storage: —</div>
         <div class="more-menu-sep"></div>
@@ -18376,7 +18378,7 @@ new MutationObserver(function (ms) { ms.forEach(function (m) { m.addedNodes.forE
 
 /* ---- 2. Audit log (what changed, never the contents) ---- */
 function aud() { try { return JSON.parse(raw(AUD) || '[]'); } catch (e) { return []; } }
-function log(o) { o.t = Date.now(); var a = aud(); a.push(o); put(AUD, JSON.stringify(a.slice(-MAXA))); }
+function log(o) { if (window.__totOut) return; o.t = Date.now(); var a = aud(); a.push(o); put(AUD, JSON.stringify(a.slice(-MAXA))); }
 var cnt = {}, tm = {};
 function count(v) { try { var j = JSON.parse(v); return Array.isArray(j) ? j.length : (j && typeof j === 'object' ? Object.keys(j).length : null); } catch (e) { return null; } }
 for (var i = 0; i < LS.length; i++) { var k0 = LS.key(i); if (k0.indexOf('tt16') !== 0) cnt[k0] = count(raw(k0)); }
@@ -18390,7 +18392,7 @@ var dbp = new Promise(function (res, rej) { if (true) { rej(); return; } var r =
 function tx(store, mode, fn) { return dbp.then(function (d) { return new Promise(function (res, rej) { var t = d.transaction(store, mode), q = fn(t.objectStore(store)); t.oncomplete = function () { res(q && q.result); }; t.onerror = t.onabort = function () { rej(t.error); }; }); }); }
 function dump() { var o = {}; for (var i = 0; i < LS.length; i++) { var k = LS.key(i); if (k.indexOf('tt16') !== 0) o[k] = raw(k); } return o; }
 function hash(s) { var h = 5381; for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return h + ':' + s.length; }
-function snap(why, force) {
+function snap(why, force) { if (window.__totOut) return Promise.resolve(false);
   if (window.TOT_EDITION === 'server') return Promise.resolve(false);   /* nothing is copied to this computer */
   var data = dump(), txt = JSON.stringify(data), h = hash(txt), bad = [];
   if (!force && h === st.hash) return Promise.resolve(false);
@@ -19450,6 +19452,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       if (Object.keys(out).length) localStorage.setItem('totSyncPrev', JSON.stringify(out)); else localStorage.removeItem('totSyncPrev'); } catch (e) { try { localStorage.removeItem('totSyncPrev'); } catch (x) {} } }
     try { keepPrev({}); } catch (e) {}
     async function sync(manual) {
+      if (window.__totOut) return;   /* v3.41: signing out, never push or pull */
       if (!cfg.url || !authBody()) { if (manual) { say(!cfg.url ? 'not set up' : 'sign in first'); } return; } if (busy) { if (manual) say('already syncing…'); return; } busy = true; lastErr = ''; say('syncing…');
       try {
         var meta = jget(MK, {}); if (!window.__ptfSeeded && window.__PTF_BOOT) { window.__ptfSeeded = true; window.__ptfSince = window.__PTF_BOOT.seq || 0; KEYS.forEach(function (k) { var e = window.__PTF_BOOT.keys[sk(k)], v = localStorage.getItem(k); if (e && typeof e.v === 'string' && v === e.v) meta[k] = { h: hash(v), t: +e.t || 0 }; }); }
@@ -27730,5 +27733,6 @@ document.addEventListener('keydown', function (e) {
   } catch (e) { console.warn('UI polish disabled:', e); }
 })();
 </script>
+<script id="signOutScript">(function(){window.totSignOut=function(){if(window.__totOut)return;if(!confirm("Sign out?\n\nYour changes are saved first. The next person can then sign in with their own Microsoft account on this computer."))return;window.__totOut=false;var o=document.createElement("div");o.style.cssText="position:fixed;inset:0;z-index:2147483000;background:#0e1220;color:#e8ecf8;display:flex;align-items:center;justify-content:center;font:18px Arial,sans-serif;text-align:center";o.innerHTML="<div><div style=\"font-size:42px\">&#128682;</div><div style=\"margin-top:8px\">Saving your changes…</div></div>";document.body.appendChild(o);try{if(window.totSyncNow)window.totSyncNow()}catch(e){}var t0=Date.now();(function w(){var d=false;try{d=window.__ptfDirty&&window.__ptfDirty()}catch(e){}if(d&&Date.now()-t0<10000)return setTimeout(w,300);window.__totOut=true;window.__ptfDirty=function(){return false};location.href="/auth/logout"})()}})();</script>
 </body>
 </html>

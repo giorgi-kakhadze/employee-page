@@ -67,6 +67,7 @@ function call(body){
   body.idToken=tok;
   return fetch(SERVER_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)}).then(function(r){return r.json()});
 }
+function signOut(){tok=null;D=null;try{if(window.google&&google.accounts&&google.accounts.id)google.accounts.id.disableAutoSelect()}catch(e){}try{sessionStorage.clear()}catch(e){}location.reload()}
 function signedOut(m){tok=null;if(refreshT){clearInterval(refreshT);refreshT=null}$('app').hidden=true;$('login').hidden=false;err(m)}
 function load(silent){
   if(!silent&&$('app').hidden)err('Loading...');
@@ -109,7 +110,7 @@ function show(){
   keepDraft();
   $('login').hidden=true;var a=$('app');a.hidden=false;if(!TABS.some(function(t){return t[0]===tab}))tab='home';
   var h=(DEMO?'<div class="banner"><b>Demo data.</b> This page is not connected to the server. Nothing you do here is sent anywhere. <button type="button" onclick="D=demoData(\'presenter\');tab=\'rotation\';show();scrollTo(0,0)">Game presenter</button> <button type="button" onclick="D=demoData(\'shuffler\');tab=\'rotation\';show();scrollTo(0,0)">Shuffler</button></div>':'')+
-    '<div class="row"><div><h1>Hello, '+esc(firstName())+'</h1><div class="mut">'+esc(D.email)+'</div></div><span><button onclick="load()">&#8635; Refresh</button> <button onclick="location.reload()">Sign out</button></span></div>'+
+    '<div class="row"><div><h1>Hello, '+esc(firstName())+'</h1><div class="mut">'+esc(D.email)+'</div></div><span><button onclick="load()">&#8635; Refresh</button> <button onclick="signOut()">Sign out</button></span></div>'+
     '<nav class="main3">'+TABS.map(function(t){return '<button data-t="'+t[0]+'" class="'+(t[0]===tab?'on':'')+'">'+t[1]+'</button>'}).join('')+'</nav><div id="pg"></div>';
   a.innerHTML=h;
   a.querySelector('nav').onclick=function(e){var b=e.target.closest('button');if(b){tab=b.getAttribute('data-t');show();window.scrollTo(0,0)}};

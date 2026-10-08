@@ -86,3 +86,9 @@ Give everyone the new `tool/PTF-pass-to-floor-Gunda.html`, **deploy the new `Cod
 - Code.gs `tv_` accepts view `board`; Server Edition rebuilt.
 - Second board view: **Whole shift, all teams**. Every person's full shift as a thin timeline (tables, zone letters, Br = break, current slot framed in green), team blocks 3 across and 2 down; with more than 6 teams the screen turns the page by itself every 15 s (page 1 / 2). Zone tables are written out under the shufflers block.
 - Whole-shift screens: every half hour has its own column and its own time label right above it (hour in bold, ":30" dimmer), a line marks every full hour, and the current half hour is framed. The name column has the same width in the header and in every row, so a time can never sit over the wrong table. The classic "The whole shift" view also labels every half hour now.
+
+## Sign out (shared computers)
+- New **Sign out** button in the top bar and in More. It first saves the person's changes to the team (a few seconds), then removes everything from this browser: all data, the sign-in, the admin key and session, and the automatic local backups. What stays: the connection to the team and the theme / sound choices. The next person signs in with their own email and password and gets their own data. Sync is switched off while signing out, so nothing empty can be sent to the team.
+- Employee page: Sign out now really signs out (it also tells Google not to pick the same account again automatically).
+- Server Edition: Sign out waits for pending changes, then ends the server session and the Microsoft sign-in (`/auth/logout`); nothing was stored on the computer anyway.
+- Test: `tests/signout.test.js`, `ptf-gunda-server/test/signout.test.js`.
