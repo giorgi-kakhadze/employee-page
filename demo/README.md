@@ -80,3 +80,7 @@ The people below are in the access list (positions and departments) so that Assi
 ## Full demo backup (rotation + chat)
 
 `PTF-demo-backup-full.json` = the demo company (about 1000 staff and employees) + a full week of rotation for all three shifts (presenters on tables, shufflers on zones) + Community: 8 channels and 8 direct/group chats with threads, reactions, pins and announcements. Restore it with Home → Backup → Import → *Replace*, then open FMD → Schedule and Community. Built by `add-chat-to-demo.py` from `PTF-demo-backup-with-rotation.json`.
+
+## Employee page demo: game presenter and shuffler rotation
+
+`employee-demo.html` (open it in a browser, also on a phone) shows the employee page with made-up data. Use the buttons at the top to switch between **Game presenter** (one table per half hour, breaks) and **Shuffler** (one zone per hour with its table numbers, breaks); **New random** makes another random person. The Rotation tab highlights the current slot as NOW. The same buttons work in the real page with `?demo` in the address.

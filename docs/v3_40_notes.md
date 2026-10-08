@@ -74,3 +74,9 @@ Server Edition: `test/tv.test.js` (41 checks) and `test/tv-browser.test.js` (15 
 
 ## You must do
 Give everyone the new `tool/PTF-pass-to-floor-Gunda.html`, **deploy the new `Code.gs` as a new version** (the screens need it), and put `PTF-tv.html` where the TVs can open it. Server Edition: nothing else; open the Screens tab.
+
+
+## Employee page: zone rotation (shufflers)
+- The Rotation tab now shows zones clearly on a phone: a big "Zone C" badge, the table numbers of the zone as large chips, hours per block, a NOW marker for the current slot, and breaks in a separate colour. Tables show as a big "Table 12".
+- Code.gs: rotation cells sent to the employee page may now be 160 characters long (was 40), so a zone with all its table numbers is not cut off. The Server Edition rules are regenerated from Code.gs.
+- Demo: `demo/employee-demo.html` has Game presenter / Shuffler buttons.

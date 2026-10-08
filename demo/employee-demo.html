@@ -13,6 +13,7 @@ h1,.mut,.row>div,.card b{min-width:0;overflow-wrap:anywhere}h1{font-size:1.4rem;
 .big{font-size:1.6rem;font-weight:700}
 .tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:.8rem;background:var(--bd);margin:2px 2px 2px 0}
 .fb{border-left:3px solid var(--ac);padding-left:10px;margin-top:10px;white-space:pre-wrap}
+.rt{border:1px solid var(--bd);border-radius:12px;padding:10px 12px;margin-top:8px}.rt.now{border-color:var(--ac);box-shadow:0 0 0 2px var(--ac) inset}.rt.brk{background:rgba(245,158,11,.08)}.rt.offr{opacity:.7}.rtT{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.nowTag{background:var(--ac);color:#fff;border-radius:999px;font-size:11px;padding:1px 8px;font-weight:700}.rtMain{margin-top:6px;font-size:18px}.zb{display:inline-block;background:var(--ac);color:#fff;border-radius:10px;padding:4px 12px;font-weight:700;font-size:20px}.zb.tb{background:var(--ok)}.rtTb{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.tn{min-width:38px;text-align:center;padding:5px 8px;border-radius:9px;border:1px solid var(--ac);font-weight:700;font-size:16px}
 .day{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd)}.day:last-child{border:0}
 .work{color:var(--ok);font-weight:600}.off{color:var(--mut)}.leave{color:var(--warn);font-weight:600}.bad{color:var(--bad);font-weight:600}
 button,select,input,textarea{font:inherit;color:var(--tx)}
@@ -98,7 +99,7 @@ function payNow(){var p=D.pay||[],y=today().slice(0,7);return p.filter(function(
 function payLast(){var p=D.pay||[],y=today().slice(0,7);return p.filter(function(x){return x.ym<y})[0]||null}
 function show(){
   $('login').hidden=true;var a=$('app');a.hidden=false;if(!TABS.some(function(t){return t[0]===tab}))tab='home';
-  var h=(DEMO?'<div class="banner"><b>Demo with random data.</b> Not connected to anything; nothing is sent anywhere. <button type="button" onclick="D=demoData();tab=\'home\';show();scrollTo(0,0)" style="margin-left:6px;padding:3px 10px;font-size:.85rem">🎲 Another random employee</button></div>':'')+
+  var h=(DEMO?'<div class="banner"><b>Demo with random data.</b> Not connected to anything; nothing is sent anywhere. <button type="button" onclick="D=demoData(\'presenter\');tab=\'rotation\';show();scrollTo(0,0)" style="margin-left:6px;padding:3px 10px;font-size:.85rem">🎰 Game presenter</button> <button type="button" onclick="D=demoData(\'shuffler\');tab=\'rotation\';show();scrollTo(0,0)" style="padding:3px 10px;font-size:.85rem">🃏 Shuffler</button> <button type="button" onclick="D=demoData();tab=\'rotation\';show();scrollTo(0,0)" style="padding:3px 10px;font-size:.85rem">🎲 New random</button> Showing: <b>'+(DEMOKIND==='shuffler'?'Shuffler':'Game presenter')+'</b></div>':'')+
     '<div class="row"><div><h1>Hello, '+esc((D.profile&&D.profile.nickname)||D.name||D.email)+'</h1><div class="mut">'+esc(D.email)+'</div></div><span></span></div>'+
     '<nav class="main3">'+TABS.map(function(t){return '<button data-t="'+t[0]+'" class="'+(t[0]===tab?'on':'')+'">'+t[1]+'</button>'}).join('')+'</nav><div id="pg"></div>';
   a.innerHTML=h;
@@ -175,14 +176,22 @@ function pSchedule(){
   if(pn&&pn.days.length){h+='<h2>Worked this month</h2><div class="card">'+pn.days.filter(function(d){return d.k==='day'||d.k==='night'}).slice().reverse().map(function(d){return '<div class="day"><span>'+dLabel(d.d)+' · '+esc(SH[d.s]||d.s||'')+'</span><span>'+d.h+' h'+(d.act?' <span class="leave">*</span>':'')+'</span></div>'}).join('')+'</div>'}
   return h+pRequests();
 }
+function rotKind(v){var m=/^Zone\s+(\S+)(?:\s*·\s*tables?\s+(.+))?$/i.exec(v);if(m)return{k:'zone',z:m[1],t:(m[2]||'').split(/\s*,\s*/).filter(Boolean)};if(/^Table\b/i.test(v))return{k:'table',t:[v.replace(/^Table\s*/i,'')]};if(v==='Break')return{k:'break'};if(v==='Off'||v==='-')return{k:'off'};return{k:'other'}}
 function pRotation(){
-  var r=D.rotation,h='<h2>My rotation</h2><div class="mut" style="margin-bottom:8px">Your tables for the coming days. View only: if something must change, send a request from Schedule.</div>';
+  var r=D.rotation,h='<h2>My rotation</h2><div class="mut" style="margin-bottom:8px">Your tables or zones for the coming days. View only: if something must change, send a request from Schedule.</div>';
   if(!r||!(r.days||[]).length)return h+'<div class="card mut">No rotation has been shared with you yet.</div>';
+  var nowH=(function(){var n=new Date();return n.getHours()+n.getMinutes()/60})(),td=today();
   r.days.forEach(function(e){
     var c=e.c||[],grp=[],i,v;for(i=0;i<c.length;i++){v=cellTxt(c[i]);if(grp.length&&grp[grp.length-1].v===v)grp[grp.length-1].to=i+1;else grp.push({v:v,from:i,to:i+1})}
-    h+='<div class="card"><b>'+dLabel(e.d,true)+'</b><div class="mut">'+esc(SH[e.s]||e.s)+(e.f!=null?' &middot; starts '+hh(e.f):'')+'</div>';
+    var hasZone=grp.some(function(g){return rotKind(g.v).k==='zone'}),isToday=e.d===td;
+    h+='<div class="card"><div class="row"><b>'+dLabel(e.d,true)+'</b>'+(hasZone?'<span class="tag">Zone rotation</span>':'')+'</div><div class="mut">'+esc(SH[e.s]||e.s)+(e.f!=null?' &middot; starts '+hh(e.f)+(c.length?' &middot; ends '+hh(e.f+c.length/2):''):'')+'</div>';
     if(!grp.length||e.f==null)h+='<div class="mut">No table plan for this day.</div>';
-    grp.forEach(function(g){var tb=/^Table/.test(g.v);h+='<div class="day"><span>'+hh(e.f+g.from/2)+' - '+hh(e.f+g.to/2)+'</span><span class="'+(tb?'work':'off')+'">'+esc(g.v)+'</span></div>'});
+    grp.forEach(function(g){var k=rotKind(g.v),f=e.f+g.from/2,t=e.f+g.to/2,nx=(nowH<e.f&&e.f+c.length/2>24)?nowH+24:nowH,cur=isToday&&nx>=f&&nx<t;
+      var tm='<b>'+hh(f)+' - '+hh(t)+'</b>';
+      if(k.k==='zone'||k.k==='table'){
+        h+='<div class="rt'+(cur?' now':'')+'"><div class="rtT">'+tm+(cur?'<span class="nowTag">NOW</span>':'')+'<span class="mut"> &middot; '+((g.to-g.from)/2)+' h</span></div><div class="rtMain">'+(k.k==='zone'?'<span class="zb">Zone '+esc(k.z)+'</span>':'<span class="zb tb">Table '+esc(k.t[0])+'</span>')+'</div>'+
+          (k.k==='zone'&&k.t.length?'<div class="rtTb">'+k.t.map(function(x){return '<span class="tn">'+esc(x)+'</span>'}).join('')+'</div><div class="mut" style="font-size:12px">Tables in this zone</div>':'')+'</div>'}
+      else h+='<div class="rt '+(k.k==='break'?'brk':'offr')+(cur?' now':'')+'"><div class="rtT">'+tm+(cur?'<span class="nowTag">NOW</span>':'')+'</div><div class="rtMain"><span class="'+(k.k==='break'?'leave':'off')+'">'+(k.k==='break'?'&#9749; Break':esc(g.v))+'</span></div></div>'});
     h+='</div>'});
   return h;
 }
@@ -215,10 +224,12 @@ function wireRequests(){
 }
 
 /* ---------- demo (only with ?demo in the address; clearly labelled, never talks to the server) ---------- */
-function demoData(){
+var DEMOKIND=null;
+function demoData(kind){
+  if(kind)DEMOKIND=kind;else if(!DEMOKIND)DEMOKIND=Math.random()<.5?'presenter':'shuffler';kind=DEMOKIND;
   var R=function(n){return Math.floor(Math.random()*n)},P=function(a){return a[R(a.length)]},d=function(n){var x=new Date();x.setDate(x.getDate()+n);return iso(x)};
   var first=P(['Ana','Nino','Mariam','Salome','Luka','Giorgi','Elene','Tamar','Davit','Nika','Sophie','Irakli']),last=P(['Beridze','Kapanadze','Gelashvili','Lomidze','Tsiklauri','Abashidze','Kvaratskhelia','Japaridze']),name=first+' '+last;
-  var pos=P(['VIP Game Presenter','Premium Game Presenter','Game Presenter','Beginner Game Presenter','Shuffler']),games=['Roulette','Blackjack','Baccarat','Poker','Dragon Tiger'].sort(function(){return Math.random()-.5}).slice(0,2+R(3));
+  var pos=kind==='shuffler'?'Shuffler':P(['VIP Game Presenter','Premium Game Presenter','Game Presenter','Beginner Game Presenter']),games=['Roulette','Blackjack','Baccarat','Poker','Dragon Tiger'].sort(function(){return Math.random()-.5}).slice(0,2+R(3));
   var CR={Roulette:['Ball spin','Chip handling','Payout accuracy','Closing bets on time','Customer interaction'],Blackjack:['Card handling','Dealing procedure','Payout accuracy','Game protection','Customer interaction'],Baccarat:['Card squeeze','Dealing procedure','Payout accuracy','Game protection','Customer interaction'],Poker:['Card handling','Pot calculation','Game protection','Customer interaction'],'Dragon Tiger':['Card handling','Dealing procedure','Payout accuracy','Customer interaction']};
   var NOTES=['Paid the wrong amount once; count the chips twice','Closed the bets a little late','Card was exposed during the deal','Forgot to announce the result','Spun the ball too softly on one round','Good, but keep the pace steady','Hand position blocked the camera once'];
   var FB=['Great energy and clear voice. Keep working on the payouts.','Solid round. Watch the timing when closing bets.','Very professional with players. Check the chip count on splits.','Good progress since last time. Focus on game protection.','Excellent round, nothing to add.'];
@@ -230,7 +241,10 @@ function demoData(){
   RM.sort(function(){return Math.random()-.5}).slice(0,1+R(4)).forEach(function(x){rem.push({date:d(-(1+R(45))),kind:x[0],title:x[1],text:x[2],by:P(['Shift lead','Team manager','Performance coach'])})});rem.sort(function(a,b){return b.date.localeCompare(a.date)});
   var T={morning:[8,16],afternoon:[16,24],night:[0,8]},cyc=P([['morning','morning','afternoon','afternoon','rest','rest'],['night','night','night','rest','rest','morning','morning'],['afternoon','afternoon','afternoon','rest','morning','morning','rest']]),off=R(7),days=[];
   for(i=0;i<21;i++){var s1=cyc[(i+off)%cyc.length];if(i===6+R(6))s1=P(['vacation','sick','rest']);days.push({d:d(i),s:s1,f:T[s1]?T[s1][0]:null,t:T[s1]?T[s1][1]:null})}
-  var rot=[];days.filter(function(x){return T[x.s]}).slice(0,3).forEach(function(x){var c=[];var t=1+R(8);for(var k=0;k<16;k++){if(k%5===4){c.push('b');t=1+R(8)}else c.push(String(t))}rot.push({d:x.d,s:x.s,f:x.f,c:c})});
+  var rot=[];days.filter(function(x){return T[x.s]}).slice(0,3).forEach(function(x){var c=[],k,Zs=['A','B','C','D','E','F','G','H'],zi=R(8),ZT=function(z){var b=Zs.indexOf(z)*5+1,a=[];for(var q=0;q<5;q++)a.push(b+q);return'Zone '+z+' \u00B7 tables '+a.join(', ')};
+    if(kind==='shuffler'){for(k=0;k<16;k++){if(k%4===0&&k)zi=(zi+1)%8;c.push(k===7||k===12?'Break':ZT(Zs[zi]))}}   /* one hour (2 slots) in a zone, then the next zone; a half-hour break twice per shift */
+    else{var t=1+R(40);for(k=0;k<16;k++){if(k%5===4){c.push('b');t=1+R(40)}else c.push(String(t))}}
+    rot.push({d:x.d,s:x.s,f:x.f,c:c})});
   var rf=0,y=today().slice(0,7),dn=new Date().getDate(),pd=[],tot2={shifts:0,hours:0,earned:0},dr=9+R(5),nr=dr+3;
   for(var k2=1;k2<=dn;k2++){var ds=y+'-'+String(k2).padStart(2,'0'),sh=cyc[(((k2-dn+off)%cyc.length)+cyc.length)%cyc.length];if(sh==='rest')continue;   /* same position in the cycle as the schedule above, so a day cannot be worked in one list and off in the other */var hrs=Math.random()<.08?4+R(3):8,rate=sh==='night'?nr:dr,mult=Math.random()<.04?2:1,amt=rate*hrs*mult;pd.push({d:ds,k:sh==='night'?'night':'day',s:sh,h:hrs,act:hrs!==8,rate:rate,mult:mult,amt:amt});tot2.shifts++;tot2.hours+=hrs;tot2.earned+=amt}
   var lm=new Date();lm.setDate(1);lm.setMonth(lm.getMonth()-1);var lsh=18+R(5),ly=iso(lm).slice(0,7),lv=1+R(5),lb=lv*50,le=1500+R(700),ll=R(2)*88;

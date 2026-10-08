@@ -13,6 +13,7 @@ h1,.mut,.row>div,.card b{min-width:0;overflow-wrap:anywhere}h1{font-size:1.4rem;
 .big{font-size:1.6rem;font-weight:700}
 .tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:.8rem;background:var(--bd);margin:2px 2px 2px 0}
 .fb{border-left:3px solid var(--ac);padding-left:10px;margin-top:10px;white-space:pre-wrap}
+.rt{border:1px solid var(--bd);border-radius:12px;padding:10px 12px;margin-top:8px}.rt.now{border-color:var(--ac);box-shadow:0 0 0 2px var(--ac) inset}.rt.brk{background:rgba(245,158,11,.08)}.rt.offr{opacity:.7}.rtT{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.nowTag{background:var(--ac);color:#fff;border-radius:999px;font-size:11px;padding:1px 8px;font-weight:700}.rtMain{margin-top:6px;font-size:18px}.zb{display:inline-block;background:var(--ac);color:#fff;border-radius:10px;padding:4px 12px;font-weight:700;font-size:20px}.zb.tb{background:var(--ok)}.rtTb{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.tn{min-width:38px;text-align:center;padding:5px 8px;border-radius:9px;border:1px solid var(--ac);font-weight:700;font-size:16px}
 .day{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd)}.day:last-child{border:0}
 .work{color:var(--ok);font-weight:600}.off{color:var(--mut)}.leave{color:var(--warn);font-weight:600}.bad{color:var(--bad);font-weight:600}
 button,select,input,textarea{font:inherit;color:var(--tx)}
@@ -102,7 +103,7 @@ function restoreDraft(){if(!DRAFT)return;var o=DRAFT.v;['rqT','rqDay','rqW','rqF
 function show(){
   keepDraft();
   $('login').hidden=true;var a=$('app');a.hidden=false;if(!TABS.some(function(t){return t[0]===tab}))tab='home';
-  var h=(DEMO?'<div class="banner"><b>Demo data.</b> This page is not connected to the server. Nothing you do here is sent anywhere.</div>':'')+
+  var h=(DEMO?'<div class="banner"><b>Demo data.</b> This page is not connected to the server. Nothing you do here is sent anywhere. <button type="button" onclick="D=demoData(\'presenter\');tab=\'rotation\';show();scrollTo(0,0)">Game presenter</button> <button type="button" onclick="D=demoData(\'shuffler\');tab=\'rotation\';show();scrollTo(0,0)">Shuffler</button></div>':'')+
     '<div class="row"><div><h1>Hello, '+esc((D.profile&&D.profile.nickname)||D.name||D.email)+'</h1><div class="mut">'+esc(D.email)+'</div></div><span><button onclick="load()">&#8635; Refresh</button> <button onclick="location.href=&quot;/auth/logout&quot;">Sign out</button></span></div>'+
     '<nav class="main3">'+TABS.map(function(t){return '<button data-t="'+t[0]+'" class="'+(t[0]===tab?'on':'')+'">'+t[1]+'</button>'}).join('')+'</nav><div id="pg"></div>';
   a.innerHTML=h;
@@ -179,14 +180,22 @@ function pSchedule(){
   if(pn&&pn.days.length){h+='<h2>Worked this month</h2><div class="card">'+pn.days.filter(function(d){return d.k==='day'||d.k==='night'}).slice().reverse().map(function(d){return '<div class="day"><span>'+dLabel(d.d)+' · '+esc(SH[d.s]||d.s||'')+'</span><span>'+d.h+' h'+(d.act?' <span class="leave">*</span>':'')+'</span></div>'}).join('')+'</div>'}
   return h+pRequests();
 }
+function rotKind(v){var m=/^Zone\s+(\S+)(?:\s*·\s*tables?\s+(.+))?$/i.exec(v);if(m)return{k:'zone',z:m[1],t:(m[2]||'').split(/\s*,\s*/).filter(Boolean)};if(/^Table\b/i.test(v))return{k:'table',t:[v.replace(/^Table\s*/i,'')]};if(v==='Break')return{k:'break'};if(v==='Off'||v==='-')return{k:'off'};return{k:'other'}}
 function pRotation(){
-  var r=D.rotation,h='<h2>My rotation</h2><div class="mut" style="margin-bottom:8px">Your tables for the coming days. View only: if something must change, send a request from Schedule.</div>';
+  var r=D.rotation,h='<h2>My rotation</h2><div class="mut" style="margin-bottom:8px">Your tables or zones for the coming days. View only: if something must change, send a request from Schedule.</div>';
   if(!r||!(r.days||[]).length)return h+'<div class="card mut">No rotation has been shared with you yet.</div>';
+  var nowH=(function(){var n=new Date();return n.getHours()+n.getMinutes()/60})(),td=today();
   r.days.forEach(function(e){
     var c=e.c||[],grp=[],i,v;for(i=0;i<c.length;i++){v=cellTxt(c[i]);if(grp.length&&grp[grp.length-1].v===v)grp[grp.length-1].to=i+1;else grp.push({v:v,from:i,to:i+1})}
-    h+='<div class="card"><b>'+dLabel(e.d,true)+'</b><div class="mut">'+esc(SH[e.s]||e.s)+(e.f!=null?' &middot; starts '+hh(e.f):'')+'</div>';
+    var hasZone=grp.some(function(g){return rotKind(g.v).k==='zone'}),isToday=e.d===td;
+    h+='<div class="card"><div class="row"><b>'+dLabel(e.d,true)+'</b>'+(hasZone?'<span class="tag">Zone rotation</span>':'')+'</div><div class="mut">'+esc(SH[e.s]||e.s)+(e.f!=null?' &middot; starts '+hh(e.f)+(c.length?' &middot; ends '+hh(e.f+c.length/2):''):'')+'</div>';
     if(!grp.length||e.f==null)h+='<div class="mut">No table plan for this day.</div>';
-    grp.forEach(function(g){var tb=/^(Table|Zone)/.test(g.v);h+='<div class="day"><span>'+hh(e.f+g.from/2)+' - '+hh(e.f+g.to/2)+'</span><span class="'+(tb?'work':'off')+'">'+esc(g.v)+'</span></div>'});
+    grp.forEach(function(g){var k=rotKind(g.v),f=e.f+g.from/2,t=e.f+g.to/2,nx=(nowH<e.f&&e.f+c.length/2>24)?nowH+24:nowH,cur=isToday&&nx>=f&&nx<t;
+      var tm='<b>'+hh(f)+' - '+hh(t)+'</b>';
+      if(k.k==='zone'||k.k==='table'){
+        h+='<div class="rt'+(cur?' now':'')+'"><div class="rtT">'+tm+(cur?'<span class="nowTag">NOW</span>':'')+'<span class="mut"> &middot; '+((g.to-g.from)/2)+' h</span></div><div class="rtMain">'+(k.k==='zone'?'<span class="zb">Zone '+esc(k.z)+'</span>':'<span class="zb tb">Table '+esc(k.t[0])+'</span>')+'</div>'+
+          (k.k==='zone'&&k.t.length?'<div class="rtTb">'+k.t.map(function(x){return '<span class="tn">'+esc(x)+'</span>'}).join('')+'</div><div class="mut" style="font-size:12px">Tables in this zone</div>':'')+'</div>'}
+      else h+='<div class="rt '+(k.k==='break'?'brk':'offr')+(cur?' now':'')+'"><div class="rtT">'+tm+(cur?'<span class="nowTag">NOW</span>':'')+'</div><div class="rtMain"><span class="'+(k.k==='break'?'leave':'off')+'">'+(k.k==='break'?'&#9749; Break':esc(g.v))+'</span></div></div>'});
     h+='</div>'});
   return h;
 }
@@ -219,22 +228,39 @@ function wireRequests(){
 }
 
 /* ---------- demo (only with ?demo in the address; clearly labelled, never talks to the server) ---------- */
-function demoData(){
-  var d=function(n){var x=new Date();x.setDate(x.getDate()+n);return iso(x)},S=['morning','morning','rest','afternoon','afternoon','night','rest'],days=[];
-  for(var i=0;i<14;i++){var s=S[i%7];days.push({d:d(i),s:s,f:s==='morning'?8:s==='afternoon'?16:s==='night'?0:null,t:s==='morning'?16:s==='afternoon'?24:s==='night'?8:null})}
-  var crit=function(a,n){return[{name:'Card handling',score:a[0],note:n&&n[0]||''},{name:'Payout accuracy',score:a[1],note:n&&n[1]||''},{name:'Game protection',score:a[2],note:''},{name:'Customer service',score:a[3],note:n&&n[2]||''}]};
-  var y=today().slice(0,7),dn=new Date().getDate(),pd=[],tot={shifts:0,hours:0,earned:0};
-  for(var k=1;k<=dn;k++){var ds=y+'-'+String(k).padStart(2,'0'),w=k%7,sh=w===3||w===0?null:w===6?'night':w===4||w===5?'afternoon':'morning';if(!sh)continue;var hrs=k===dn-3?5:8,rate=sh==='night'?14:11,amt=rate*hrs*(k===dn-1?2:1);pd.push({d:ds,k:sh==='night'?'night':'day',s:sh,h:hrs,act:hrs!==8,rate:rate,mult:k===dn-1?2:1,amt:amt});tot.shifts++;tot.hours+=hrs;tot.earned+=amt}
-  var lm=new Date();lm.setDate(1);lm.setMonth(lm.getMonth()-1);var ly=iso(lm).slice(0,7);
-  return{email:'ana.beridze@example.com',name:'Ana Beridze',profile:{name:'Ana Beridze',nickname:'Annie',workId:'W1000',status:'Employed',position:'VIP Game Presenter',team:'Team Red',shift:'Rotating',manager:'Nino Kapanadze',startDate:'2024-03-01',phone:'+995 555 12 34 56',email:'ana.beridze@example.com',games:['Roulette','Blackjack','Baccarat']},
-    evaluations:[{game:'Roulette',date:d(-5),ts:Date.now()-5*864e5,total:92,criteria:crit([3,2,3,3],['','Paid 35:1 on a split once; recheck the chip count','']),improve:['Payout accuracy'],feedback:'Great pace and energy. Count the chips twice on splits.',kind:'Regular'},{game:'Blackjack',date:d(-21),ts:Date.now()-21*864e5,total:100,criteria:crit([3,3,3,3]),improve:[],feedback:'Perfect round.',kind:'Close-up'}],
-    retraining:[{date:d(3),reason:'Payout accuracy on roulette',status:'Scheduled'}],
-    gameCounts:[{game:'Roulette',period:y,count:1240},{game:'Blackjack',period:y,count:860},{game:'Baccarat',period:y,count:310},{game:'Roulette',period:ly,count:1105},{game:'Blackjack',period:ly,count:990}],
-    incidents:[{date:d(-4),type:'Procedural mistake',game:'Roulette',table:'RO 2',severity:'Medium',summary:'Closed bets late',action:'Game resumed with the internal tool'}],
-    remarks:[{date:d(-2),kind:'positive',title:'Thank you from a VIP player',text:'Player wrote to support about the friendly game.',by:'Nino Kapanadze'},{date:d(-9),kind:'remark',title:'Late 10 minutes',text:'Please be at the table 5 minutes before the shift.',by:'Shift lead'},{date:d(-30),kind:'violation',title:'Phone on the floor',text:'Phones stay in the locker.',by:'Nino Kapanadze'}],
-    pay:[{ym:y,unit:'hour',cur:'GEL',final:false,upTo:today(),days:pd,bonus:[],extra:[],totals:{shifts:tot.shifts,hours:tot.hours,earned:tot.earned,leave:0,bonus:0,total:tot.earned,plannedShifts:9,plannedHours:72,planned:820}},
-      {ym:ly,unit:'hour',cur:'GEL',final:true,upTo:ly+'-28',days:[],bonus:[{name:'VIP quality bonus',type:'Performance',level:3,of:5,amount:150}],extra:[],totals:{shifts:20,hours:158,earned:1890,leave:88,bonus:150,total:2128,plannedShifts:0,plannedHours:0,planned:0}}],
-    schedule:{days:days},rotation:{days:[{d:d(0),s:'morning',f:8,c:['3','3','3','3','b','5','5','5','5','b','1','1','1','1','1','1']},{d:d(1),s:'morning',f:8,c:['7','7','7','7','b','2','2','2','2','b','4','4','4','4','4','4']}]},requests:[{id:'d1',type:'annual',from:d(20),to:d(24),status:'pending',created:Date.now()-864e5,note:'Family trip'}]};
+var DEMOKIND=null;
+function demoData(kind){
+  if(kind)DEMOKIND=kind;else if(!DEMOKIND)DEMOKIND=Math.random()<.5?'presenter':'shuffler';kind=DEMOKIND;
+  var R=function(n){return Math.floor(Math.random()*n)},P=function(a){return a[R(a.length)]},d=function(n){var x=new Date();x.setDate(x.getDate()+n);return iso(x)};
+  var first=P(['Ana','Nino','Mariam','Salome','Luka','Giorgi','Elene','Tamar','Davit','Nika','Sophie','Irakli']),last=P(['Beridze','Kapanadze','Gelashvili','Lomidze','Tsiklauri','Abashidze','Kvaratskhelia','Japaridze']),name=first+' '+last;
+  var pos=kind==='shuffler'?'Shuffler':P(['VIP Game Presenter','Premium Game Presenter','Game Presenter','Beginner Game Presenter']),games=['Roulette','Blackjack','Baccarat','Poker','Dragon Tiger'].sort(function(){return Math.random()-.5}).slice(0,2+R(3));
+  var CR={Roulette:['Ball spin','Chip handling','Payout accuracy','Closing bets on time','Customer interaction'],Blackjack:['Card handling','Dealing procedure','Payout accuracy','Game protection','Customer interaction'],Baccarat:['Card squeeze','Dealing procedure','Payout accuracy','Game protection','Customer interaction'],Poker:['Card handling','Pot calculation','Game protection','Customer interaction'],'Dragon Tiger':['Card handling','Dealing procedure','Payout accuracy','Customer interaction']};
+  var NOTES=['Paid the wrong amount once; count the chips twice','Closed the bets a little late','Card was exposed during the deal','Forgot to announce the result','Spun the ball too softly on one round','Good, but keep the pace steady','Hand position blocked the camera once'];
+  var FB=['Great energy and clear voice. Keep working on the payouts.','Solid round. Watch the timing when closing bets.','Very professional with players. Check the chip count on splits.','Good progress since last time. Focus on game protection.','Excellent round, nothing to add.'];
+  var evals=[];for(var i=0;i<4+R(3);i++){var g=P(games),cs=CR[g].map(function(c){var sc=Math.random()<.7?3:Math.random()<.6?2:R(2);return{name:c,group:'',score:sc,note:sc<3?P(NOTES):''}}),tot=Math.round(cs.reduce(function(a,c){return a+c.score},0)/(cs.length*3)*100),dd=-(3+i*9+R(6));
+    evals.push({game:g,date:d(dd),ts:Date.now()+dd*864e5,total:tot,criteria:cs,improve:cs.filter(function(c){return c.score<3}).sort(function(a,b){return a.score-b.score}).slice(0,2).map(function(c){return c.name}),feedback:tot===100?FB[4]:P(FB.slice(0,4)),kind:P(['Regular','Regular','Close-up','Exam'])})}
+  var IT=['Procedural mistake','Wrong result / payout','Card / ball handling','Game resumed','Late bet closing'],inc=[];for(i=0;i<R(6);i++){var g2=P(games);inc.push({date:d(-(1+R(40))),type:P(IT),game:g2,table:g2.slice(0,2).toUpperCase()+' '+(1+R(8)),severity:P(['Low','Low','Medium','High']),summary:P(['Paid a losing bet','Card exposed before closing bets','Ball launched after no more bets','Wrong number announced','Dealt to the wrong box']),action:P(['Game resumed with the internal tool','Payout corrected by the shift lead','Round voided','Coaching session booked'])})}
+  inc.sort(function(a,b){return b.date.localeCompare(a.date)});
+  var RM=[['positive','Thank you from a player','A player praised the friendly game in the chat.'],['positive','Helped a new colleague','Showed a trainee the table routine without being asked.'],['remark','Late 10 minutes','Please be at the table 5 minutes before the shift.'],['remark','Uniform','Name badge was missing.'],['violation','Phone on the floor','Phones stay in the locker.'],['disciplinary','Written warning','Second late arrival this month.']],rem=[];
+  RM.sort(function(){return Math.random()-.5}).slice(0,1+R(4)).forEach(function(x){rem.push({date:d(-(1+R(45))),kind:x[0],title:x[1],text:x[2],by:P(['Shift lead','Team manager','Performance coach'])})});rem.sort(function(a,b){return b.date.localeCompare(a.date)});
+  var T={morning:[8,16],afternoon:[16,24],night:[0,8]},cyc=P([['morning','morning','afternoon','afternoon','rest','rest'],['night','night','night','rest','rest','morning','morning'],['afternoon','afternoon','afternoon','rest','morning','morning','rest']]),off=R(7),days=[];
+  for(i=0;i<21;i++){var s1=cyc[(i+off)%cyc.length];if(i===6+R(6))s1=P(['vacation','sick','rest']);days.push({d:d(i),s:s1,f:T[s1]?T[s1][0]:null,t:T[s1]?T[s1][1]:null})}
+  var rot=[];days.filter(function(x){return T[x.s]}).slice(0,3).forEach(function(x){var c=[],k,Zs=['A','B','C','D','E','F','G','H'],zi=R(8),ZT=function(z){var b=Zs.indexOf(z)*5+1,a=[];for(var q=0;q<5;q++)a.push(b+q);return'Zone '+z+' \u00B7 tables '+a.join(', ')};
+    if(kind==='shuffler'){for(k=0;k<16;k++){if(k%4===0&&k)zi=(zi+1)%8;c.push(k===7||k===12?'Break':ZT(Zs[zi]))}}   /* one hour (2 slots) in a zone, then the next zone; a half-hour break twice per shift */
+    else{var t=1+R(40);for(k=0;k<16;k++){if(k%5===4){c.push('b');t=1+R(40)}else c.push(String(t))}}
+    rot.push({d:x.d,s:x.s,f:x.f,c:c})});
+  var rf=0,y=today().slice(0,7),dn=new Date().getDate(),pd=[],tot2={shifts:0,hours:0,earned:0},dr=9+R(5),nr=dr+3;
+  for(var k2=1;k2<=dn;k2++){var ds=y+'-'+String(k2).padStart(2,'0'),sh=cyc[(((k2-dn+off)%cyc.length)+cyc.length)%cyc.length];if(sh==='rest')continue;   /* same position in the cycle as the schedule above, so a day cannot be worked in one list and off in the other */var hrs=Math.random()<.08?4+R(3):8,rate=sh==='night'?nr:dr,mult=Math.random()<.04?2:1,amt=rate*hrs*mult;pd.push({d:ds,k:sh==='night'?'night':'day',s:sh,h:hrs,act:hrs!==8,rate:rate,mult:mult,amt:amt});tot2.shifts++;tot2.hours+=hrs;tot2.earned+=amt}
+  var lm=new Date();lm.setDate(1);lm.setMonth(lm.getMonth()-1);var lsh=18+R(5),ly=iso(lm).slice(0,7),lv=1+R(5),lb=lv*50,le=1500+R(700),ll=R(2)*88;
+  var gc=[];games.forEach(function(g){gc.push({game:g,period:y,count:200+R(1200)},{game:g,period:ly,count:400+R(1400)})});
+  var email=(first+'.'+last).toLowerCase()+'@example.com',wid='W'+(1000+R(9000));
+  return{email:email,name:name,profile:{name:name,nickname:P(['Ace','Sunny','Max','Lucky','Star','Kiki','Leo','Mimi','Nini','Gio']),workId:wid,status:P(['Employed','Employed','Probation']),position:pos,team:'Team '+P(['Red','Blue','Green','Gold']),shift:'Rotating',manager:P(['Nino Kapanadze','Levan Gelashvili','Mia Manager']),startDate:d(-(120+R(900))),phone:'+995 555 '+(10+R(89))+' '+(10+R(89))+' '+(10+R(89)),email:email,games:games},
+    evaluations:evals.sort(function(a,b){return b.ts-a.ts}),
+    retraining:evals.some(function(e){return e.total<85})?[{date:d(2+R(10)),reason:(evals.filter(function(e){return e.total<85})[0].improve[0]||'Procedure')+' on '+evals.filter(function(e){return e.total<85})[0].game,status:'Scheduled'}]:[],
+    gameCounts:gc,incidents:inc,remarks:rem,
+    pay:[{ym:y,unit:'hour',cur:'GEL',final:false,upTo:today(),days:pd,bonus:[],extra:[],totals:{shifts:tot2.shifts,hours:tot2.hours,earned:tot2.earned,leave:0,bonus:0,total:tot2.earned,plannedShifts:6+R(6),plannedHours:72,planned:600+R(400)}},
+      {ym:ly,unit:'hour',cur:'GEL',final:true,upTo:ly+'-28',days:[],bonus:[{name:pos.indexOf('VIP')>=0?'VIP quality bonus':'Quality bonus',type:'Performance',level:lv,of:5,amount:lb}],extra:[],totals:{shifts:lsh,hours:lsh*8-R(10),earned:le,leave:ll,bonus:lb,total:le+ll+lb,plannedShifts:0,plannedHours:0,planned:0}}],
+    schedule:{days:days},rotation:{days:rot},requests:(rf=10+R(10),Math.random()<.6)?[{id:'d1',type:P(['annual','swap','dayoff']),from:d(rf),to:d(rf+R(3)),status:P(['pending','approved']),created:Date.now()-864e5,note:'Family event',decisionNote:''}]:[]};
 }
 function demoCall(b){
   if(b.action==='me')return D;
