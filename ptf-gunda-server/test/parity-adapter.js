@@ -17,6 +17,7 @@ module.exports = function (codePath) {
     files: {}, uploads, mails: env.mails, props, cache: {}, driveFiles: filesStore,
     post(body) {
       const b = typeof body === 'string' ? (() => { try { return JSON.parse(body); } catch (e) { return null; } })() : body;
+      if (b && typeof b === 'object' && b.action === 'tv') return JSON.parse(JSON.stringify(rules.tv(b, cur)));   /* lobby screens need no sign-in */
       let id = null;
       if (b && typeof b === 'object') {
         const em = String(b.email || '').trim().toLowerCase();

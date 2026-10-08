@@ -1,6 +1,6 @@
 {
   "name": "ptf-gunda-server",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "Pass to the Floor \u00b7 Gunda \u00b7 Server Edition: the same tool, hosted centrally, signed in with Microsoft Entra ID, data in PostgreSQL.",
   "private": true,
   "license": "UNLICENSED",
