@@ -28,7 +28,7 @@ tr.th td{background:transparent;color:var(--ac);font-size:calc(2.4vh*var(--z));f
 .tb2{background:var(--card);border-radius:1.2vh;padding:.8vh .7vw;min-width:0}.tb2 h2{margin:0 0 .5vh;color:var(--ac);font-size:calc(2.4vh*var(--bs,1));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tb2 h2 small{color:var(--mut);font-weight:500;font-size:.7em}
 .pl{display:grid;grid-template-columns:1fr 1fr;gap:.35vh .5vw}.pp{display:flex;justify-content:space-between;align-items:baseline;gap:.4vw;padding:.2vh .5vw;border-radius:.8vh;background:#0e1830;font-size:calc(1.9vh*var(--bs,1));white-space:nowrap;overflow:hidden}.pp span:first-child{overflow:hidden;text-overflow:ellipsis}.pp b{color:#bfdbfe;font-size:1.15em}.pp i{color:var(--mut);font-style:normal;font-size:.7em;margin-left:.3em}.pp.br b{color:var(--warn);font-weight:500;font-size:.85em}.pp.nb{opacity:.45}
 .zl{margin:.3vh 0;padding:.3vh .5vw;border-radius:.8vh;background:#12301f;font-size:calc(1.9vh*var(--bs,1))}.zl b{color:#c7f9cc}.zl small{color:#86c99a;margin-left:.4vw}.zl div{color:#e6fff0}.zl.br{background:#2a2312}.zl.br b{color:var(--warn)}
-.bh,.br{display:grid;gap:1px;align-items:center}.bh{color:var(--mut);font-size:calc(1.3vh*var(--bs,1));margin-bottom:.2vh}.bh span{text-align:left;overflow:hidden;white-space:nowrap}.bh span.now{color:var(--ok);font-weight:700}
+.bh,.br{display:grid;gap:1px;align-items:center}.bh{color:var(--mut);font-size:calc(1.3vh*var(--bs,1));margin-bottom:.2vh}.bh span{overflow:hidden;white-space:nowrap}.bh .hl{text-align:center;font-size:calc(1.15vh*var(--bs,1));opacity:.65;border-left:1px solid transparent}.bh .hl.hr{opacity:1;color:#c9d4ee;border-left-color:#3a4a73}.bh .hl.now{color:var(--ok);opacity:1;font-weight:700}.bc.hb{border-left:2px solid #3a4a73}.bc.d3{font-size:calc(1.35vh*var(--bs,1));letter-spacing:-.03em}
 .br{margin:.15vh 0}.br .bn{font-size:calc(1.7vh*var(--bs,1));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:.3vw}.bc{text-align:center;border-radius:.4vh;font-size:calc(1.7vh*var(--bs,1));font-weight:700;background:#0e1830;color:#bfdbfe;white-space:nowrap;overflow:hidden;line-height:1.35}.bc.zn{background:#12301f;color:#c7f9cc}.bc.br2{background:#2a2312;color:var(--warn);font-weight:500}.bc.of{background:transparent;color:#4b5878}.bc.cur{box-shadow:inset 0 0 0 .35vh var(--ok)}
 .zl2{margin-top:.5vh;color:#86c99a;font-size:calc(1.4vh*var(--bs,1));line-height:1.35}.zl2 b{color:#c7f9cc}
 #pg{position:fixed;right:1.5vw;bottom:1vh;color:var(--mut);font-size:2vh}
@@ -86,13 +86,13 @@ tr.th td{background:transparent;color:var(--ac);font-size:calc(2.4vh*var(--z));f
   /* "Whole shift, all teams": every person's full shift as a thin timeline, team blocks 3 across and 2 down; with more teams the screen turns the page by itself. */
   function drawBoardFull(cur){
     var S=D.screen||{},rows=D.rows,teams=(D.teams||[]).filter(function(t){return rows.some(function(r){return r.t===t.id})}),N=0;rows.forEach(function(r){N=Math.max(N,r.c.length)});
-    var gt='minmax(0,5.2em) repeat('+N+',minmax(0,1fr))',per=6,pages=Math.max(1,Math.ceil(teams.length/per));if(page>=pages)page=0;
+    var gt='4.6vw repeat('+N+',minmax(0,1fr))',per=6,pages=Math.max(1,Math.ceil(teams.length/per));if(page>=pages)page=0;
     var bl=teams.slice(page*per,page*per+per).map(function(t){
       var R=rows.filter(function(r){return r.t===t.id}).sort(function(a,b){return a.n.localeCompare(b.n)}),Z=(D.zones||{})[t.id],h='<div class="bh" style="grid-template-columns:'+gt+'"><span></span>';
-      for(var c=0;c<N;c+=2)h+='<span style="grid-column:span '+Math.min(2,N-c)+'" class="'+(cur>=c&&cur<c+2?'now':'')+'">'+hh(D.start+c/2).replace(/^0/,'')+'</span>';h+='</div>';
+      for(var c=0;c<N;c++){var hr=(c%2===0);h+='<span class="hl'+(hr?' hr':'')+(cur===c?' now':'')+'">'+(hr?String(Math.floor(((D.start+c/2)%24+24)%24)):':30')+'</span>'}h+='</div>';
       R.forEach(function(r){h+='<div class="br" style="grid-template-columns:'+gt+'"><span class="bn">'+esc(r.n)+'</span>';var c=0;
         while(c<N){var f=cellOf(c<r.c.length?r.c[c]:'',r),sp=1;while(c+sp<N&&cellKey(r,c+sp)===cellKey(r,c))sp++;var k=f.k==='br'?'br2':f.k,tx=f.k==='zn'?f.a.replace(/^Zone /,''):f.k==='br'?'Br':f.a;
-          h+='<span class="bc '+k+(cur>=c&&cur<c+sp?' cur':'')+'" style="grid-column:span '+sp+'">'+esc(tx)+'</span>';c+=sp}
+          h+='<span class="bc '+k+(sp===1&&String(tx).length>=3?' d3':'')+(c%2===0?' hb':'')+(cur>=c&&cur<c+sp?' cur':'')+'" style="grid-column:span '+sp+'">'+esc(tx)+'</span>';c+=sp}
         h+='</div>'});
       if(Z&&Z.length)h+='<div class="zl2">'+Z.map(function(q){return'<b>'+esc(q.n)+'</b>: '+esc(rng(q.t||[]))}).join(' &nbsp;·&nbsp; ')+'</div>';
       return'<div class="tb2"><h2>'+esc(t.name)+' <small>'+R.length+'</small></h2>'+h+'</div>'});
@@ -113,7 +113,7 @@ tr.th td{background:transparent;color:var(--ac);font-size:calc(2.4vh*var(--z));f
     var rows=D.rows.slice(),tord={};(D.teams||[]).forEach(function(t,i){tord[t.id]=i});rows.sort(function(a,b){return(tord[a.t]||0)-(tord[b.t]||0)||a.n.localeCompare(b.n)});
     var multi=(D.teams||[]).length>1,per=S.rowsPer||0;
     var full=S.view==='full',h='<table class="'+(full?'full':'')+'"><tr><td class="nm" style="background:none"></td>';
-    if(full){for(var c=from;c<to;c+=2){var sp=Math.min(2,to-c);h+='<th colspan="'+sp+'"'+(cur>=c&&cur<c+sp?' class="now"':'')+'>'+hh(D.start+c/2)+'</th>'}}
+    if(full){for(var c=from;c<to;c++){h+='<th'+(cur===c?' class="now"':'')+(c%2?' style="opacity:.6;font-weight:500"':'')+'>'+hh(D.start+c/2)+'</th>'}}
     else for(var c=from;c<to;c++)h+='<th'+(c===cur?' class="now"':'')+'>'+(c===cur?'NOW ':'')+hh(D.start+c/2)+'</th>';h+='</tr>';
     var all=[],lastT=null;rows.forEach(function(r){if(multi&&r.t!==lastT){var tn=((D.teams||[]).filter(function(t){return t.id===r.t})[0]||{}).name||'';all.push('<tr class="th"><td colspan="'+(to-from+1)+'">'+esc(tn)+'</td></tr>');lastT=r.t}
       var s='<tr><td class="nm">'+esc(r.n)+'</td>',c2=from;while(c2<to){var f=c2<r.c.length?cellOf(r.c[c2],r):{k:'of',a:'',b:''},span=1;while(c2+span<to&&cellKey(r,c2+span)===cellKey(r,c2))span++;
