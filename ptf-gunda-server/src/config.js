@@ -27,7 +27,7 @@ function load(e) {
     trustProxy: bool(e.PTF_TRUST_PROXY, prod),
     frontDoorId: e.PTF_FRONTDOOR_ID || '',
     mail: { transport: e.PTF_MAIL || (prod ? 'graph' : 'log'), from: e.PTF_MAIL_FROM || '', tenant: e.ENTRA_TENANT_ID || '', clientId: e.GRAPH_CLIENT_ID || e.ENTRA_CLIENT_ID || '', clientSecret: e.GRAPH_CLIENT_SECRET || e.ENTRA_CLIENT_SECRET || '' },
-    limits: { rpcPerMin: +e.PTF_RPC_PER_MIN || 600, bodyBytes: 6 * 1024 * 1024, uploadBytes: 3 * 1024 * 1024, authPerMin: 30 },
+    limits: { rpcPerMin: +e.PTF_RPC_PER_MIN || 600, bodyBytes: 6 * 1024 * 1024, uploadBytes: 3 * 1024 * 1024, authPerMin: +e.PTF_AUTH_PER_MIN || 30 },
     appInsights: e.APPLICATIONINSIGHTS_CONNECTION_STRING || ''
   };
   const errs = [];

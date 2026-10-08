@@ -15,6 +15,7 @@ async function start(env, opts) {
     async client(email, o) {
       o = o || {}; let ck = ''; const c = { email, csrf: '' };
       const take = (r) => { const sc = r.headers.getSetCookie ? r.headers.getSetCookie() : []; sc.forEach((x) => { const kv = x.split(';')[0]; const nm = kv.split('=')[0]; ck = ck.split('; ').filter((y) => y && y.split('=')[0] !== nm).concat(/=$/.test(kv) ? [] : [kv]).join('; '); }); };
+      c.cookie = () => ck;
       c.get = async (p, h) => { const r = await fetch(base + p, { redirect: 'manual', headers: Object.assign({ cookie: ck }, h || {}) }); take(r); return r; };
       c.post = async (p, body, h) => { const r = await fetch(base + p, { method: 'POST', redirect: 'manual', headers: Object.assign({ cookie: ck, 'content-type': 'application/json', 'x-ptf-csrf': c.csrf }, h || {}), body: typeof body === 'string' ? body : JSON.stringify(body) }); take(r); return r; };
       c.rpc = async (body) => (await c.post('/api/rpc', body)).json();
