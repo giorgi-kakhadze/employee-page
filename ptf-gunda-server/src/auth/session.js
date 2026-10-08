@@ -14,12 +14,12 @@ module.exports = function sessions(db, cfg) {
       await db.q('INSERT INTO sessions(id,email,name,admin,csrf,created,last,expires,ip,ua) VALUES(?,?,?,?,?,?,?,?,?,?)', [id, u.email, u.name || '', u.admin ? 1 : 0, csrf, now, now, now + cfg.sessionHours * 3600e3, String(req.ip || '').slice(0, 60), String(req.ua || '').slice(0, 200)]);
       return { raw, csrf, maxAge: cfg.sessionHours * 3600 };
     },
-    async get(raw) {
+    async get(raw, o) {
       if (!raw || raw.length > 100) return null; const id = mac(raw), now = Date.now(), c = cache.get(id);
       let row = c && now - c.at < 30e3 ? c.row : null;
       if (!row) { row = (await db.q('SELECT * FROM sessions WHERE id=?', [id]))[0]; if (!row) { cache.delete(id); return null; } row = { id: row.id, email: row.email, name: row.name, admin: !!Number(row.admin), csrf: row.csrf, created: Number(row.created), last: Number(row.last), expires: Number(row.expires) }; cache.set(id, { row, at: now }); if (cache.size > 20000) cache.clear(); }
       if (row.expires < now || row.last + cfg.sessionIdleMinutes * 60e3 < now) { await this.destroyId(id); return null; }
-      if (now - row.last > 60e3) { row.last = now; db.q('UPDATE sessions SET last=? WHERE id=?', [now, id]).catch(() => {}); }
+      if (!(o && o.peek) && now - row.last > 60e3) { row.last = now; db.q('UPDATE sessions SET last=? WHERE id=?', [now, id]).catch(() => {}); }
       return row;
     },
     async destroy(raw) { if (raw) await this.destroyId(mac(raw)); },

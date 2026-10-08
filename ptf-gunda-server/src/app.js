@@ -44,7 +44,7 @@ async function createApp(cfg, opts) {
   /* big values are the same for many people (the schedule of a location, the employee list). JSON-escaping them again for every person was a third of the server's work,
      so the escaped text of each big value is kept (64 most recent versions) and pasted into the answer. */
   const frag = new Map(); let fragBytes = 0;
-  function fragOf(v) { let e = frag.get(v); if (!e) { e = Buffer.from(JSON.stringify(v)); frag.set(v, e); fragBytes += e.length; while (fragBytes > 300 * 1048576 && frag.size > 1) { const k = frag.keys().next().value; fragBytes -= frag.get(k).length; frag.delete(k); } } return e; }
+  function fragOf(v) { let e = frag.get(v); if (!e) { e = Buffer.from(JSON.stringify(v)); frag.set(v, e); fragBytes += e.length; while (fragBytes > 160 * 1048576 && frag.size > 1) { const k = frag.keys().next().value; fragBytes -= frag.get(k).length; frag.delete(k); } } return e; }
   /* the answer to a pull as a Buffer: small parts are text, big shared values are pasted in as bytes (no 9 MB string is ever built) */
   function pullBuf(r, tail) {
     const bufs = []; let txt = '{"keys":{', first = true;
@@ -55,10 +55,20 @@ async function createApp(cfg, opts) {
   }
   /* admission control for the heavy answers (a whole page of data is 4-9 MB): at most 6 are built and sent at once, the rest wait their turn (up to 600 waiting).
      A crowd all opening the tool at the same moment is then slower for the last ones, but the server never builds hundreds of 9 MB answers in memory at once. */
-  const gate = { n: 0, max: cfg.bootConcurrency || 6, q: [], async enter(res) { if (this.n >= this.max) { if (this.q.length >= 600) return false; await new Promise((r) => this.q.push(r)); } else this.n++; let done = false; const out = () => { if (done) return; done = true; const nx = this.q.shift(); if (nx) nx(); else this.n--; }; res.on('finish', out); res.on('close', out); return true; } };
-  const ipOf = (req) => { if (cfg.trustProxy) { const x = String(req.headers['x-azure-clientip'] || req.headers['x-forwarded-for'] || '').split(',')[0].trim(); if (x) return x.replace(/:\d+$/, ''); } return req.socket.remoteAddress || ''; };
+  const gate = { n: 0, max: cfg.bootConcurrency || 6, q: [],
+    async enter(res) {
+      let held = false, gone = false;
+      res.on('close', () => { gone = true; if (held) { held = false; const nx = this.q.shift(); if (nx) nx(); else this.n--; } });
+      res.on('finish', () => { if (held) { held = false; const nx = this.q.shift(); if (nx) nx(); else this.n--; } });
+      if (this.n >= this.max) { if (this.q.length >= 600) return false; const ok = await new Promise((r) => { const f = () => r(true); f.res = res; this.q.push(f); setTimeout(() => { const ix = this.q.indexOf(f); if (ix >= 0) { this.q.splice(ix, 1); r(false); } }, 60000).unref(); }); if (!ok) return false; } else this.n++;
+      if (res.destroyed || gone) { const nx = this.q.shift(); if (nx) nx(); else this.n--; return false; }
+      held = true; return true;
+    } };
+  const ipOf = (req) => { if (cfg.trustProxy) { const x = String(req.headers['x-azure-clientip'] || req.headers['x-forwarded-for'] || '').split(',')[0].trim(); if (x) return /^\d+\.\d+\.\d+\.\d+:\d+$/.test(x) ? x.replace(/:\d+$/, '') : x; } return req.socket.remoteAddress || ''; };
   const sse = new Set(); let sseTimer = null, ssePending = false;
-  state.on(() => { ssePending = true; if (sseTimer) return; sseTimer = setTimeout(() => { sseTimer = null; if (!ssePending) return; ssePending = false; const m = 'data: {"seq":' + state.seq + '}\n\n'; for (const r of sse) { try { r.write(m); } catch (e) {} } }, 400); });
+  const sseSites = new Set(); let sseAll = false;   // which locations changed since the last notice
+  state.on((ev) => { for (const k of ev.keys || []) { const q = rules.parseKey_(k); if (!q) continue; if (['totAccessPolicy', 'totAccessGrants', 'totAccessAsks', 'totSites'].indexOf(q.name) >= 0) sseAll = true; else sseSites.add(q.site); }
+    ssePending = true; if (sseTimer) return; sseTimer = setTimeout(() => { sseTimer = null; if (!ssePending) return; ssePending = false; const m = 'data: {"seq":' + state.seq + '}\n\n', all = sseAll, sites = new Set(sseSites); sseAll = false; sseSites.clear(); for (const r of sse) { if (!all && !sites.has(r._site)) continue; try { r.write(m); } catch (e) {} } }, 400); });
 
   function sendAsset(req, res, name, extra) {
     const a = assets.get(name); if (!a) return false;
@@ -107,10 +117,11 @@ async function createApp(cfg, opts) {
   }
 
   async function route(req, res) {
+    if (req.url.startsWith('//')) { res.writeHead(404); return res.end(); }
     const url = new URL(req.url, 'http://x'), p = url.pathname, m = req.method, ip = ipOf(req);
     if (cfg.frontDoorId && p !== '/healthz' && req.headers['x-azure-fdid'] !== cfg.frontDoorId) { res.writeHead(403); return res.end(); }
 
-    if (p === '/healthz') { let ok = true; try { await db.q('SELECT 1 AS x'); } catch (e) { ok = false; } return U.sendJson(req, res, ok ? 200 : 503, { ok, seq: state.seq }); }
+    if (p === '/healthz') { let ok = true; try { await db.q('SELECT 1 AS x'); } catch (e) { ok = false; } return U.sendJson(req, res, ok ? 200 : 503, { ok }); }
     if (p === '/static/shim.js' || p === '/static/pre.js') { if (sendAsset(req, res, p.slice(8))) return; }
 
     /* ---- sign-in ---- */
@@ -170,10 +181,12 @@ async function createApp(cfg, opts) {
     }
     if (m === 'GET' && p === '/api/events') {
       if (!isStaff(id) || sse.size >= 3000) { res.writeHead(sse.size >= 3000 ? 503 : 403); return res.end(); }
+      if ([...sse].filter((r) => r._sid === id.sid).length >= 4) { res.writeHead(429); return res.end(); }
+      res._sid = id.sid; res._site = String(url.searchParams.get('site') || 'main').replace(/[^a-z0-9-]/g, '').slice(0, 30) || 'main';
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
       res.write('retry: 5000\n\ndata: {"seq":' + state.seq + '}\n\n'); sse.add(res);
       const raw = U.parseCookies(req.headers.cookie)[sessions.cookieName];
-      const hb = setInterval(async () => { try { if (!(await sessions.get(raw))) { res.end(); return; } res.write(': hb\n\n'); } catch (e) {} }, 25000);   // a signed-out or expired session loses its live channel
+      const hb = setInterval(async () => { try { if (!(await sessions.get(raw, { peek: true }))) { res.end(); return; } res.write(': hb\n\n'); } catch (e) {} }, 25000);   // a signed-out or expired session loses its live channel
       req.on('close', () => { clearInterval(hb); sse.delete(res); }); return;
     }
     if (m === 'GET' && p === '/api/admin/audit') {
@@ -198,6 +211,8 @@ async function createApp(cfg, opts) {
       let b; try { b = JSON.parse(await U.readBody(req, cfg.limits.bodyBytes)); } catch (e) { return U.sendJson(req, res, e.status || 400, { error: e.status === 413 ? 'too large' : 'bad request' }); }
       if (!b || typeof b !== 'object' || Array.isArray(b)) return U.sendJson(req, res, 400, { error: 'bad request' });
       if (p === '/api/rpc' && !isStaff(id)) return U.sendJson(req, res, 403, { error: 'not allowed' });
+      if (p === '/api/employee' && !limit('emp:' + id.email, 20, 60e3)) return U.sendJson(req, res, 429, { error: 'busy' }, { 'Retry-After': '10' });
+      if (b.action === 'pull' && !(+b.since > 0)) { if (!limit('fullpull:' + id.email, cfg.limits.fullPullPerMin, 60e3)) return U.sendJson(req, res, 429, { error: 'busy' }, { 'Retry-After': '10' }); if (!(await gate.enter(res))) return U.sendJson(req, res, 503, { error: 'busy' }, { 'Retry-After': '5' }); }
       const lab = req._lab = { l: p === '/api/employee' ? 'employee' : 'rpc' }; const r = await rpc(id, b, p === '/api/employee' ? EMPLOYEE_ACTIONS : null, ip, lab);
       if (b.action === 'pull' && r && r.keys) return U.sendBuf(req, res, 200, pullBuf(r, '}'), 'application/json; charset=utf-8', { 'Cache-Control': 'no-store' });
       return U.sendJson(req, res, 200, r, { 'Cache-Control': 'no-store' });
@@ -216,13 +231,13 @@ async function createApp(cfg, opts) {
   const timers = [];
   const every = (ms, fn, name) => timers.push(setInterval(() => { Promise.resolve().then(fn).catch((e) => console.error('[job ' + name + ']', e.message)); }, ms));
   if (!opts.noJobs) {
-    every(1000, () => state.catchUp(), 'catchup');                      // pick up what other instances saved
+    every(1000, () => db.lock(() => state.catchUp()), 'catchup');                      // pick up what other instances saved
     every(15000, () => mail.work(), 'mail');
     every(10 * 60e3, () => sessions.sweep(), 'sessions');
     every(60 * 60e3, async () => { files.cleanVideos(62); await mail.cleanup(); }, 'cleanup');
     every(60e3, async () => {                                           // 07:00 local: the daily project e-mail; once a day across all instances
       const hh = new Intl.DateTimeFormat('en-GB', { timeZone: cfg.tz, hour: '2-digit', hourCycle: 'h23' }).format(new Date()); if (hh !== '07') return;
-      await state.mutate((cur) => { rules.runDigest(cur, { email: '', name: '' }); }); await mail.flushQueue();
+      await db.lock(async () => { for (const r of await db.q(`SELECT k,v FROM meta WHERE k LIKE 'prop:%'`)) props[r.k.slice(5)] = r.v; rules.runDigest(state.cur, { email: '', name: '' }); }); await mail.flushQueue();
     }, 'digest');
     every(24 * 3600e3, () => require('./services/backup').run(state, cfg), 'backup');
   }

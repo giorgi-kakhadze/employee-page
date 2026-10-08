@@ -51,7 +51,7 @@
   /* push: the server says "seq N" when anything is saved by anyone; ask the sync to run */
   window.__ptfLive = function () {
     try {
-      var es = new EventSource('/api/events'); var last = window.__ptfSeq || 0;
+      var es = new EventSource('/api/events?site=' + encodeURIComponent(B.site || 'main')); var last = window.__ptfSeq || 0;
       /* spread the answers of many people over a few seconds, and never pull more often than every 4 s because of live notices */
       var wait = null, lastRun = 0;
       es.onmessage = function (ev) { try { var s = JSON.parse(ev.data).seq; if (s > last) { last = s; if (wait) return; var d = Math.max(Math.random() * 1500, lastRun + 4000 - Date.now()); wait = setTimeout(function () { wait = null; lastRun = Date.now(); if (window.totSyncNow) window.totSyncNow(); }, d); } } catch (e) {} };

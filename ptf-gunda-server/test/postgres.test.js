@@ -4,7 +4,7 @@ const { ok, section, done, sample } = require('./util'); const { start } = requi
 const pg = require('pg'); const ADMIN_URL = process.env.TEST_PG_URL || 'postgres://postgres@127.0.0.1:54329/postgres';
 (async () => {
   const root = new pg.Client({ connectionString: ADMIN_URL }); await root.connect(); await root.query('DROP DATABASE IF EXISTS ptf_test'); await root.query('CREATE DATABASE ptf_test'); await root.end();
-  const url = ADMIN_URL.replace(/\/[^/]*$/, '/ptf_test'), env = { DATABASE_URL: url, DATABASE_SSL: '' };
+  const url = ADMIN_URL.replace(/\/[^/]*$/, '/ptf_test'), env = { DATABASE_URL: url, DATABASE_SSL: '', PTF_FULLPULL_PER_MIN: '100000', PTF_RPC_PER_MIN: '100000' };
   const A = await start(env), B = await start(env, { noJobs: false });
   ok('both instances run on PostgreSQL', A.state.d.kind === 'postgres' && B.state.d.kind === 'postgres');
   await A.state.replaceAll({ keys: sample() }); await B.state.catchUp();

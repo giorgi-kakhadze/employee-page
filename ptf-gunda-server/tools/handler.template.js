@@ -41,7 +41,7 @@ function handle(b, id, cur) {
     }
 /*__BODY__*/
     return { error: 'unknown' };
-  } catch (ex) { try { Logger.log('handle: ' + (ex && ex.stack || ex)); } catch (x) {} return { error: 'server error' }; }
+  } catch (ex) { try { Logger.log('handle: ' + (ex && ex.stack || ex)); } catch (x) {} if (b && /^(push|reqNew|reqCancel)$/.test(b.action)) throw ex; return { error: 'server error' }; }   /* a write that failed half way must not be kept: the state layer then reloads from the database */
 }
 /* the daily project e-mail (07:00) */
 function runDigest(cur, id) { ENV.id = id || { email: '', name: '' }; ENV.state = { cur: cur }; return projDigest_(cur, false); }

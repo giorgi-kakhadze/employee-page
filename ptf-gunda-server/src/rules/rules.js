@@ -70,8 +70,8 @@ function sh_(s) { return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_2
 function out_(o) { return o; }
 
 function jp_(s, d) { try { var v = JSON.parse(s); return v == null ? d : v; } catch (e) { return d; } }
-var JPC_ = new Map();   /* parsed-copy cache for read-only use: callers must not change what they get */
-function jpc_(s, d) { if (typeof s !== 'string' || s.length < 2000) return jp_(s, d); var c = JPC_.get(s); if (c === undefined) { c = { v: jp_(s, null) }; if (JPC_.size >= 160) JPC_.clear(); JPC_.set(s, c); } return c.v == null ? d : c.v; }
+var JPC_ = new Map(), JPCB_ = 0;   /* parsed-copy cache for read-only use (callers must not change what they get), least recently used first, at most 60 million characters of source text (a parsed copy is several times larger) */
+function jpc_(s, d) { if (typeof s !== 'string' || s.length < 2000) return jp_(s, d); var c = JPC_.get(s); if (c === undefined) { c = { v: jp_(s, null) }; JPC_.set(s, c); JPCB_ += s.length; while (JPCB_ > 60000000 && JPC_.size > 1) { var o = JPC_.keys().next().value; JPCB_ -= o.length; JPC_.delete(o); } } else { JPC_.delete(s); JPC_.set(s, c); } return c.v == null ? d : c.v; }
 
 function verifyGoogle_() { return ENV.id && ENV.id.email ? { email: String(ENV.id.email).trim().toLowerCase(), name: String(ENV.id.name || '') } : null; }
 
@@ -128,7 +128,8 @@ function me_(tok) {
   /* v3.31: own pay statements (written by a manager's device; the bonus appears once the month review is final), own remarks / violations / disciplinary
      cases / positive feedback that staff chose to show, and own service incidents */
   var py = jpc_(K[mypre + 'totMyPay'] && K[mypre + 'totMyPay'].v, {}), pm = (py.byEmail || {})[g.email];
-  if (pm && pm.months) out.pay = Object.keys(pm.months).sort().reverse().slice(0, 6).map(function (k) { return pm.months[k]; });
+  function scrubPay_(v, d) { if (typeof v === 'number' || typeof v === 'boolean' || v == null) return v; if (typeof v === 'string') return v.replace(/[<>&"']/g, '').slice(0, 120); if (d > 4) return null; if (Array.isArray(v)) return v.slice(0, 60).map(function (x) { return scrubPay_(x, d + 1); }); var o = {}; Object.keys(v).slice(0, 80).forEach(function (k) { o[String(k).replace(/[^\w.-]/g, '').slice(0, 40)] = scrubPay_(v[k], d + 1); }); return o; }
+  if (pm && pm.months) out.pay = Object.keys(pm.months).sort().reverse().slice(0, 6).map(function (k) { return scrubPay_(pm.months[k], 0); });
   var mineRec = function (x) { var w = String(x.workId || x.empId || '').trim().toLowerCase(), n = String(x.name || '').trim().toLowerCase(); return w ? (!!myWid && w === myWid) : (myUniq && !!myNm && n === myNm); };   /* v3.39: never by name when the record has an ID, or when the name is shared */
   out.remarks = jpc_(K[mypre + 'totRemarks'] && K[mypre + 'totRemarks'].v, []).filter(function (x) { return x && x.share !== false && mineRec(x); })
     .map(function (x) { return { date: String(x.date || '').slice(0, 10), kind: String(x.kind || 'note').slice(0, 20), title: String(x.title || '').slice(0, 120), text: String(x.text || '').slice(0, 2000), by: String(x.by || '').slice(0, 60) }; })
@@ -613,6 +614,7 @@ function auditPush_(newV, oldV, c, max) {
   return JSON.stringify(o);
 }
 
+var KNOWN_NAMES = ["totTombstones","evalResults","traineeNotes","coachingActions","auditLog","customSpaces","idPrintHistory","employeeHistory","totJournal","totTeams","totProjects","totProjItems","totProjBoard","totChannels","totMessages","totBonusCfg","totBonusReviews","totRemarks","totMyPay","totUniqRules","totIncidents","totIncImports","totIncCfg","totAccessPolicy","totEmpRemovals","totTasks","totAnnouncements","totComments","totSites","totOnboardingHier","employeeDataSource","logbookDescriptions","logbookCustomGames","logbookSettings","totAppearance","totAppearanceDept","wsCustomConfig","idCardSizeSettings","idCompanyLogoSettings","idCardBarcodeSettings","idCardFreeLayout","idCompanyLogo","idCardFreeLayoutEnabled","totWorkshopFiles","totOnboardingFiles","totSchedule","totRetrain","totRecruitment","evalShare","evalVideos","evalPhotos","totMySchedules","totCases","totWorkbooks","totIntegrations","totEmpRequests","totProcessTpl","totEvalKinds","totEvalCfgBackups","totDeptCfg","totDeptDocs","totLifecycle","totGameCounts","totImportHistory","totAccessGrants","totAccessAsks"];
 /* ===== server handler (hand-written; the permission rules above and the pull / push body below are from Code.gs) ===== */
 var FULL_KEYS = ['totAccessPolicy', 'totAccessGrants', 'totSites'];   /* when one of these changed, what each person may see changed too: send everything */
 var GLOBAL_NAMES = ['totAccessPolicy', 'totAccessGrants', 'totAccessAsks', 'totSites'];   /* shared by all locations (stored under their plain names) */
@@ -687,6 +689,7 @@ function handle(b, id, cur) {
       Object.keys(b.keys || {}).sort(function (x, y) { return order(x) - order(y); }).forEach(function (k) {
         var n = b.keys[k], p = parseKey_(k);
         if (!p || !n || typeof n.v !== 'string' || n.v.length > 4500000) { denied.push(k); return; }
+        if (!admin && KNOWN_NAMES.indexOf(p.name) < 0) { denied.push(k); return; }   /* staff can only write the keys the tool uses (no junk keys) */
         if (!admin && (ADMIN_ONLY_WRITE.indexOf(k) >= 0 || ADMIN_ONLY_WRITE.indexOf(p.name) >= 0 || me.sites.indexOf(p.site) < 0 || !keyOk_(cur, em, me, cx, p.name, 'write'))) { denied.push(k); return; }
         var o = cur.keys[k], t = Math.min(+n.t || now, now + 60000), pre = k.slice(0, k.length - p.name.length);
         if (!admin && !o && Object.keys(cur.keys).length >= MAX_KEYS) { denied.push(k); return; }   /* v3.39: staff cannot create unlimited keys */
@@ -706,7 +709,7 @@ function handle(b, id, cur) {
     }
 
     return { error: 'unknown' };
-  } catch (ex) { try { Logger.log('handle: ' + (ex && ex.stack || ex)); } catch (x) {} return { error: 'server error' }; }
+  } catch (ex) { try { Logger.log('handle: ' + (ex && ex.stack || ex)); } catch (x) {} if (b && /^(push|reqNew|reqCancel)$/.test(b.action)) throw ex; return { error: 'server error' }; }   /* a write that failed half way must not be kept: the state layer then reloads from the database */
 }
 /* the daily project e-mail (07:00) */
 function runDigest(cur, id) { ENV.id = id || { email: '', name: '' }; ENV.state = { cur: cur }; return projDigest_(cur, false); }

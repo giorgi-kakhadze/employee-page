@@ -11,6 +11,7 @@
 
    Usage: node tools/port-code-gs.js [path/to/Code.gs]      (writes src/rules/rules.js) */
 const fs = require('fs'), path = require('path');
+const root0 = path.join(__dirname, '..', '..');
 const srcPath = process.argv[2] || path.join(__dirname, '..', '..', 'tool', 'Code.gs');
 let s = fs.readFileSync(srcPath, 'utf8');
 const ver = (/Pass-to-Floor[^\n]*v?(\d+\.\d+)/.exec(s) || [])[1] || '';
@@ -31,9 +32,12 @@ rep("function out_(o) { return ContentService.createTextOutput(JSON.stringify(o)
 cut('/* Checks a Google sign-in token with Google', '/* What ONE employee may see', "function verifyGoogle_() { return ENV.id && ENV.id.email ? { email: String(ENV.id.email).trim().toLowerCase(), name: String(ENV.id.name || '') } : null; }\n\n");
 
 /* 3b. the employee page (me_, empOf_) only reads what it parses, so parsed copies of the big lists are cached (the single-file edition parsed 2 MB per request) */
-rep("function jp_(s, d) { try { var v = JSON.parse(s); return v == null ? d : v; } catch (e) { return d; } }", "function jp_(s, d) { try { var v = JSON.parse(s); return v == null ? d : v; } catch (e) { return d; } }\nvar JPC_ = new Map();   /* parsed-copy cache for read-only use: callers must not change what they get */\nfunction jpc_(s, d) { if (typeof s !== 'string' || s.length < 2000) return jp_(s, d); var c = JPC_.get(s); if (c === undefined) { c = { v: jp_(s, null) }; if (JPC_.size >= 160) JPC_.clear(); JPC_.set(s, c); } return c.v == null ? d : c.v; }");
+rep("function jp_(s, d) { try { var v = JSON.parse(s); return v == null ? d : v; } catch (e) { return d; } }", "function jp_(s, d) { try { var v = JSON.parse(s); return v == null ? d : v; } catch (e) { return d; } }\nvar JPC_ = new Map(), JPCB_ = 0;   /* parsed-copy cache for read-only use (callers must not change what they get), least recently used first, at most 60 million characters of source text (a parsed copy is several times larger) */\nfunction jpc_(s, d) { if (typeof s !== 'string' || s.length < 2000) return jp_(s, d); var c = JPC_.get(s); if (c === undefined) { c = { v: jp_(s, null) }; JPC_.set(s, c); JPCB_ += s.length; while (JPCB_ > 60000000 && JPC_.size > 1) { var o = JPC_.keys().next().value; JPCB_ -= o.length; JPC_.delete(o); } } else { JPC_.delete(s); JPC_.set(s, c); } return c.v == null ? d : c.v; }");
 { const a = s.indexOf('function me_(tok) {'), b = s.indexOf('/* ===== v3.16 employee requests ===== */'); if (a < 0 || b < a) throw new Error('port: me_ anchors not found'); s = s.slice(0, a) + s.slice(a, b).split('jp_(').join('jpc_(') + s.slice(b); }
 { const a = s.indexOf('function empOf_(K, email) {'), b = s.indexOf('function isoOk_('); if (a < 0 || b < a) throw new Error('port: empOf_ anchors not found'); s = s.slice(0, a) + s.slice(a, b).split('jp_(').join('jpc_(') + s.slice(b); }
+
+/* 3b2. what a manager wrote into a pay statement is shown on the employee page: pass on numbers and short plain text only */
+rep("if (pm && pm.months) out.pay = Object.keys(pm.months).sort().reverse().slice(0, 6).map(function (k) { return pm.months[k]; });", "function scrubPay_(v, d) { if (typeof v === 'number' || typeof v === 'boolean' || v == null) return v; if (typeof v === 'string') return v.replace(/[<>&\"']/g, '').slice(0, 120); if (d > 4) return null; if (Array.isArray(v)) return v.slice(0, 60).map(function (x) { return scrubPay_(x, d + 1); }); var o = {}; Object.keys(v).slice(0, 80).forEach(function (k) { o[String(k).replace(/[^\\w.-]/g, '').slice(0, 40)] = scrubPay_(v[k], d + 1); }); return o; }\n  if (pm && pm.months) out.pay = Object.keys(pm.months).sort().reverse().slice(0, 6).map(function (k) { return scrubPay_(pm.months[k], 0); });");
 
 /* 3c. every position below Manager gets the schedule without pay: strip it once per version, not once per person */
 rep("function stripPay_(e) {", "var SPC_ = new Map();\nfunction stripPay_(e) { var c = SPC_.get(e.v); if (c !== undefined) return { v: c, t: e.t }; var r = stripPay0_(e); if (SPC_.size >= 16) SPC_.clear(); SPC_.set(e.v, r.v); return r; }\nfunction stripPay0_(e) {");
@@ -79,6 +83,10 @@ cut('/* Run ONCE from the Apps Script editor', 'function delMap_', '');
 /* 6. everything from backup_ to the end (Drive backups, doPost, video cleanup, triggers) is replaced by the server handler */
 cut('function backup_(df) {', null, '/*__HANDLER__*/\n');
 
+/* names of the keys the tool really syncs (taken from its own sync code): staff cannot create any other key */
+const toolHtml = fs.readFileSync(path.join(root0, 'tool', 'PTF-pass-to-floor-Gunda.html'), 'utf8'), names = new Set(['totTombstones']);
+['UNION', 'LWW'].forEach((n) => { const m = new RegExp('var ' + n + ' = \\[([^\\]]*)\\]').exec(toolHtml); if (!m) throw new Error('port: ' + n + ' list not found in the tool'); m[1].split(',').forEach((x) => { const v = x.trim().replace(/^'|'$/g, ''); if (v) names.add(v); }); });
+Object.keys({}).length;
 const head = s;
 const handler = fs.readFileSync(path.join(__dirname, 'handler.template.js'), 'utf8');
 const orig = fs.readFileSync(srcPath, 'utf8');
@@ -92,12 +100,13 @@ brep("      if (admin) return out_({ keys: cur.keys, updatedAt: cur.updatedAt ||
      "      var dl = deltaPlan_(+b.since || 0);\n      if (admin) { var ak = {}; Object.keys(cur.keys).forEach(function (k) { if (!dl.delta || dl.sent(k, parseKey_(k))) ak[k] = cur.keys[k]; }); return out_({ keys: ak, updatedAt: cur.updatedAt || 0, seq: ENV.seq(), delta: dl.delta }); }\n      var res = { keys: {}, updatedAt: cur.updatedAt || 0, seq: ENV.seq(), delta: dl.delta };");
 brep("var p = parseKey_(k), en = cur.keys[k]; if (!p || !en) return;\n        if (k === 'totAccessPolicy')", "var p = parseKey_(k), en = cur.keys[k]; if (!p || !en) return;\n        if (dl.delta && !dl.sent(k, p)) return;\n        if (!siteWanted_(b, p)) return;\n        if (k === 'totAccessPolicy')");
 brep("Object.keys(cur.keys).forEach(function (k) { if (!dl.delta || dl.sent(k, parseKey_(k))) ak[k] = cur.keys[k]; });", "Object.keys(cur.keys).forEach(function (k) { var q = parseKey_(k); if (q && (!dl.delta || dl.sent(k, q)) && siteWanted_(b, q)) ak[k] = cur.keys[k]; });");
+brep("if (!p || !n || typeof n.v !== 'string' || n.v.length > 4500000) { denied.push(k); return; }", "if (!p || !n || typeof n.v !== 'string' || n.v.length > 4500000) { denied.push(k); return; }\n        if (!admin && KNOWN_NAMES.indexOf(p.name) < 0) { denied.push(k); return; }   /* staff can only write the keys the tool uses (no junk keys) */");
 brep("if (changed) { backup_(df); cur.updatedAt = now; df.setContent(JSON.stringify(cur)); try { projDigest_(cur, false); } catch (x) {} }   /* v3.32 daily project digest */", "if (changed) { cur.updatedAt = now; }");
 
 const out = '/* GENERATED by tools/port-code-gs.js from tool/Code.gs' + (ver ? ' (v' + ver + ')' : '') + '. Do not edit; edit the source and run:  npm run build:rules */\n\'use strict\';\n' +
   'module.exports = function createRules(ENV) {\n' +
   'var Utilities = ENV.Utilities, Session = ENV.Session, CacheService = ENV.CacheService, PropertiesService = ENV.PropertiesService, MailApp = ENV.MailApp, Logger = ENV.Logger;\n' +
-  head.replace('/*__HANDLER__*/', handler.replace('/*__BODY__*/', body)) + '\n};\n';
+  head.replace('/*__HANDLER__*/', 'var KNOWN_NAMES = ' + JSON.stringify(Array.from(names)) + ';\n' + handler.replace('/*__BODY__*/', body)) + '\n};\n';
 fs.mkdirSync(path.join(__dirname, '..', 'src', 'rules'), { recursive: true });
 fs.writeFileSync(path.join(__dirname, '..', 'src', 'rules', 'rules.js'), out);
 console.log('rules.js written (' + out.length + ' bytes) from ' + path.relative(process.cwd(), srcPath));

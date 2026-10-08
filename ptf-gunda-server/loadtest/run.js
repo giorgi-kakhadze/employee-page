@@ -35,7 +35,7 @@ async function main() {
   const pol = JSON.parse(j.keys.totAccessPolicy.v), sites = ['main', 'site2', 'site3', 'site4'], roles = ['shift_lead', 'shift_lead', 'performance_coach', 'scheduling_coordinator', 'scheduling_coordinator', 'training_coordinator', 'hr_recruiter', 'service_manager'], staff = [];
   for (let i = 0; i < STAFF; i++) { const email = 'staff' + i + '@load.test', mgr = i % 12 === 0, role = mgr ? 'manager' : roles[i % roles.length], st = mgr ? sites : [i % 10 < 4 ? 'main' : sites[1 + (i % 3)]]; pol.users[email] = { role, name: 'Staff ' + i, sites: st }; staff.push({ email, role, sites: st }); }
   j.keys.totAccessPolicy = { v: JSON.stringify(pol), t: Date.now() - 60000 }; const tmp = path.join(os.tmpdir(), 'ptf-load-import.json'); fs.writeFileSync(tmp, JSON.stringify(j));
-  const env = Object.assign({}, process.env, { PTF_ENV: 'dev', PTF_DEV_LOGIN: '1', DATABASE_URL: dbUrl, DATABASE_SSL: '', PTF_RPC_PER_MIN: '100000', PTF_AUTH_PER_MIN: '100000', PTF_DATA_DIR: path.join(os.tmpdir(), 'ptf-load-data'), PTF_METRICS: 'fast', PTF_TZ: 'UTC' });
+  const env = Object.assign({}, process.env, { PTF_ENV: 'dev', PTF_DEV_LOGIN: '1', DATABASE_URL: dbUrl, DATABASE_SSL: '', PTF_RPC_PER_MIN: '100000', PTF_AUTH_PER_MIN: '100000', PTF_FULLPULL_PER_MIN: '100000', PTF_DATA_DIR: path.join(os.tmpdir(), 'ptf-load-data'), PTF_METRICS: 'fast', PTF_TZ: 'UTC' });
   execFileSync('node', [path.join(root, 'scripts', 'import-backup.js'), tmp], { env, stdio: 'inherit' });
   /* employees for the self-service page: people from the data set */
   const emps = JSON.parse(j.keys.employeeDataSource.v).filter((e) => e.status === 'Employed' && e.ext && e.ext.email).map((e) => e.ext.email); const employees = emps.slice(0, EMPL);
@@ -100,6 +100,6 @@ async function worker(msg) {
     while (Date.now() < END) { const x = await req(base, 'POST', '/api/employee', { headers: { cookie: ck, 'x-ptf-csrf': csrf }, body: { action: 'me' } }); if (x.status !== 200) err('employee me ' + x.status); else { rec('employee page data (me)', x.ms, x.wire); let j; try { j = JSON.parse(x.buf.toString()); } catch (e) {} if (!j || j.error) err('employee me: ' + (j && j.error)); } await sleep(Math.min(rnd(40, 80) * 1000, Math.max(0, END - Date.now()))); }
   }
   const all = []; for (let i = w; i < STAFF; i += W) all.push(staffVU(i)); for (let i = w; i < EMPL; i += W) all.push(employeeVU(i));
-  await Promise.all(all); process.send({ done: { lat, errs, bytes, peak } }); process.exit(0);
+  await Promise.all(all); process.send({ done: { lat, errs, bytes, peak } }, () => process.exit(0));
 }
 if (process.env.LT_WORKER != null) { process.once('message', (m) => worker(m)); } else main().catch((e) => { console.error(e); process.exit(2); });

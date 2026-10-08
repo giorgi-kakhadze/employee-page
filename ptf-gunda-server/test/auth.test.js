@@ -53,6 +53,8 @@ const TENANT = 'tenant-1111', CID = 'client-2222';
   s = await signIn('ana@x.com', { to: 'https://evil.example/' }); ok('an outside address in "to" is ignored (no open redirect)', s.r2.headers.get('location') === '/');
   s = await signIn('ana@x.com', { to: '//evil.example/' }); ok('so is a protocol-relative one', s.r2.headers.get('location') === '/');
 
+  s = await signIn('ana@x.com', { to: '/\t/evil.example' }); ok('a tab inside "to" does not make an open redirect', s.r2.headers.get('location') === '/', s.r2.headers.get('location'));
+
   section('3. Everything that must be refused');
   s = await signIn('ana@x.com', { state: 'forged-state-value-0123456789' }); ok('a wrong state (login CSRF)', !s.ok && s.r2.status === 401);
   { const c = await S.client(null); const r = await c.get('/auth/callback?code=abc&state=def'); ok('a callback without the sign-in cookie', r.status === 401); }

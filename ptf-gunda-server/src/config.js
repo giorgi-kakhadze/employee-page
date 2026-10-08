@@ -9,6 +9,7 @@ function list(v) { return String(v || '').split(/[,;\s]+/).map(s => s.trim().toL
 function load(e) {
   e = e || env;
   const mode = (e.PTF_ENV || 'production').toLowerCase();
+  if (['production', 'dev', 'test'].indexOf(mode) < 0) { const c0 = { errors: ['PTF_ENV must be "production", "dev" or "test" (got "' + mode + '")'], mode, prod: true, entra: {}, limits: {}, mail: {}, bootstrapAdmins: [] }; return c0; }
   const prod = mode === 'production';
   const c = {
     mode, prod,
@@ -24,10 +25,10 @@ function load(e) {
     entra: { tenant: e.ENTRA_TENANT_ID || '', clientId: e.ENTRA_CLIENT_ID || '', clientSecret: e.ENTRA_CLIENT_SECRET || '', adminRole: e.ENTRA_ADMIN_ROLE || 'PTF.Admin', adminGroup: e.ENTRA_ADMIN_GROUP_ID || '', allowedDomains: list(e.PTF_ALLOWED_DOMAINS) },
     bootstrapAdmins: list(e.PTF_BOOTSTRAP_ADMINS),
     devLogin: bool(e.PTF_DEV_LOGIN, false),
-    trustProxy: bool(e.PTF_TRUST_PROXY, prod),
+    trustProxy: bool(e.PTF_TRUST_PROXY, !!e.PTF_FRONTDOOR_ID),
     frontDoorId: e.PTF_FRONTDOOR_ID || '',
     mail: { transport: e.PTF_MAIL || (prod ? 'graph' : 'log'), from: e.PTF_MAIL_FROM || '', tenant: e.ENTRA_TENANT_ID || '', clientId: e.GRAPH_CLIENT_ID || e.ENTRA_CLIENT_ID || '', clientSecret: e.GRAPH_CLIENT_SECRET || e.ENTRA_CLIENT_SECRET || '' },
-    limits: { rpcPerMin: +e.PTF_RPC_PER_MIN || 600, bodyBytes: 6 * 1024 * 1024, uploadBytes: 3 * 1024 * 1024, authPerMin: +e.PTF_AUTH_PER_MIN || 30 },
+    limits: { rpcPerMin: +e.PTF_RPC_PER_MIN || 600, bodyBytes: 6 * 1024 * 1024, uploadBytes: 3 * 1024 * 1024, authPerMin: +e.PTF_AUTH_PER_MIN || 30, fullPullPerMin: +e.PTF_FULLPULL_PER_MIN || 20 },
     appInsights: e.APPLICATIONINSIGHTS_CONNECTION_STRING || ''
   };
   const errs = [];
@@ -39,6 +40,7 @@ function load(e) {
     if (c.sessionSecret.length < 32) errs.push('PTF_SESSION_SECRET must be a random secret of at least 32 characters');
     if (!c.entra.tenant || !c.entra.clientId || !c.entra.clientSecret) errs.push('ENTRA_TENANT_ID, ENTRA_CLIENT_ID and ENTRA_CLIENT_SECRET are required');
     if (!c.entra.allowedDomains.length) errs.push('PTF_ALLOWED_DOMAINS (your company e-mail domains) is required');
+    if (c.trustProxy && !c.frontDoorId) errs.push('PTF_FRONTDOOR_ID is required when PTF_TRUST_PROXY is on (otherwise anyone could fake their address)');
     if (c.mail.transport === 'graph' && !c.mail.from) errs.push('PTF_MAIL_FROM (the sending mailbox) is required for e-mail');
   } else {
     c.salt = c.salt || 'dev-salt-not-secret'; c.sessionSecret = c.sessionSecret || 'dev-session-secret-not-secret-0000000000';

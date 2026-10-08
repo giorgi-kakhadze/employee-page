@@ -24,7 +24,7 @@ module.exports = function oidc(cfg, sign, unsign, opts) {
     start(returnTo) {
       const state = crypto.randomBytes(18).toString('base64url'), nonce = crypto.randomBytes(18).toString('base64url'), ver = crypto.randomBytes(32).toString('base64url');
       const q = new URLSearchParams({ client_id: E.clientId, response_type: 'code', redirect_uri: redirect, response_mode: 'query', scope: 'openid profile email', state, nonce, code_challenge: sha(ver), code_challenge_method: 'S256', prompt: 'select_account' });
-      return { url: authority + '/' + E.tenant + '/oauth2/v2.0/authorize?' + q, cookie: sign({ s: state, n: nonce, v: ver, r: /^\/[^/\\]/.test(returnTo || '') || returnTo === '/' ? returnTo : '/', x: Date.now() + 600e3 }) };
+      return { url: authority + '/' + E.tenant + '/oauth2/v2.0/authorize?' + q, cookie: sign({ s: state, n: nonce, v: ver, r: /^\/([A-Za-z0-9_\-.\/?=&%#]*)$/.test(returnTo || '') && !/^\/[\/\\]/.test(returnTo) ? returnTo : '/', x: Date.now() + 600e3 }) };
     },
     /* step 2: the browser comes back with ?code=&state= ; returns { email, name, admin, roles } or throws */
     async finish(query, cookieVal) {

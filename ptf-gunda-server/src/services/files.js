@@ -14,7 +14,7 @@ module.exports = function files(dir) {
     CH,
     chunk(o) {
       const bytes = Buffer.from(String(o.data || ''), 'base64'), f = tmpOf(o.owner, o.up);
-      if (!bytes.length || bytes.length > CH) return { error: 'bad upload' };
+      if (!bytes.length || bytes.length > CH || !Number.isInteger(o.i) || !Number.isInteger(o.n) || o.i < 0 || o.n !== Math.ceil(o.size / CH) || o.i * CH + bytes.length > o.size) return { error: 'bad upload' };
       if (o.i === 0) { try { fs.rmSync(f, { force: true }); } catch (e) {} } else if (!fs.existsSync(f)) return { error: 'upload session lost, start again' };
       const fd = fs.openSync(f, o.i === 0 ? 'w' : 'r+'); try { fs.writeSync(fd, bytes, 0, bytes.length, o.i * CH); } finally { fs.closeSync(fd); }
       if (o.i < o.n - 1) return { ok: true };

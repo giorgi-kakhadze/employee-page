@@ -9,7 +9,7 @@ function sqliteDriver(file) {
   const db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=5000;');
   let chain = Promise.resolve();
-  const run = (sql, p) => { const st = db.prepare(sql); return /^\s*(select|with|pragma)/i.test(sql) ? st.all(...(p || [])) : (st.run(...(p || [])), []); };
+  const run = (sql, p) => { const st = db.prepare(sql); return (/^\s*(select|with|pragma)/i.test(sql) || /\breturning\b/i.test(sql)) ? st.all(...(p || [])) : (st.run(...(p || [])), []); };
   const mk = () => ({ q: async (sql, p) => run(sql, p) });
   return {
     kind: 'sqlite', file,
@@ -39,7 +39,7 @@ function pgDriver(url, opts) {
     /* in-process mutex first (cheap), then a PostgreSQL advisory lock so that several app instances take turns */
     async lock(fn) { const prev = chain; let rel; chain = new Promise(r => { rel = r; }); await prev;
       let c; try { c = await pool.connect(); await c.query('SELECT pg_advisory_lock(727001)'); return await fn(); }
-      finally { if (c) { try { await c.query('SELECT pg_advisory_unlock(727001)'); } catch (e) {} c.release(); } rel(); } },
+      finally { if (c) { let bad = false; try { await c.query('SELECT pg_advisory_unlock(727001)'); } catch (e) { bad = true; } c.release(bad); } rel(); } },
     async close() { await pool.end(); },
     idCol: 'BIGSERIAL PRIMARY KEY'
   };

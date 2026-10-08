@@ -33,12 +33,12 @@ class State {
   /* pick up what another instance saved. Cheap when nothing changed (one indexed query). */
   async catchUp() {
     const rows = await this.d.q('SELECT k,v,t,seq FROM kv WHERE seq > ?', [this.seq]); let max = this.seq, changed = [];
-    for (const r of rows) { this.cur.keys[r.k] = { v: r.v, t: Number(r.t) }; this.seqOf[r.k] = Number(r.seq); changed.push(r.k); if (Number(r.seq) > max) max = Number(r.seq); }
+    for (const r of rows) { if (Number(r.seq) <= (this.seqOf[r.k] || 0)) continue; this.cur.keys[r.k] = { v: r.v, t: Number(r.t) }; this.seqOf[r.k] = Number(r.seq); changed.push(r.k); if (Number(r.seq) > max) max = Number(r.seq); }
     for (const r of await this.d.q(`SELECT k,v,seq FROM meta WHERE k IN ('del','updatedAt') AND seq > ?`, [this.metaSeq.del || 0])) {
       if (r.k === 'del') { try { this.cur.del = JSON.parse(r.v) || {}; } catch (e) {} this.metaSeq.del = Number(r.seq); if (Number(r.seq) > max) max = Number(r.seq); }
     }
     const u = await this.d.q(`SELECT v FROM meta WHERE k='updatedAt'`); if (u[0]) this.cur.updatedAt = Number(u[0].v) || this.cur.updatedAt;
-    this.seq = max; if (changed.length) this.emit({ keys: changed, remote: true });
+    this.seq = Math.max(this.seq, max); if (changed.length) this.emit({ keys: changed, remote: true });
     return changed;
   }
   on(fn) { this.listeners.push(fn); }
@@ -56,10 +56,11 @@ class State {
       const changed = Object.keys(this.cur.keys).filter(k => this.cur.keys[k] !== before[k]);
       const delChanged = JSON.stringify(this.cur.del) !== delBefore;
       if (!changed.length && !delChanged) { this.cur.updatedAt = updBefore; return out; }
+      const snap = {}; changed.forEach((k) => { snap[k] = this.cur.keys[k]; });
       try {
         let seq = this.seq;
         await this.d.tx(async (t) => {
-          for (const k of changed) { const e = this.cur.keys[k]; seq++; await t.q(`INSERT INTO kv(k,v,t,seq) VALUES(?,?,?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v,t=excluded.t,seq=excluded.seq`, [k, e.v, e.t, seq]); this.seqOf[k] = seq; }
+          for (const k of changed) { const e = snap[k]; seq++; await t.q(`INSERT INTO kv(k,v,t,seq) VALUES(?,?,?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v,t=excluded.t,seq=excluded.seq`, [k, e.v, e.t, seq]); this.seqOf[k] = seq; }
           if (delChanged) { seq++; await t.q(`INSERT INTO meta(k,v,seq) VALUES('del',?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v,seq=excluded.seq`, [JSON.stringify(this.cur.del), seq]); this.metaSeq.del = seq; }
           await t.q(`INSERT INTO meta(k,v,seq) VALUES('updatedAt',?,0) ON CONFLICT(k) DO UPDATE SET v=excluded.v`, [String(this.cur.updatedAt)]);
           await t.q(`INSERT INTO meta(k,v,seq) VALUES('seq',?,0) ON CONFLICT(k) DO UPDATE SET v=excluded.v`, [String(seq)]);

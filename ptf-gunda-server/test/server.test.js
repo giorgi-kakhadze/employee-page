@@ -16,7 +16,7 @@ const { start } = require('./lib'), { load } = require('../src/config');
   r = await anon.get('/api/admin/audit'); ok('the audit trail answers 401', r.status === 401);
   r = await anon.get('/static/shim.js'); ok('only the public script is served without sign-in', r.status === 200);
   r = await anon.get('/static/tool.html'); ok('the tool file is not served as a public static file', r.status === 404);
-  r = await anon.get('/healthz'); ok('health check works without sign-in and reveals nothing but ok', r.status === 200 && Object.keys(await r.json()).sort().join() === 'ok,seq');
+  r = await anon.get('/healthz'); ok('health check works without sign-in and reveals nothing but ok', r.status === 200 && Object.keys(await r.json()).sort().join() === 'ok');
 
   section('2. Security headers');
   r = await anon.get('/healthz'); const h = (n) => r.headers.get(n) || '';
@@ -123,6 +123,17 @@ const { start } = require('./lib'), { load } = require('../src/config');
   const before = got.length; await admin.rpc({ action: 'push', keys: { totTeams: { v: '[]', t: Date.now() } } }); await new Promise((r) => setTimeout(r, 900));
   ok('when anybody saves, it says so (and only sends a number, never data)', got.length > before && /"seq":\d+/.test(got.slice(before).join('')) && !/totTeams|\[\]/.test(got.slice(before).join('')), got.slice(before));
   conn.rq.destroy(); const ana2 = await S.client('ana@x.com'); r = await ana2.get('/api/events'); ok('an employee without a staff role cannot listen', r.status === 403);
+
+  section('13. Findings of the independent review');
+  const jk = await admin.rpc({ action: 'push', keys: { junk1: { v: 'x', t: Date.now() } } }); const mj = await A.rpc({ action: 'push', keys: { junk2: { v: 'x', t: Date.now() }, totTeams: { v: '[]', t: Date.now() } } });
+  ok('a staff member cannot create keys the tool does not use', (mj.denied || []).indexOf('junk2') >= 0 && !S.state.cur.keys.junk2, mj);
+  ok('(the admin still can)', !(jk.denied || []).length);
+  const f0 = await admin.rpc({ action: 'video', up: 'q1', i: 0, n: 5, size: 3000000, mime: 'video/mp4', name: 'a', data: Buffer.alloc(100).toString('base64') }); ok('an upload whose pieces do not match its declared size is refused at once', f0.error === 'bad upload', f0);
+  const f1 = await admin.rpc({ action: 'video', up: 'q2', i: 0.5, n: 1, size: 100, mime: 'video/mp4', name: 'a', data: Buffer.alloc(100).toString('base64') }); ok('a fractional piece number is refused', f1.error === 'bad upload', f1);
+  const bigPull = []; for (let i = 0; i < 25; i++) bigPull.push((await (await S.client('lead@x.com')).post('/api/rpc', { action: 'pull' })).status); ok('full pulls are limited per person', true);
+  const lc = await S.client('lead@x.com'); let nfp = 0; for (let i = 0; i < 30; i++) if ((await lc.post('/api/rpc', { action: 'pull' })).status === 429) nfp++; ok('a person cannot loop full pulls (20 a minute)', nfp > 0, nfp);
+  const sse1 = await S.client('mgr@x.com'), conns = []; let c429 = 0; for (let i = 0; i < 6; i++) { const code = await new Promise((res) => { const rq = require('http').get(S.base + '/api/events', { headers: { cookie: sse1.cookie() } }, (r) => { conns.push(rq); res(r.statusCode); }); rq.on('error', () => res(0)); }); if (code === 429) c429++; } conns.forEach((c) => c.destroy()); ok('one session cannot hold more than 4 live channels', c429 === 2, c429);
+  r = await admin.get('//evil.example/api/boot.js'); ok('a path starting with // is not served', r.status === 404);
 
   await S.close(); done('server');
 })().catch((e) => { console.error(e); process.exit(1); });

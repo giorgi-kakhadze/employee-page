@@ -50,7 +50,7 @@ Every sign-in, sign-out, refused save, refused request (CSRF, origin), failed si
 Not in the trail (to keep it readable): ordinary saves. Set `cfg.auditEveryPush` in code if you want one line per save. Record-level history stays in the tool's own change journal.
 
 ## 2. Known limits (read these)
-1. **`script-src 'unsafe-inline'`.** The tool uses inline event handlers and builds embedded tools as inline documents. A nonce-based policy would block them. The tool escapes all text it displays, and `connect-src 'self'` stops stolen data from being sent anywhere, but a future script-injection bug would not be stopped by CSP. Removing inline handlers from 27,000 lines is a separate project.
+1. **`script-src 'unsafe-inline'`.** The tool uses inline event handlers and builds embedded tools as inline documents. A nonce-based policy would block them. The tool escapes all text it displays, and `connect-src 'self'` stops scripts from sending data with fetch / XHR / live channels to other sites, but it does **not** stop leaving by navigation (`location = 'https://…?d=…'`, `window.open`), and an injected script could act as the signed-in user inside the page. A future script-injection bug would therefore not be stopped by CSP. Removing inline handlers from 27,000 lines is a separate project.
 2. **The rules are the old rules.** Anything the single-file edition allowed (for example a manager being able to watch evaluation videos by default) is still allowed. The change here is *who can reach the rules*, not what the rules say.
 3. **An administrator sees everything**, as before. Use few administrators, require MFA and conditional access on the app registration, and read the audit trail.
 4. **Instances catch up once a second.** A save on one instance is visible on the others within about a second; a revoked session within 30 seconds.
@@ -60,7 +60,16 @@ Not in the trail (to keep it readable): ordinary saves. Set `cfg.auditEveryPush`
 8. **Not penetration-tested.** The tests above are mine. Have a third party test it before it holds real pay and evaluation data.
 9. **Dependencies.** One runtime dependency (`pg`); run `npm audit` in CI (template included).
 
-## 3. What to configure in Microsoft Entra
+10. **Identity is the e-mail claim.** Sessions and the access list use the e-mail from the signed token (checked against the tenant and the allowed domains), not the immutable object id. A recycled mailbox address would inherit the earlier holder's position. Keep Entra's "assignment required" on, and remove people from Access management when they leave.
+11. **Deprovisioning is not instant.** A session lasts up to 10 hours even if the person is disabled in Entra or loses `PTF.Admin`; to end it now delete the row (see RUNBOOK). The live channel no longer extends the idle timeout.
+12. **Audit chain is unkeyed.** Anyone who can rewrite the whole audit table can recompute it; ship the rows to Log Analytics. Admin changes to access rules are in the tool's own change journal, not in the server audit.
+13. **No upload quota yet.** Each upload piece is validated against the declared size, but there is no per-person byte quota; uploaded project files are not deleted when their project is removed.
+14. **Files are read synchronously** from the share; a slow share slows everybody for that moment.
+
+## 3. Independent review
+Before release a separate reviewer (a second AI agent, read-only, not told what I expected) went through the server code and reported 20 findings. Fixed and tested: junk-key memory exhaustion (staff can now only write the keys the tool uses), a leak in the boot-load queue, unbounded full pulls (now limited and queued), an open redirect through a tab character, upload piece/size validation, a half-applied save being kept, a catch-up race between instances, duplicate daily e-mails and outbox sends across instances, fail-open configuration (an unknown `PTF_ENV` no longer disables checks; the proxy header is trusted only with a Front Door id), IPv6 addresses, employee-page request limits, per-session live-channel cap, pay statements shown on the employee page are scrubbed of markup, `//` paths. Still open and listed in the limits above: 10–14, nonce-based CSP, a revoke-sessions admin action. A human penetration test is still recommended.
+
+## 4. What to configure in Microsoft Entra
 * App registration, single tenant, redirect URI `https://<host>/auth/callback` (Web), no implicit flow.
 * App role `PTF.Admin` assigned to the few administrators; "Assignment required" ON for the enterprise application, so only assigned people or groups can sign in at all.
 * Conditional access: MFA, compliant device, block legacy auth.

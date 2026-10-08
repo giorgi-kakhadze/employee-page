@@ -27,8 +27,9 @@ module.exports = function mail(db, cfg, sent) {
     async flushQueue() { const p = pending; pending = []; for (const r of p) await db.q('INSERT INTO outbox(ts,to_addr,subject,body) VALUES(?,?,?,?)', r).catch(e => { console.error('[mail] queue failed', e.message); }); },
     async work() {
       await this.flushQueue();
-      const rows = await db.q(`SELECT * FROM outbox WHERE status='queued' AND next_at<=? ORDER BY id LIMIT 20`, [Date.now()]); let ok = 0;
+      const rows = await db.q(`SELECT * FROM outbox WHERE status IN ('queued','sending') AND next_at<=? ORDER BY id LIMIT 20`, [Date.now()]); let ok = 0;
       for (const r of rows) {
+        const got = await db.q(`UPDATE outbox SET status='sending', next_at=? WHERE id=? AND status IN ('queued','sending') AND next_at<=? RETURNING id`, [Date.now() + 300e3, r.id, Date.now()]); if (!got.length) continue;   // another instance took it
         try { await transport(r.to_addr, r.subject, r.body); await db.q(`UPDATE outbox SET status='sent', tries=tries+1, err=NULL WHERE id=?`, [r.id]); ok++; }
         catch (e) { const t = Number(r.tries) + 1; await db.q(`UPDATE outbox SET tries=?, status=?, next_at=?, err=? WHERE id=?`, [t, t >= 6 ? 'failed' : 'queued', Date.now() + Math.min(3600e3, 30e3 * Math.pow(3, t)), String(e.message).slice(0, 200), r.id]); }
       }

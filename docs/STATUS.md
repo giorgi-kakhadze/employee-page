@@ -18,6 +18,8 @@ Checked against `docs/platform-requirements.txt` (35 sections), using the code i
 
 "v3.38" marks 💬 Community: channels created by managers and private direct / group chats for staff (see `docs/v3_38_notes.md`).
 
+"Server Edition" (`ptf-gunda-server/`, separate from the single-file edition) is the same tool hosted centrally: Microsoft sign-in, PostgreSQL, no data on laptops, built for about 5,000 people and hundreds at once (see `ptf-gunda-server/README.md` and its `docs/`).
+
 "v3.39" marks the mass test: server and employee page hardening, speed with 1,000 people, Escape and the sync pill (see `docs/v3_39_notes.md`).
 
 "v3.33" marks teams, restricted / shared items and files, branching tasks, workflow stages, approvals, file storage and the Progress page (see `docs/v3_33_notes.md`).
