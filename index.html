@@ -109,7 +109,7 @@ function show(){
   keepDraft();
   $('login').hidden=true;var a=$('app');a.hidden=false;if(!TABS.some(function(t){return t[0]===tab}))tab='home';
   var h=(DEMO?'<div class="banner"><b>Demo data.</b> This page is not connected to the server. Nothing you do here is sent anywhere. <button type="button" onclick="D=demoData(\'presenter\');tab=\'rotation\';show();scrollTo(0,0)">Game presenter</button> <button type="button" onclick="D=demoData(\'shuffler\');tab=\'rotation\';show();scrollTo(0,0)">Shuffler</button></div>':'')+
-    '<div class="row"><div><h1>Hello, '+esc((D.profile&&D.profile.nickname)||D.name||D.email)+'</h1><div class="mut">'+esc(D.email)+'</div></div><span><button onclick="load()">&#8635; Refresh</button> <button onclick="location.reload()">Sign out</button></span></div>'+
+    '<div class="row"><div><h1>Hello, '+esc(firstName())+'</h1><div class="mut">'+esc(D.email)+'</div></div><span><button onclick="load()">&#8635; Refresh</button> <button onclick="location.reload()">Sign out</button></span></div>'+
     '<nav class="main3">'+TABS.map(function(t){return '<button data-t="'+t[0]+'" class="'+(t[0]===tab?'on':'')+'">'+t[1]+'</button>'}).join('')+'</nav><div id="pg"></div>';
   a.innerHTML=h;
   a.querySelector('nav').onclick=function(e){var b=e.target.closest('button');if(b){tab=b.getAttribute('data-t');show();window.scrollTo(0,0)}};
@@ -185,6 +185,7 @@ function pSchedule(){
   if(pn&&pn.days.length){h+='<h2>Worked this month</h2><div class="card">'+pn.days.filter(function(d){return d.k==='day'||d.k==='night'}).slice().reverse().map(function(d){return '<div class="day"><span>'+dLabel(d.d)+' · '+esc(SH[d.s]||d.s||'')+'</span><span>'+d.h+' h'+(d.act?' <span class="leave">*</span>':'')+'</span></div>'}).join('')+'</div>'}
   return h+pRequests();
 }
+function firstName(){var n=String((D.profile&&D.profile.name)||D.name||'').trim();if(n.indexOf(',')>0)n=n.split(',')[1].trim();return n.split(/\s+/)[0]||D.email}
 function rotKind(v){var m=/^Zone\s+(\S+)(?:\s*·\s*tables?\s+(.+))?$/i.exec(v);if(m)return{k:'zone',z:m[1],t:(m[2]||'').split(/\s*,\s*/).filter(Boolean)};if(/^Table\b/i.test(v))return{k:'table',t:[v.replace(/^Table\s*/i,'')]};if(v==='Break')return{k:'break'};if(v==='Off'||v==='-')return{k:'off'};return{k:'other'}}
 function pRotation(){
   var r=D.rotation,h='<h2>My rotation</h2><div class="mut" style="margin-bottom:8px">Your tables or zones for the coming days. View only: if something must change, send a request from Schedule.</div>';

@@ -16,6 +16,9 @@ let fails = 0; const ok = (n, c, x) => { console.log((c ? '  ✅ ' : '  ❌ ') +
     const t = await p.evaluate(() => { var s = rotKind('Zone C · tables 11, 12, 13'); return JSON.stringify(s); });
     ok(f + ': zone text is parsed', t === '{"k":"zone","z":"C","t":["11","12","13"]}', t);
   }
+  const q = await br.newPage(); await q.goto('file://' + __dirname + '/../index.html?demo'); await q.waitForTimeout(400);
+  const g = await q.evaluate(() => { D = demoData('presenter'); D.profile.name = 'Salome Beridze'; D.profile.nickname = 'Lucky'; show(); const a = document.querySelector('#app h1').textContent; D.profile.name = 'Beridze, Nino'; show(); return [a, document.querySelector('#app h1').textContent]; });
+  ok('greeting uses the first name, not the nickname', g[0] === 'Hello, Salome' && g[1] === 'Hello, Nino', g.join(' | '));
   ok('no page errors', perr.length === 0, perr.join(' | '));
   await br.close(); console.log('employee_zone_view: ' + (fails ? fails + ' FAILED' : 'ALL PASSED')); process.exit(fails ? 1 : 0);
 })();
