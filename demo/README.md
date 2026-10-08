@@ -84,3 +84,6 @@ The people below are in the access list (positions and departments) so that Assi
 ## Employee page demo: game presenter and shuffler rotation
 
 `employee-demo.html` (open it in a browser, also on a phone) shows the employee page with made-up data. Use the buttons at the top to switch between **Game presenter** (one table per half hour, breaks) and **Shuffler** (one zone per hour with its table numbers, breaks); **New random** makes another random person. The Rotation tab highlights the current slot as NOW. The same buttons work in the real page with `?demo` in the address.
+
+## Lite backup (about 2 MB)
+`PTF-demo-backup-lite.json`: about 270 people, all three shifts, 3 days of rotation (presenters on tables, shufflers on zones), Community channels and chats, evaluations, tickets, pay, uniforms and the rest, in under 2 MB. Built by `make-lite-backup.py` → `build-rotation-demo.js` (with `IN`, `OUT`, `DAYS`) → `add-chat-to-demo.py` (with `IN`, `OUT`).

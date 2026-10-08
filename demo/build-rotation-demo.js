@@ -2,9 +2,9 @@
    for game presenters (tables, half an hour each) and shufflers (zones of tables, one hour each; smaller zones on the days with more staff).
    It drives the tool itself (the same Generate button people press), so the file is exactly what the tool produces.   node demo/build-rotation-demo.js */
 const fs = require('fs'), path = require('path');
-const root = path.join(__dirname, '..'), tool = path.join(root, 'tool', 'PTF-pass-to-floor-Gunda.html'), code = path.join(root, 'tool', 'Code.gs'), DEMO = path.join(__dirname, 'PTF-demo-backup.json'), OUT = path.join(__dirname, 'PTF-demo-backup-with-rotation.json');
+const root = path.join(__dirname, '..'), tool = path.join(root, 'tool', 'PTF-pass-to-floor-Gunda.html'), code = path.join(root, 'tool', 'Code.gs'), DEMO = process.env.IN ? path.resolve(process.env.IN) : path.join(__dirname, 'PTF-demo-backup.json'), OUT = process.env.OUT ? path.resolve(process.env.OUT) : path.join(__dirname, 'PTF-demo-backup-with-rotation.json');
 const gas = require(path.join(root, 'tests', 'fakegas'))(code); require(path.join(root, 'tests', 'seed'))(gas);
-const DAYS = ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11'], SHIFTS = ['morning', 'afternoon', 'night'];
+const DAYS = (process.env.DAYS || '2026-10-05,2026-10-06,2026-10-07,2026-10-08,2026-10-09,2026-10-10,2026-10-11').split(','), SHIFTS = ['morning', 'afternoon', 'night'];
 (async () => {
   const H = await require(path.join(root, 'tests', 'harness'))(tool, gas);
   const P = await H.open({ admin: true }); await P.setViewportSize({ width: 1600, height: 1000 }); await P.sync();

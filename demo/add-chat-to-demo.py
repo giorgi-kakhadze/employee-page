@@ -1,8 +1,8 @@
 """Adds Community channels, threads, reactions, pins and direct/group chats to the rotation demo backup.
    python3 demo/add-chat-to-demo.py   ->  demo/PTF-demo-backup-full.json"""
-import json, random, hashlib
+import json, random, hashlib, os
 random.seed(77)
-src = json.load(open('demo/PTF-demo-backup-with-rotation.json'))
+src = json.load(open(os.environ.get('IN', 'demo/PTF-demo-backup-with-rotation.json')))
 d = src['data']
 users = json.loads(d['totAccessPolicy'])['users']
 by = lambda role: [e for e, x in users.items() if x['role'] == role]
@@ -123,7 +123,7 @@ dm('dm-8', [svc[0], svc[1], mgr[4]], [(svc[0], 'Two tickets about the break room
 msgs.sort(key=lambda m: m['ts'])
 d['totChannels'] = json.dumps(chs, ensure_ascii=False, separators=(',', ':'))
 d['totMessages'] = json.dumps(msgs, ensure_ascii=False, separators=(',', ':'))
-src['_meta']['note'] = 'Demo company: about 1000 staff and employees, a full week of rotation (presenters on tables, shufflers on zones, all three shifts), plus Community channels and chats.'
+src['_meta']['note'] = os.environ.get('NOTE') or 'Demo company: about 1000 staff and employees, a full week of rotation (presenters on tables, shufflers on zones, all three shifts), plus Community channels and chats.'
 src['_meta']['reason'] = 'full-demo'
-json.dump(src, open('demo/PTF-demo-backup-full.json', 'w'), ensure_ascii=False, separators=(',', ':'))
+json.dump(src, open(os.environ.get('OUT', 'demo/PTF-demo-backup-full.json'), 'w'), ensure_ascii=False, separators=(',', ':'))
 print(len(chs), 'channels/chats', len([m for m in msgs if m['kind'] == 'msg']), 'messages', len([m for m in msgs if m['kind'] == 'react']), 'reactions')
