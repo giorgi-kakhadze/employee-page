@@ -8,31 +8,32 @@ first = "Giorgi Nino Luka Mariam Davit Tamar Nika Ana Sandro Eka Irakli Salome L
 last = "Beridze Kapanadze Gelashvili Maisuradze Lomidze Chkheidze Tsiklauri Mamaladze Bakradze Kvaratskhelia Gabunia Iashvili Javakhishvili Tabatadze Nozadze Sulaberidze Chikovani Gvenetadze Kobakhidze Gogoladze Khutsishvili Dolidze Jorjadze Meskhi Abashidze".split()
 games = ["Blackjack", "Roulette", "Baccarat", "Game Show", "Poker"]
 rows, used = [], set()
+TN = {1: "Team One", 2: "Team Two", 3: "Team Three", 4: "Shufflers"}
 def person(i, pos, badge, team, shift, st):
     while True:
         n = random.choice(first) + " " + random.choice(last)
         if n not in used: used.add(n); break
     f, l = n.split()
     wid = "E%d" % (20001 + i)
-    return [n, f + " " + l[0] + ".", wid, wid, "Employed", pos, badge, "Team %d" % team, shift, st,
+    return [n, f + " " + l[0] + ".", wid, wid, "Employed", pos, badge, TN[team], shift, st,
             "+995 5%02d %02d %02d %02d" % (random.randint(10, 99), *[random.randint(0, 99) for _ in range(3)]),
             "%s.%s%d@example.com" % (f.lower(), l.lower(), i), "%d-%02d-%02d" % (random.choice([2024, 2025, 2026]), random.randint(1, 9), random.randint(1, 28)),
-            ", ".join(random.sample(games, 2)) if pos == "Game Presenter" else "", random.choice(["English", "English, Georgian", "English, Russian", "Georgian"]), random.choice(["Female", "Male"]), "Mariami Beridze" if team == 1 else "Luka Chkheidze"]
+            ", ".join(random.sample(games, 2)) if pos == "Game Presenter" else "", random.choice(["English", "English, Georgian", "English, Russian", "Georgian"]), random.choice(["Female", "Male"]), "Mariami Beridze" if team in (1, 4) else "Luka Chkheidze"]
 i = 0
 shifts = ["Morning", "Afternoon", "Night"]
-# 150 game presenters: 3 shifts x 2 sets x 25; badges mixed; teams 1 and 2 alternate
+# 150 game presenters: 3 shifts x 2 sets x 25; badges mixed; teams One, Two, Three rotate
 badges = ["VIP"] * 12 + ["Premium"] * 30 + ["Beginner"] * 18 + [""] * 90; random.shuffle(badges)
 for sh in shifts:
     for st in ["Set 1", "Set 2"]:
         for k in range(25):
-            rows.append(person(i, "Game Presenter", badges[len(rows) if len(rows) < 150 else 0], 1 + (k % 2), sh, st)); i += 1
-# 50 shufflers: Team 3 (set up zones for this team), about 8 per shift and set (+2 extra)
+            rows.append(person(i, "Game Presenter", badges[len(rows) if len(rows) < 150 else 0], 1 + (k % 3), sh, st)); i += 1
+# 50 shufflers: team Shufflers (set up zones for this team), about 8 per shift and set (+2 extra)
 for sh in shifts:
     for st in ["Set 1", "Set 2"]:
         for k in range(8):
-            rows.append(person(i, "Shuffler", "", 3, sh, st)); i += 1
+            rows.append(person(i, "Shuffler", "", 4, sh, st)); i += 1
 for k in range(2):
-    rows.append(person(i, "Shuffler", "", 3, "Morning", "Set 1")); i += 1
+    rows.append(person(i, "Shuffler", "", 4, "Morning", "Set 1")); i += 1
 random.shuffle(rows)
 hdr = ["Full Name", "Screen Name", "Workday ID", "Barcode", "Status", "Position", "Badge", "Team", "Shift", "Set", "Phone", "Email", "Start Date", "Games", "Languages", "Gender", "Team Manager"]
 wb = openpyxl.Workbook(); ws = wb.active; ws.title = "Employees"; ws.append(hdr)
