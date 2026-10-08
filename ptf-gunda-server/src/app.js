@@ -6,6 +6,8 @@ const sessionsFactory = require('./auth/session'), oidcFactory = require('./auth
 const filesFactory = require('./services/files'), auditFactory = require('./services/audit'), mailFactory = require('./services/mail');
 const U = require('./http/util'), securityHeaders = require('./http/headers');
 
+/* per-person settings that are not shared data (theme, sounds, which location was open last). Kept on the server so they follow the person, not the laptop. */
+const PREF_KEYS = ['totAppTheme', 'totAppStyle', 'totSoundPrefs', 'totMusicPrefs', 'totConsentV1', 'totLastSite', 'rememberSupervisor', 'supFirstName'];
 const EMPLOYEE_ACTIONS = ['me', 'reqNew', 'reqCancel'];
 const WRITE_ACTIONS = ['push', 'reqNew', 'reqCancel'];
 const KNOWN_ACTIONS = ['pull', 'push', 'me', 'reqNew', 'reqCancel', 'login', 'video', 'videoGet', 'projNotify', 'pjFileUp', 'pjFileGet', 'list', 'setStatus', 'remove', 'request'];
@@ -21,6 +23,10 @@ async function createApp(cfg, opts) {
     onProp: (k, v) => { db.q(`INSERT INTO meta(k,v,seq) VALUES(?,?,0) ON CONFLICT(k) DO UPDATE SET v=excluded.v`, ['prop:' + k, v]).catch(() => {}); },
     onMail: (to, s, b) => mail.enqueue(to, s, b) });
   const rules = createRules(env);
+  /* how long the rule code takes per action (milliseconds of CPU, it is synchronous); printed by the metrics line, so capacity can be planned from real numbers */
+  const stats = { m: {}, h: {}, rec(a, ms) { const e = this.m[a] || (this.m[a] = []); if (e.length < 5000) e.push(ms); }, http(a, ms) { const e = this.h[a] || (this.h[a] = []); if (e.length < 5000) e.push(ms); },
+    sum(m) { const o = {}; Object.keys(m).forEach((a) => { const s = m[a].slice().sort((x, y) => x - y), n = s.length; o[a] = { n, p50: +s[Math.floor(n * 0.5)].toFixed(2), p95: +s[Math.floor(n * 0.95)].toFixed(2), p99: +s[Math.floor(n * 0.99)].toFixed(2), max: +s[n - 1].toFixed(1) }; }); return o; },
+    take() { const o = { rules: this.sum(this.m), http: this.sum(this.h) }; this.m = {}; this.h = {}; return o; } };
   const { sign, unsign } = U.signer(cfg.sessionSecret), limit = U.limiter(), baseHeaders = securityHeaders(cfg);
   const oidc = cfg.entra.clientId ? oidcFactory(cfg, sign, unsign, { authority: opts.authority, fetchJson: opts.fetchJson }) : null;
   const pub = path.join(__dirname, '..', 'public'), assets = new Map();
@@ -35,6 +41,21 @@ async function createApp(cfg, opts) {
   }
   loadAssets();
 
+  /* big values are the same for many people (the schedule of a location, the employee list). JSON-escaping them again for every person was a third of the server's work,
+     so the escaped text of each big value is kept (64 most recent versions) and pasted into the answer. */
+  const frag = new Map(); let fragBytes = 0;
+  function fragOf(v) { let e = frag.get(v); if (!e) { e = Buffer.from(JSON.stringify(v)); frag.set(v, e); fragBytes += e.length; while (fragBytes > 300 * 1048576 && frag.size > 1) { const k = frag.keys().next().value; fragBytes -= frag.get(k).length; frag.delete(k); } } return e; }
+  /* the answer to a pull as a Buffer: small parts are text, big shared values are pasted in as bytes (no 9 MB string is ever built) */
+  function pullBuf(r, tail) {
+    const bufs = []; let txt = '{"keys":{', first = true;
+    for (const k of Object.keys(r.keys || {})) { const x = r.keys[k]; txt += (first ? '' : ',') + JSON.stringify(k) + ':'; first = false;
+      if (x && typeof x.v === 'string' && x.v.length > 20000) { bufs.push(Buffer.from(txt + '{"v":')); bufs.push(fragOf(x.v)); txt = ',"t":' + (+x.t || 0) + '}'; } else txt += JSON.stringify(x); }
+    txt += '},"updatedAt":' + (+r.updatedAt || 0) + ',"seq":' + (+r.seq || 0) + ',"delta":' + (r.delta ? 'true' : 'false') + (tail || '');
+    bufs.push(Buffer.from(txt)); return Buffer.concat(bufs);
+  }
+  /* admission control for the heavy answers (a whole page of data is 4-9 MB): at most 6 are built and sent at once, the rest wait their turn (up to 600 waiting).
+     A crowd all opening the tool at the same moment is then slower for the last ones, but the server never builds hundreds of 9 MB answers in memory at once. */
+  const gate = { n: 0, max: cfg.bootConcurrency || 6, q: [], async enter(res) { if (this.n >= this.max) { if (this.q.length >= 600) return false; await new Promise((r) => this.q.push(r)); } else this.n++; let done = false; const out = () => { if (done) return; done = true; const nx = this.q.shift(); if (nx) nx(); else this.n--; }; res.on('finish', out); res.on('close', out); return true; } };
   const ipOf = (req) => { if (cfg.trustProxy) { const x = String(req.headers['x-azure-clientip'] || req.headers['x-forwarded-for'] || '').split(',')[0].trim(); if (x) return x.replace(/:\d+$/, ''); } return req.socket.remoteAddress || ''; };
   const sse = new Set(); let sseTimer = null, ssePending = false;
   state.on(() => { ssePending = true; if (sseTimer) return; sseTimer = setTimeout(() => { sseTimer = null; if (!ssePending) return; ssePending = false; const m = 'data: {"seq":' + state.seq + '}\n\n'; for (const r of sse) { try { r.write(m); } catch (e) {} } }, 400); });
@@ -66,7 +87,7 @@ async function createApp(cfg, opts) {
   }
 
   /* run one tool request (the single-file tool's pull / push / etc.) */
-  async function rpc(id, b, allowed, ip) {
+  async function rpc(id, b, allowed, ip, lab) {
     const act = b && b.action;
     if (typeof act !== 'string' || KNOWN_ACTIONS.indexOf(act) < 0) return { error: 'unknown' };
     if (allowed && allowed.indexOf(act) < 0) return { error: 'not allowed' };
@@ -74,9 +95,11 @@ async function createApp(cfg, opts) {
     if (act === 'setStatus' || act === 'remove') return { ok: true };
     if (act === 'request') return { status: 'approved' };
     const who = { email: id.email, name: id.name, admin: id.admin };
-    let r;
-    if (WRITE_ACTIONS.indexOf(act) >= 0) r = await state.mutate((cur) => rules.handle(b, who, cur));
-    else { await state.settled(); r = rules.handle(b, who, state.cur); }
+    let r, ms = 0;
+    const timed = (cur) => { const t0 = process.hrtime.bigint(); try { return rules.handle(b, who, cur); } finally { ms = Number(process.hrtime.bigint() - t0) / 1e6; } };
+    if (WRITE_ACTIONS.indexOf(act) >= 0) r = await state.mutate(timed);
+    else { await state.settled(); r = timed(state.cur); }
+    stats.rec(act, ms); if (lab) lab.l = lab.l + ':' + act;
     mail.flushQueue().catch(() => {});
     if (act === 'push') { const n = Object.keys(b.keys || {}).length; if ((r.denied && r.denied.length) || (r.conflicts && r.conflicts.length)) audit.log(id.email, 'push.refused', 'denied=' + (r.denied || []).join(',').slice(0, 300) + ' conflicts=' + (r.conflicts || []).length, ip); else if (n && cfg.auditEveryPush) audit.log(id.email, 'push', n + ' keys', ip); }
     if (act === 'videoGet' || act === 'pjFileGet') audit.log(id.email, act, String(b.id || '').slice(0, 60), ip);
@@ -88,7 +111,7 @@ async function createApp(cfg, opts) {
     if (cfg.frontDoorId && p !== '/healthz' && req.headers['x-azure-fdid'] !== cfg.frontDoorId) { res.writeHead(403); return res.end(); }
 
     if (p === '/healthz') { let ok = true; try { await db.q('SELECT 1 AS x'); } catch (e) { ok = false; } return U.sendJson(req, res, ok ? 200 : 503, { ok, seq: state.seq }); }
-    if (p === '/static/shim.js' || p === '/static/portal.js') { if (sendAsset(req, res, p.slice(8))) return; }
+    if (p === '/static/shim.js' || p === '/static/pre.js') { if (sendAsset(req, res, p.slice(8))) return; }
 
     /* ---- sign-in ---- */
     if (p === '/auth/login' && m === 'GET') {
@@ -131,22 +154,41 @@ async function createApp(cfg, opts) {
     }
     if (m === 'GET' && p === '/api/boot.js') {   // the tool's data for this person, written into the page before the tool starts
       if (!isStaff(id)) { res.writeHead(403); return res.end(); }
+      if (!limit('boot:' + id.sid, 30, 60e3)) return page(res, 429, 'Slow down', 'Reloading too fast. Wait a minute.');
+      if (!(await gate.enter(res))) { res.writeHead(503, { 'Retry-After': '5' }); return res.end(); }
       await state.settled();
-      const r = rules.handle({ action: 'pull' }, { email: id.email, name: id.name, admin: id.admin }, state.cur);
-      const role = id.admin ? 'admin' : rules.whoIs_(state.cur, id.email).role;
-      const boot = { keys: r.keys || {}, seq: r.seq, updatedAt: r.updatedAt, user: { email: id.email, name: id.name, admin: id.admin, role }, csrf: id.csrf, site: opts.site || '' };
-      return U.sendBuf(req, res, 200, Buffer.from('window.__PTF_BOOT=' + JSON.stringify(boot).replace(/</g, '\\u003c') + ';'), 'text/javascript; charset=utf-8', { 'Cache-Control': 'no-store' });
+      const w = id.admin ? { role: 'admin', sites: null } : rules.whoIs_(state.cur, id.email);
+      let site = String(url.searchParams.get('site') || '').replace(/[^a-z0-9-]/g, '').slice(0, 30);
+      const okSite = (s) => s && (w.sites ? w.sites.indexOf(s) >= 0 : true);
+      if (!okSite(site)) site = w.sites ? (w.sites.indexOf('main') >= 0 ? 'main' : (w.sites[0] || 'main')) : 'main';
+      const r = rules.handle({ action: 'pull', site }, { email: id.email, name: id.name, admin: id.admin }, state.cur);
+      const role = w.role;
+      let prefs = {}; try { const pr = (await db.q('SELECT v FROM prefs WHERE email=?', [id.email]))[0]; if (pr) prefs = JSON.parse(pr.v) || {}; } catch (e) {}
+      const boot = { prefs, keys: r.keys || {}, seq: r.seq, updatedAt: r.updatedAt, user: { email: id.email, name: id.name, admin: id.admin, role }, csrf: id.csrf, site };
+      const small = JSON.stringify({ user: boot.user, csrf: boot.csrf, site: boot.site, prefs: boot.prefs }).replace(/</g, '\\u003c').slice(1);
+      return U.sendBuf(req, res, 200, Buffer.concat([Buffer.from('window.__PTF_BOOT='), pullBuf(r, ',' + small), Buffer.from(';')]), 'text/javascript; charset=utf-8', { 'Cache-Control': 'no-store' });
     }
     if (m === 'GET' && p === '/api/events') {
       if (!isStaff(id) || sse.size >= 3000) { res.writeHead(sse.size >= 3000 ? 503 : 403); return res.end(); }
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
       res.write('retry: 5000\n\ndata: {"seq":' + state.seq + '}\n\n'); sse.add(res);
-      const hb = setInterval(() => { try { res.write(': hb\n\n'); } catch (e) {} }, 25000);
+      const raw = U.parseCookies(req.headers.cookie)[sessions.cookieName];
+      const hb = setInterval(async () => { try { if (!(await sessions.get(raw))) { res.end(); return; } res.write(': hb\n\n'); } catch (e) {} }, 25000);   // a signed-out or expired session loses its live channel
       req.on('close', () => { clearInterval(hb); sse.delete(res); }); return;
     }
     if (m === 'GET' && p === '/api/admin/audit') {
       if (!id.admin) { res.writeHead(403); return res.end(); } await audit.flush();
       return U.sendJson(req, res, 200, { rows: await audit.recent(url.searchParams.get('n')), chain: url.searchParams.get('verify') === '1' ? await audit.verify() : undefined }, { 'Cache-Control': 'no-store' });
+    }
+    if (m === 'POST' && p === '/api/prefs') {
+      if (req.headers['x-ptf-csrf'] !== id.csrf) return U.sendJson(req, res, 403, { error: 'forbidden' });
+      if (!limit('prefs:' + id.sid, 60, 60e3)) return U.sendJson(req, res, 429, { error: 'busy' });
+      let b; try { b = JSON.parse(await U.readBody(req, 32768)); } catch (e) { return U.sendJson(req, res, 400, { error: 'bad request' }); }
+      const o = {}; let n = 0; if (!b || typeof b.prefs !== 'object' || Array.isArray(b.prefs)) return U.sendJson(req, res, 400, { error: 'bad request' });
+      for (const k of PREF_KEYS) if (typeof b.prefs[k] === 'string') { o[k] = b.prefs[k].slice(0, 4000); n += o[k].length; }
+      if (n > 16000) return U.sendJson(req, res, 413, { error: 'too large' });
+      await db.q('INSERT INTO prefs(email,v,t) VALUES(?,?,?) ON CONFLICT(email) DO UPDATE SET v=excluded.v,t=excluded.t', [id.email, JSON.stringify(o), Date.now()]);
+      return U.sendJson(req, res, 200, { ok: true }, { 'Cache-Control': 'no-store' });
     }
     if (m === 'POST' && (p === '/api/rpc' || p === '/api/employee')) {
       // CSRF: a custom header that a cross-site form or image cannot send, plus the Origin check
@@ -156,7 +198,8 @@ async function createApp(cfg, opts) {
       let b; try { b = JSON.parse(await U.readBody(req, cfg.limits.bodyBytes)); } catch (e) { return U.sendJson(req, res, e.status || 400, { error: e.status === 413 ? 'too large' : 'bad request' }); }
       if (!b || typeof b !== 'object' || Array.isArray(b)) return U.sendJson(req, res, 400, { error: 'bad request' });
       if (p === '/api/rpc' && !isStaff(id)) return U.sendJson(req, res, 403, { error: 'not allowed' });
-      const r = await rpc(id, b, p === '/api/employee' ? EMPLOYEE_ACTIONS : null, ip);
+      const lab = req._lab = { l: p === '/api/employee' ? 'employee' : 'rpc' }; const r = await rpc(id, b, p === '/api/employee' ? EMPLOYEE_ACTIONS : null, ip, lab);
+      if (b.action === 'pull' && r && r.keys) return U.sendBuf(req, res, 200, pullBuf(r, '}'), 'application/json; charset=utf-8', { 'Cache-Control': 'no-store' });
       return U.sendJson(req, res, 200, r, { 'Cache-Control': 'no-store' });
     }
     res.writeHead(404); res.end();
@@ -164,6 +207,7 @@ async function createApp(cfg, opts) {
 
   const server = http.createServer((req, res) => {
     for (const k in baseHeaders) res.setHeader(k, baseHeaders[k]);
+    const t0 = process.hrtime.bigint(); res.on('finish', () => { const p = req.url.split('?')[0]; stats.http(req._lab ? req._lab.l : p === '/api/boot.js' ? 'boot' : p === '/' || p === '/employee' || p === '/tool' ? 'page' : p.startsWith('/dev/login') || p.startsWith('/auth') ? 'sign-in' : 'other', Number(process.hrtime.bigint() - t0) / 1e6); });
     route(req, res).catch((e) => { console.error('[http]', req.method, req.url.split('?')[0], e && e.stack || e); if (!res.headersSent) { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end('{"error":"server error"}'); } else res.end(); });
   });
   server.requestTimeout = 60000; server.headersTimeout = 15000; server.keepAliveTimeout = 65000; server.maxRequestsPerSocket = 0;
@@ -184,7 +228,7 @@ async function createApp(cfg, opts) {
   }
 
   return {
-    server, state, sessions, audit, mail, files, rules, env, cfg, reloadAssets: loadAssets,
+    server, state, sessions, audit, mail, files, rules, env, cfg, stats, reloadAssets: loadAssets,
     listen: (port, host) => new Promise((r) => server.listen(port === undefined ? cfg.port : port, host || '0.0.0.0', () => r(server.address().port))),
     async close() { timers.forEach(clearInterval); for (const r of sse) { try { r.end(); } catch (e) {} } sse.clear(); await new Promise((r) => server.close(r)); server.closeAllConnections && server.closeAllConnections(); await audit.flush(); await mail.flushQueue(); await state.close(); }
   };

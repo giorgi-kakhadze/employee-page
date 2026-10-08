@@ -1,12 +1,16 @@
 /* ===== server handler (hand-written; the permission rules above and the pull / push body below are from Code.gs) ===== */
 var FULL_KEYS = ['totAccessPolicy', 'totAccessGrants', 'totSites'];   /* when one of these changed, what each person may see changed too: send everything */
-var DEPEND_KEYS = SCOPED.concat(['totTeams']);                       /* record filters depend on these: when one changed, re-send all filtered keys */
+var GLOBAL_NAMES = ['totAccessPolicy', 'totAccessGrants', 'totAccessAsks', 'totSites'];   /* shared by all locations (stored under their plain names) */
+/* a browser works in ONE location at a time: it asks for that location's keys plus the shared ones (saves sending 4 locations' data to somebody who opens one). This only trims the answer; access rules are unchanged. */
+function siteWanted_(b, q) { var s = b && typeof b.site === 'string' ? b.site : ''; if (!s) return true; return q.site === s || (q.site === 'main' && GLOBAL_NAMES.indexOf(q.name) >= 0); }
+/* record filters of a filtered key depend on other keys of the same location: when one of those changed, the filtered key must be sent again even if it did not change itself */
+var DEPENDS = { totCases: ['totTasks'], totComments: ['totTasks', 'totAnnouncements', 'totProjects', 'totProjItems', 'totTeams'], totMessages: ['totChannels'], totProjects: ['totTeams'], totProjItems: ['totProjects', 'totTeams'], totProjBoard: ['totProjects', 'totTeams'] };
 function deltaPlan_(since) {
   if (!(since > 0)) return { delta: false, sent: function () { return true; } };
-  var full = false, scoped = false, seqOf = ENV.seqOf();
-  Object.keys(seqOf).forEach(function (k) { if (seqOf[k] <= since) return; var q = parseKey_(k); if (!q) return; if (FULL_KEYS.indexOf(q.name) >= 0) full = true; if (DEPEND_KEYS.indexOf(q.name) >= 0) scoped = true; });
+  var full = false, changed = {}, seqOf = ENV.seqOf();
+  Object.keys(seqOf).forEach(function (k) { if (seqOf[k] <= since) return; var q = parseKey_(k); if (!q) return; if (FULL_KEYS.indexOf(q.name) >= 0) full = true; changed[q.site + '|' + q.name] = 1; });
   if (full || since > ENV.seq()) return { delta: false, sent: function () { return true; } };
-  return { delta: true, sent: function (k, q) { if ((seqOf[k] || 0) > since) return true; if (scoped && q && (SCOPED.indexOf(q.name) >= 0 || q.name === 'auditLog' || q.name === 'totJournal')) return true; return false; } };
+  return { delta: true, sent: function (k, q) { if ((seqOf[k] || 0) > since) return true; var d = q && DEPENDS[q.name]; if (!d) return false; for (var i = 0; i < d.length; i++) if (changed[q.site + '|' + d[i]]) return true; return false; } };
 }
 /* handle(b, id, cur): b is the request body, id the verified identity { email, name, admin }, cur the live data.
    Returns the JSON answer. Actions that change data (push, reqNew, reqCancel) must be called inside State.mutate. */
@@ -41,4 +45,4 @@ function handle(b, id, cur) {
 }
 /* the daily project e-mail (07:00) */
 function runDigest(cur, id) { ENV.id = id || { email: '', name: '' }; ENV.state = { cur: cur }; return projDigest_(cur, false); }
-return { handle: handle, runDigest: runDigest, parseKey_: parseKey_, whoIs_: whoIs_, ctx_: ctx_, policy_: policy_ };
+return { handle: handle, runDigest: runDigest, siteWanted_: siteWanted_, parseKey_: parseKey_, whoIs_: whoIs_, ctx_: ctx_, policy_: policy_ };

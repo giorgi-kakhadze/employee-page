@@ -30,6 +30,27 @@ rep("function out_(o) { return ContentService.createTextOutput(JSON.stringify(o)
 /* 3. identity: the verified e-mail comes from the Entra ID session, never from the request */
 cut('/* Checks a Google sign-in token with Google', '/* What ONE employee may see', "function verifyGoogle_() { return ENV.id && ENV.id.email ? { email: String(ENV.id.email).trim().toLowerCase(), name: String(ENV.id.name || '') } : null; }\n\n");
 
+/* 3b. the employee page (me_, empOf_) only reads what it parses, so parsed copies of the big lists are cached (the single-file edition parsed 2 MB per request) */
+rep("function jp_(s, d) { try { var v = JSON.parse(s); return v == null ? d : v; } catch (e) { return d; } }", "function jp_(s, d) { try { var v = JSON.parse(s); return v == null ? d : v; } catch (e) { return d; } }\nvar JPC_ = new Map();   /* parsed-copy cache for read-only use: callers must not change what they get */\nfunction jpc_(s, d) { if (typeof s !== 'string' || s.length < 2000) return jp_(s, d); var c = JPC_.get(s); if (c === undefined) { c = { v: jp_(s, null) }; if (JPC_.size >= 160) JPC_.clear(); JPC_.set(s, c); } return c.v == null ? d : c.v; }");
+{ const a = s.indexOf('function me_(tok) {'), b = s.indexOf('/* ===== v3.16 employee requests ===== */'); if (a < 0 || b < a) throw new Error('port: me_ anchors not found'); s = s.slice(0, a) + s.slice(a, b).split('jp_(').join('jpc_(') + s.slice(b); }
+{ const a = s.indexOf('function empOf_(K, email) {'), b = s.indexOf('function isoOk_('); if (a < 0 || b < a) throw new Error('port: empOf_ anchors not found'); s = s.slice(0, a) + s.slice(a, b).split('jp_(').join('jpc_(') + s.slice(b); }
+
+/* 3c. every position below Manager gets the schedule without pay: strip it once per version, not once per person */
+rep("function stripPay_(e) {", "var SPC_ = new Map();\nfunction stripPay_(e) { var c = SPC_.get(e.v); if (c !== undefined) return { v: c, t: e.t }; var r = stripPay0_(e); if (SPC_.size >= 16) SPC_.clear(); SPC_.set(e.v, r.v); return r; }\nfunction stripPay0_(e) {");
+
+/* 3d. the access policy and the grants are read many times per request; parse each version once (callers only read them) */
+rep("function policy_(cur) { try { var e = cur.keys.totAccessPolicy; var p = e && JSON.parse(e.v); return p && typeof p === 'object' ? p : { users: {}, roles: {} }; } catch (x) { return { users: {}, roles: {} }; } }",
+    "var POL_ = { v: null, p: null };\nfunction policy_(cur) { try { var e = cur.keys.totAccessPolicy; if (!e) return { users: {}, roles: {} }; if (POL_.v !== e.v) { var q = JSON.parse(e.v); POL_ = { v: e.v, p: q && typeof q === 'object' ? q : { users: {}, roles: {} } }; } return POL_.p; } catch (x) { return { users: {}, roles: {} }; } }");
+rep("function grants_(cur) { try { var e = cur.keys.totAccessGrants, g = e && JSON.parse(e.v); return g && typeof g === 'object' ? g : {}; } catch (x) { return {}; } }",
+    "var GRN_ = { v: null, g: null };\nfunction grants_(cur) { try { var e = cur.keys.totAccessGrants; if (!e) return {}; if (GRN_.v !== e.v) { var q = JSON.parse(e.v); GRN_ = { v: e.v, g: q && typeof q === 'object' ? q : {} }; } return GRN_.g; } catch (x) { return {}; } }");
+
+/* 3e. filtering for one person parsed whole lists again and again. Managers and the admin read these lists unfiltered, so they need no parse at all; the others share one parsed copy per version (callers only read it) */
+rep("var a = jp_(v, null); if (!Array.isArray(a)) return all ? v : '[]'; return all ? v : JSON.stringify(", "if (all) return v; var a = jpc_(v, null); if (!Array.isArray(a)) return '[]'; return JSON.stringify(");
+rep("function journalPull_(v, c, okSrc) { var a = jp_(v, null);", "function journalPull_(v, c, okSrc) { if (c.all && typeof v === 'string' && v.charAt(0) === '[') return v; var a = jpc_(v, null);");
+rep("function auditPull_(v, c) { var a = jp_(v, null);", "function auditPull_(v, c) { var a = jpc_(v, null);");
+rep("var o = {}, a = jp_(cur.keys[k] && cur.keys[k].v, []);", "var o = {}, a = jpc_(cur.keys[k] && cur.keys[k].v, []);");
+rep("var o = { t: {}, d: {} }, a = jp_(cur.keys[pre + 'totTeams'] && cur.keys[pre + 'totTeams'].v, []);", "var o = { t: {}, d: {} }, a = jpc_(cur.keys[pre + 'totTeams'] && cur.keys[pre + 'totTeams'].v, []);");
+
 /* 4. the Google Apps Script services that remain are provided by src/rules/env.js (Utilities, Session, CacheService, PropertiesService, MailApp) */
 
 /* 5. project files: stored by the file service instead of Drive */
@@ -69,7 +90,8 @@ function brep(from, to) { const i = body.indexOf(from); if (i < 0) throw new Err
 /* delta pull: a browser that already holds sequence N receives only the keys saved after N */
 brep("      if (admin) return out_({ keys: cur.keys, updatedAt: cur.updatedAt || 0 });\n      var res = { keys: {}, updatedAt: cur.updatedAt || 0 };",
      "      var dl = deltaPlan_(+b.since || 0);\n      if (admin) { var ak = {}; Object.keys(cur.keys).forEach(function (k) { if (!dl.delta || dl.sent(k, parseKey_(k))) ak[k] = cur.keys[k]; }); return out_({ keys: ak, updatedAt: cur.updatedAt || 0, seq: ENV.seq(), delta: dl.delta }); }\n      var res = { keys: {}, updatedAt: cur.updatedAt || 0, seq: ENV.seq(), delta: dl.delta };");
-brep("var p = parseKey_(k), en = cur.keys[k]; if (!p || !en) return;\n        if (k === 'totAccessPolicy')", "var p = parseKey_(k), en = cur.keys[k]; if (!p || !en) return;\n        if (dl.delta && !dl.sent(k, p)) return;\n        if (k === 'totAccessPolicy')");
+brep("var p = parseKey_(k), en = cur.keys[k]; if (!p || !en) return;\n        if (k === 'totAccessPolicy')", "var p = parseKey_(k), en = cur.keys[k]; if (!p || !en) return;\n        if (dl.delta && !dl.sent(k, p)) return;\n        if (!siteWanted_(b, p)) return;\n        if (k === 'totAccessPolicy')");
+brep("Object.keys(cur.keys).forEach(function (k) { if (!dl.delta || dl.sent(k, parseKey_(k))) ak[k] = cur.keys[k]; });", "Object.keys(cur.keys).forEach(function (k) { var q = parseKey_(k); if (q && (!dl.delta || dl.sent(k, q)) && siteWanted_(b, q)) ak[k] = cur.keys[k]; });");
 brep("if (changed) { backup_(df); cur.updatedAt = now; df.setContent(JSON.stringify(cur)); try { projDigest_(cur, false); } catch (x) {} }   /* v3.32 daily project digest */", "if (changed) { cur.updatedAt = now; }");
 
 const out = '/* GENERATED by tools/port-code-gs.js from tool/Code.gs' + (ver ? ' (v' + ver + ')' : '') + '. Do not edit; edit the source and run:  npm run build:rules */\n\'use strict\';\n' +

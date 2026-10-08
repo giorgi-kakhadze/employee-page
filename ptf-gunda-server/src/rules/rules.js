@@ -70,6 +70,8 @@ function sh_(s) { return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_2
 function out_(o) { return o; }
 
 function jp_(s, d) { try { var v = JSON.parse(s); return v == null ? d : v; } catch (e) { return d; } }
+var JPC_ = new Map();   /* parsed-copy cache for read-only use: callers must not change what they get */
+function jpc_(s, d) { if (typeof s !== 'string' || s.length < 2000) return jp_(s, d); var c = JPC_.get(s); if (c === undefined) { c = { v: jp_(s, null) }; if (JPC_.size >= 160) JPC_.clear(); JPC_.set(s, c); } return c.v == null ? d : c.v; }
 
 function verifyGoogle_() { return ENV.id && ENV.id.email ? { email: String(ENV.id.email).trim().toLowerCase(), name: String(ENV.id.name || '') } : null; }
 
@@ -81,16 +83,16 @@ function me_(tok) {
   Object.keys(K).forEach(function (k) {
     var tail = 'employeeDataSource'; if (k.slice(-tail.length) !== tail || !parseKey_(k) || parseKey_(k).name !== tail) return;
     var pre = k.slice(0, k.length - tail.length);
-    var hit = jp_(K[k] && K[k].v, []).filter(function (e) { return e && String(e.email || (e.ext && e.ext.email) || '').trim().toLowerCase() === g.email; });
+    var hit = jpc_(K[k] && K[k].v, []).filter(function (e) { return e && String(e.email || (e.ext && e.ext.email) || '').trim().toLowerCase() === g.email; });
     if (hit.length !== 1) return;
     var e = hit[0], wid = String(e.workId || '').trim().toLowerCase(); found++; out.name = e.fullName || e.nickname || out.name; mypre = pre; myWid = wid;
-    var nmL = String(e.fullName || e.nickname || '').trim().toLowerCase(), all0 = jp_(K[k] && K[k].v, []);
+    var nmL = String(e.fullName || e.nickname || '').trim().toLowerCase(), all0 = jpc_(K[k] && K[k].v, []);
     myUniq = !!nmL && all0.filter(function (x) { return x && String(x.fullName || x.nickname || '').trim().toLowerCase() === nmL; }).length === 1;   /* v3.39: a name only identifies someone when nobody else has it */
     inactive = /^(terminated|retired)$/i.test(String(e.status || '').trim());   /* v3.39 */
     var x0 = e.ext || {}; out.profile = { name: String(e.fullName || '').slice(0, 80), nickname: String(e.nickname || '').slice(0, 40), workId: String(e.workId || '').slice(0, 30), status: String(e.status || '').slice(0, 30), position: String(x0.position || '').slice(0, 60), team: String(x0.team || '').slice(0, 40), shift: String(x0.shift || '').slice(0, 30), startDate: String(x0.startDate || '').slice(0, 20), phone: String(x0.phone || '').slice(0, 30), manager: String(x0.manager || x0.lineManager || '').slice(0, 80), email: g.email, games: String(x0.games || '').split(/[,;\/]+/).map(function (t) { return t.trim().slice(0, 40); }).filter(Boolean).slice(0, 30) };
-    var share = jp_(K[pre + 'evalShare'] && K[pre + 'evalShare'].v, {}), res = jp_(K[pre + 'evalResults'] && K[pre + 'evalResults'].v, []);
+    var share = jpc_(K[pre + 'evalShare'] && K[pre + 'evalShare'].v, {}), res = jpc_(K[pre + 'evalResults'] && K[pre + 'evalResults'].v, []);
     /* v3.11: the employee's own retraining rows (date, reason, status only; trainer names, comments and signatures are never sent) */
-    var nm = String(e.fullName || e.nickname || '').trim().toLowerCase(), rt = jp_(K[pre + 'totRetrain'] && K[pre + 'totRetrain'].v, {});
+    var nm = String(e.fullName || e.nickname || '').trim().toLowerCase(), rt = jpc_(K[pre + 'totRetrain'] && K[pre + 'totRetrain'].v, {});
     (rt.sessions || []).forEach(function (se) { (se.rows || []).forEach(function (row) {
       var rw = String(row.wid || '').trim().toLowerCase(); if (!row || !(rw ? (wid && rw === wid) : (myUniq && nm && String(row.name || '').trim().toLowerCase() === nm))) return;   /* v3.39: a row with a work ID belongs to that ID only */
       var at = String(row.attend || '').toLowerCase();
@@ -107,7 +109,7 @@ function me_(tok) {
   var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   Object.keys(K).forEach(function (k) {
     if (k.slice(-14) !== 'totMySchedules' || !parseKey_(k) || parseKey_(k).name !== 'totMySchedules') return;
-    var blob = jp_(K[k] && K[k].v, {}), sent = blob.sent || {}, m = (blob.byEmail || {})[g.email]; if (!m) return;
+    var blob = jpc_(K[k] && K[k].v, {}), sent = blob.sent || {}, m = (blob.byEmail || {})[g.email]; if (!m) return;
     /* v3.16: the tool now writes m.sx (schedule days) and m.rx (rotation rows), each with "at" = the time it is released to the employee (0 = already). The old m.days / m.rot with a "sent" flag is still understood. */
     var nowMs = Date.now(), rel = function (d) { return d && /^\d{4}-\d{2}-\d{2}$/.test(String(d.d || '')) && d.d >= today && (!(+d.at > 0) || +d.at <= nowMs); };
     var sx = Array.isArray(m.sx) ? m.sx : (sent.sch ? m.days : null), rx = Array.isArray(m.rx) ? m.rx : (sent.rot ? m.rot : null);
@@ -118,20 +120,20 @@ function me_(tok) {
   if (found > 1) return { error: 'This e-mail is on more than one employee list. Ask your manager.' };   /* v3.39: same rule as sending a request */
   if (inactive) return { error: 'This account is no longer active. Ask your manager.' };   /* v3.39: terminated and retired employees no longer see pay, evaluations or requests */
   /* v3.22: this employee's own game counts (imported from Grafana/CSV in the tool), last 12 months only; matched by work ID, or by exact full name when the row has no ID */
-  var gcE = K[mypre + 'totGameCounts'], gcAll = jp_(gcE && gcE.v, []), cut = Utilities.formatDate(new Date(Date.now() - 366 * 86400000), Session.getScriptTimeZone(), 'yyyy-MM'), myNm = String(out.name || '').trim().toLowerCase();
+  var gcE = K[mypre + 'totGameCounts'], gcAll = jpc_(gcE && gcE.v, []), cut = Utilities.formatDate(new Date(Date.now() - 366 * 86400000), Session.getScriptTimeZone(), 'yyyy-MM'), myNm = String(out.name || '').trim().toLowerCase();
   if (Array.isArray(gcAll)) out.gameCounts = gcAll.filter(function (r) { if (!r || String(r.period || '').slice(0, 7) < cut) return false; var rid = String(r.empId || '').trim().toLowerCase(); return rid ? (!!myWid && rid === myWid) : (myUniq && !!myNm && String(r.name || '').trim().toLowerCase() === myNm); })
     .map(function (r) { return { game: String(r.game || '').slice(0, 60), period: String(r.period || '').slice(0, 10), count: +r.count || 0 }; }).sort(function (a, b) { return b.period.localeCompare(a.period); }).slice(0, 300);
   /* v3.16: this employee's own requests (never anyone else's) */
   out.requests = reqList_(K[mypre + 'totEmpRequests'], g.email).slice(0, 40);
   /* v3.31: own pay statements (written by a manager's device; the bonus appears once the month review is final), own remarks / violations / disciplinary
      cases / positive feedback that staff chose to show, and own service incidents */
-  var py = jp_(K[mypre + 'totMyPay'] && K[mypre + 'totMyPay'].v, {}), pm = (py.byEmail || {})[g.email];
+  var py = jpc_(K[mypre + 'totMyPay'] && K[mypre + 'totMyPay'].v, {}), pm = (py.byEmail || {})[g.email];
   if (pm && pm.months) out.pay = Object.keys(pm.months).sort().reverse().slice(0, 6).map(function (k) { return pm.months[k]; });
   var mineRec = function (x) { var w = String(x.workId || x.empId || '').trim().toLowerCase(), n = String(x.name || '').trim().toLowerCase(); return w ? (!!myWid && w === myWid) : (myUniq && !!myNm && n === myNm); };   /* v3.39: never by name when the record has an ID, or when the name is shared */
-  out.remarks = jp_(K[mypre + 'totRemarks'] && K[mypre + 'totRemarks'].v, []).filter(function (x) { return x && x.share !== false && mineRec(x); })
+  out.remarks = jpc_(K[mypre + 'totRemarks'] && K[mypre + 'totRemarks'].v, []).filter(function (x) { return x && x.share !== false && mineRec(x); })
     .map(function (x) { return { date: String(x.date || '').slice(0, 10), kind: String(x.kind || 'note').slice(0, 20), title: String(x.title || '').slice(0, 120), text: String(x.text || '').slice(0, 2000), by: String(x.by || '').slice(0, 60) }; })
     .sort(function (a, b) { return b.date.localeCompare(a.date); }).slice(0, 60);
-  out.incidents = jp_(K[mypre + 'totIncidents'] && K[mypre + 'totIncidents'].v, []).filter(function (x) { return x && mineRec(x); })
+  out.incidents = jpc_(K[mypre + 'totIncidents'] && K[mypre + 'totIncidents'].v, []).filter(function (x) { return x && mineRec(x); })
     .map(function (x) { return { date: String(x.date || '').slice(0, 10), type: String(x.type || '').slice(0, 60), game: String(x.game || '').slice(0, 40), table: String(x.table || '').slice(0, 20), severity: String(x.severity || '').slice(0, 20), summary: String(x.summary || '').slice(0, 300), action: String(x.action || '').slice(0, 300) }; })
     .sort(function (a, b) { return b.date.localeCompare(a.date); }).slice(0, 60);
   out.evaluations.sort(function (a, b) { return b.ts - a.ts; });
@@ -151,7 +153,7 @@ function empOf_(K, email) {
   var found = null, n = 0, tail = 'employeeDataSource';
   Object.keys(K).forEach(function (k) {
     if (k.slice(-tail.length) !== tail || !parseKey_(k) || parseKey_(k).name !== tail) return;
-    var hit = jp_(K[k] && K[k].v, []).filter(function (e) { return e && String(e.email || (e.ext && e.ext.email) || '').trim().toLowerCase() === email; });
+    var hit = jpc_(K[k] && K[k].v, []).filter(function (e) { return e && String(e.email || (e.ext && e.ext.email) || '').trim().toLowerCase() === email; });
     if (hit.length === 1) { found = { e: hit[0], pre: k.slice(0, k.length - tail.length) }; n++; }
   });
   return n === 1 ? found : null;
@@ -218,7 +220,8 @@ function parseKey_(k) {
   if (m) return m[2] in Object.prototype ? null : { site: m[1], name: m[2] };   /* v3.39: not 'constructor', '__proto__', 'toString' … (they broke the rule tables and poisoned every pull) */
   return /^[A-Za-z0-9_.:-]{1,60}$/.test(k) && !(k in Object.prototype) ? { site: 'main', name: k } : null;
 }
-function policy_(cur) { try { var e = cur.keys.totAccessPolicy; var p = e && JSON.parse(e.v); return p && typeof p === 'object' ? p : { users: {}, roles: {} }; } catch (x) { return { users: {}, roles: {} }; } }
+var POL_ = { v: null, p: null };
+function policy_(cur) { try { var e = cur.keys.totAccessPolicy; if (!e) return { users: {}, roles: {} }; if (POL_.v !== e.v) { var q = JSON.parse(e.v); POL_ = { v: e.v, p: q && typeof q === 'object' ? q : { users: {}, roles: {} } }; } return POL_.p; } catch (x) { return { users: {}, roles: {} }; } }
 function whoIs_(cur, em) { var p = policy_(cur), u = (p.users || {})[em]; if (!u || !u.role) return { role: '', sites: [] };   /* v2.1: an approved account with no role yet receives no site data */
   return { role: String(u.role), sites: Array.isArray(u.sites) ? u.sites.map(String) : ['main'] }; }
 /* v3.21 ADMIN-ONLY MODE: every screen except Home is locked for non-admins until the admin grants it (tool: Permissions page, key totAccessGrants).
@@ -227,7 +230,8 @@ const GATE_VIEW = { totBonusCfg: 'dept', totBonusReviews: 'dept', totRemarks: 'd
   totOnboardingHier: 'onboarding', totOnboardingV2: 'onboarding', totOnboardingFiles: 'onboarding', totSchedule: 'schedule', totMySchedules: 'schedule', totAppearance: 'appearance', totAppearanceDept: 'appearance',
   totTasks: 'tasks', totCases: 'tasks', totComments: 'tasks', totAnnouncements: 'tasks', totRecruitment: 'recruiting', totWorkbooks: 'recruiting', totEmpRequests: 'requests',
   totGameCounts: 'dept', totImportHistory: 'dept', totLifecycle: 'dept', totDeptDocs: 'dept', totDeptCfg: 'dept', idPrintHistory: 'id', logbookDescriptions: 'logbooks', logbookCustomGames: 'logbooks', logbookSettings: 'logbooks' };
-function grants_(cur) { try { var e = cur.keys.totAccessGrants, g = e && JSON.parse(e.v); return g && typeof g === 'object' ? g : {}; } catch (x) { return {}; } }
+var GRN_ = { v: null, g: null };
+function grants_(cur) { try { var e = cur.keys.totAccessGrants; if (!e) return {}; if (GRN_.v !== e.v) { var q = JSON.parse(e.v); GRN_ = { v: e.v, g: q && typeof q === 'object' ? q : {} }; } return GRN_.g; } catch (x) { return {}; } }
 function gateOk_(cur, em, name) { var v = GATE_VIEW[name]; if (!v) return true; var g = grants_(cur); if (g.on === false) return true; var u = g.byEmail && g.byEmail[em], x = u && u.views && u.views[v]; return !!(x && (!x.until || +x.until > Date.now())); }
 function redactGrants_(e, em) { try { var g = JSON.parse(e.v), o = {}; if (g.byEmail && g.byEmail[em]) o[em] = g.byEmail[em]; return { v: JSON.stringify({ v: g.v || 1, on: g.on, u: g.u || 0, byEmail: o }), t: e.t }; } catch (x) { return { v: JSON.stringify({ byEmail: {} }), t: e.t }; } }
 function mineAsks_(e, em) { try { var a = JSON.parse(e.v); return { v: JSON.stringify((Array.isArray(a) ? a : []).filter(function (r) { return r && r.email === em; })), t: e.t }; } catch (x) { return { v: '[]', t: e.t }; } }
@@ -293,7 +297,9 @@ function redactPolicy_(e, em, c) { try { var p = JSON.parse(e.v), all = p.users 
   var cd = {}; Object.keys(all).forEach(function (k) { var x = all[k]; if (x && typeof x === 'object' && x.role) cd[k] = { name: String(x.name || ''), role: String(x.role || '') }; });   /* v3.38 Community: staff directory for direct chats */
   var A = p.access && typeof p.access === 'object' ? p.access : null, ac = A ? { roles: A.roles || {}, users: {} } : undefined; if (A && A.users && A.users[em]) ac.users[em] = A.users[em];   /* v3.36 */
   return { v: JSON.stringify({ roles: p.roles || {}, depts: p.depts || {}, users: u, upd: p.upd || 0, access: ac, chatDir: cd }), t: e.t }; } catch (x) { return { v: JSON.stringify({ roles: {}, users: {}, upd: 0 }), t: e.t }; } }
-function stripPay_(e) { try { var o = JSON.parse(e.v); if (o && typeof o === 'object' && !Array.isArray(o) && 'pay' in o) { delete o.pay; return { v: JSON.stringify(o), t: e.t }; } } catch (x) {} return e; }
+var SPC_ = new Map();
+function stripPay_(e) { var c = SPC_.get(e.v); if (c !== undefined) return { v: c, t: e.t }; var r = stripPay0_(e); if (SPC_.size >= 16) SPC_.clear(); SPC_.set(e.v, r.v); return r; }
+function stripPay0_(e) { try { var o = JSON.parse(e.v); if (o && typeof o === 'object' && !Array.isArray(o) && 'pay' in o) { delete o.pay; return { v: JSON.stringify(o), t: e.t }; } } catch (x) {} return e; }
 function keepPay_(newV, oldV) { try { var n = JSON.parse(newV); if (!n || typeof n !== 'object' || Array.isArray(n)) return newV; var o = oldV ? JSON.parse(oldV) : null; if (o && o.pay !== undefined) n.pay = o.pay; else delete n.pay; return JSON.stringify(n); } catch (x) { return newV; } }
 
 /* ===== v3.23 record-level privacy: tickets (totTasks), cases (totCases), comments (totComments), announcements (totAnnouncements), audit log ===== */
@@ -307,9 +313,9 @@ function low_(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
 /* who is asking: the admin key sees everything; everybody else is described by their position and department */
 function ctx_(cur, em, admin) {
   var cache = {}, c = { all: !!admin, adm: !!admin, em: em, name: '', dept: '', cache: cache };
-  c.idx = function (pre, name) { var k = pre + name; if (!cache[k]) { var o = {}, a = jp_(cur.keys[k] && cur.keys[k].v, []); (Array.isArray(a) ? a : []).forEach(function (x) { if (x && x.id != null) o[String(x.id)] = x; }); Object.defineProperty(o, '__pre', { value: pre }); cache[k] = o; } return cache[k]; };
+  c.idx = function (pre, name) { var k = pre + name; if (!cache[k]) { var o = {}, a = jpc_(cur.keys[k] && cur.keys[k].v, []); (Array.isArray(a) ? a : []).forEach(function (x) { if (x && x.id != null) o[String(x.id)] = x; }); Object.defineProperty(o, '__pre', { value: pre }); cache[k] = o; } return cache[k]; };
   /* v3.33: the teams this person belongs to (member or lead) and the departments of those teams, per site */
-  c.tm = function (pre) { var k = pre + 'totTeams#me'; if (!cache[k]) { var o = { t: {}, d: {} }, a = jp_(cur.keys[pre + 'totTeams'] && cur.keys[pre + 'totTeams'].v, []);
+  c.tm = function (pre) { var k = pre + 'totTeams#me'; if (!cache[k]) { var o = { t: {}, d: {} }, a = jpc_(cur.keys[pre + 'totTeams'] && cur.keys[pre + 'totTeams'].v, []);
     (Array.isArray(a) ? a : []).forEach(function (t) { if (!t || t.id == null || !em) return; if ((Array.isArray(t.members) ? t.members : []).map(low_).indexOf(em) >= 0 || low_(t.lead) === em) { o.t[String(t.id)] = 1; if (t.dept) o.d[String(t.dept)] = 1; } }); cache[k] = o; } return cache[k]; };
   c.dels = function (k) { return (cur.del || {})[k] || {}; };   /* v3.32: ids deleted from a key (projects removed with their items) */
   if (admin) return c;
@@ -361,7 +367,7 @@ function recVis_(name, x, c, pre) { if (name === 'totChannels') return chVis_(x,
 function recOwner_(name, x, c) { if (c.all) return true; var e = name === 'totComments' ? x.email : name === 'totCases' ? x.byEmail : x.fromEmail, n = name === 'totComments' ? x.who : name === 'totCases' ? x.by : x.fromName;
   return e ? low_(e) === c.em : (!!c.name && low_(n) === c.name); }   /* records saved before e-mails were stored: the name from the access list */
 function scopedPull_(name, v, c, pre) { var all = name === 'totChannels' || name === 'totMessages' ? c.adm : c.all;   /* v3.38: managers do not read other people's direct chats */
-  var a = jp_(v, null); if (!Array.isArray(a)) return all ? v : '[]'; return all ? v : JSON.stringify(a.filter(function (x) { return x && recVis_(name, x, c, pre); })); }
+  if (all) return v; var a = jpc_(v, null); if (!Array.isArray(a)) return '[]'; return JSON.stringify(a.filter(function (x) { return x && recVis_(name, x, c, pre); })); }
 /* merge a save record by record: records this person cannot see are kept untouched; a visible record missing from the save counts as deleted only if
    this person may delete it; new records are accepted only if this person can see them; deleted ids are remembered so they never come back */
 const REC_AUTHOR = { totTasks: ['fromEmail', 'fromName', 'fromRole'], totCases: ['byEmail', 'by'], totAnnouncements: ['fromEmail', 'fromName', 'fromRole'], totComments: ['email', 'who'] };
@@ -594,10 +600,10 @@ function delMap_(cur, k) { cur.del = cur.del || {}; var m = cur.del[k] = cur.del
 /* audit log for non-admins: they receive their own entries; what they send is added (never replaces), and only entries in their own name are accepted */
 function auditMine_(x, c) { var e = low_(x && x.email); return e ? e === c.em : (!!c.name && low_(x && x.who) === c.name); }
 function auditId_(x) { return x && x.id != null ? String(x.id) : x && typeof x === 'object' ? String(x.ts) + '|' + x.who + '|' + x.act : JSON.stringify(x); }
-function auditPull_(v, c) { var a = jp_(v, null); return Array.isArray(a) ? JSON.stringify(a.filter(function (x) { return auditMine_(x, c); })) : '[]'; }
+function auditPull_(v, c) { var a = jpc_(v, null); return Array.isArray(a) ? JSON.stringify(a.filter(function (x) { return auditMine_(x, c); })) : '[]'; }
 /* v3.28 change journal: add-only like the audit log. A person receives their own entries, their department's, and the entries about data they can open
    themselves (src = the data key the change was made in, checked with the same rules as reading that key). */
-function journalPull_(v, c, okSrc) { var a = jp_(v, null); if (!Array.isArray(a)) return '[]'; if (c.all) return v;
+function journalPull_(v, c, okSrc) { if (c.all && typeof v === 'string' && v.charAt(0) === '[') return v; var a = jpc_(v, null); if (!Array.isArray(a)) return '[]'; if (c.all) return v;
   return JSON.stringify(a.filter(function (x) { return x && typeof x === 'object' && (low_(x.email) === c.em || (x.dep && x.dep === c.dept) || (x.src && okSrc(String(x.src)))); })); }
 function auditPush_(newV, oldV, c, max) {
   var n = jp_(newV, null), o = jp_(oldV, []); if (!Array.isArray(n)) return null; if (!Array.isArray(o)) o = [];
@@ -609,13 +615,17 @@ function auditPush_(newV, oldV, c, max) {
 
 /* ===== server handler (hand-written; the permission rules above and the pull / push body below are from Code.gs) ===== */
 var FULL_KEYS = ['totAccessPolicy', 'totAccessGrants', 'totSites'];   /* when one of these changed, what each person may see changed too: send everything */
-var DEPEND_KEYS = SCOPED.concat(['totTeams']);                       /* record filters depend on these: when one changed, re-send all filtered keys */
+var GLOBAL_NAMES = ['totAccessPolicy', 'totAccessGrants', 'totAccessAsks', 'totSites'];   /* shared by all locations (stored under their plain names) */
+/* a browser works in ONE location at a time: it asks for that location's keys plus the shared ones (saves sending 4 locations' data to somebody who opens one). This only trims the answer; access rules are unchanged. */
+function siteWanted_(b, q) { var s = b && typeof b.site === 'string' ? b.site : ''; if (!s) return true; return q.site === s || (q.site === 'main' && GLOBAL_NAMES.indexOf(q.name) >= 0); }
+/* record filters of a filtered key depend on other keys of the same location: when one of those changed, the filtered key must be sent again even if it did not change itself */
+var DEPENDS = { totCases: ['totTasks'], totComments: ['totTasks', 'totAnnouncements', 'totProjects', 'totProjItems', 'totTeams'], totMessages: ['totChannels'], totProjects: ['totTeams'], totProjItems: ['totProjects', 'totTeams'], totProjBoard: ['totProjects', 'totTeams'] };
 function deltaPlan_(since) {
   if (!(since > 0)) return { delta: false, sent: function () { return true; } };
-  var full = false, scoped = false, seqOf = ENV.seqOf();
-  Object.keys(seqOf).forEach(function (k) { if (seqOf[k] <= since) return; var q = parseKey_(k); if (!q) return; if (FULL_KEYS.indexOf(q.name) >= 0) full = true; if (DEPEND_KEYS.indexOf(q.name) >= 0) scoped = true; });
+  var full = false, changed = {}, seqOf = ENV.seqOf();
+  Object.keys(seqOf).forEach(function (k) { if (seqOf[k] <= since) return; var q = parseKey_(k); if (!q) return; if (FULL_KEYS.indexOf(q.name) >= 0) full = true; changed[q.site + '|' + q.name] = 1; });
   if (full || since > ENV.seq()) return { delta: false, sent: function () { return true; } };
-  return { delta: true, sent: function (k, q) { if ((seqOf[k] || 0) > since) return true; if (scoped && q && (SCOPED.indexOf(q.name) >= 0 || q.name === 'auditLog' || q.name === 'totJournal')) return true; return false; } };
+  return { delta: true, sent: function (k, q) { if ((seqOf[k] || 0) > since) return true; var d = q && DEPENDS[q.name]; if (!d) return false; for (var i = 0; i < d.length; i++) if (changed[q.site + '|' + d[i]]) return true; return false; } };
 }
 /* handle(b, id, cur): b is the request body, id the verified identity { email, name, admin }, cur the live data.
    Returns the JSON answer. Actions that change data (push, reqNew, reqCancel) must be called inside State.mutate. */
@@ -651,11 +661,12 @@ function handle(b, id, cur) {
     if (act === 'pjFileGet') return out_(pjFileGet_(b, cx, me));
     if (act === 'pull') {
       var dl = deltaPlan_(+b.since || 0);
-      if (admin) { var ak = {}; Object.keys(cur.keys).forEach(function (k) { if (!dl.delta || dl.sent(k, parseKey_(k))) ak[k] = cur.keys[k]; }); return out_({ keys: ak, updatedAt: cur.updatedAt || 0, seq: ENV.seq(), delta: dl.delta }); }
+      if (admin) { var ak = {}; Object.keys(cur.keys).forEach(function (k) { var q = parseKey_(k); if (q && (!dl.delta || dl.sent(k, q)) && siteWanted_(b, q)) ak[k] = cur.keys[k]; }); return out_({ keys: ak, updatedAt: cur.updatedAt || 0, seq: ENV.seq(), delta: dl.delta }); }
       var res = { keys: {}, updatedAt: cur.updatedAt || 0, seq: ENV.seq(), delta: dl.delta };
       Object.keys(cur.keys).forEach(function (k) {
         var p = parseKey_(k), en = cur.keys[k]; if (!p || !en) return;
         if (dl.delta && !dl.sent(k, p)) return;
+        if (!siteWanted_(b, p)) return;
         if (k === 'totAccessPolicy') { res.keys[k] = redactPolicy_(en, em, cx); return; }
         if (k === 'totSites') { res.keys[k] = en; return; }
         if (p.name === 'totIntegrations') return;   /* v3.39: flow trigger URLs are secrets; only the admin key reads them */
@@ -699,7 +710,7 @@ function handle(b, id, cur) {
 }
 /* the daily project e-mail (07:00) */
 function runDigest(cur, id) { ENV.id = id || { email: '', name: '' }; ENV.state = { cur: cur }; return projDigest_(cur, false); }
-return { handle: handle, runDigest: runDigest, parseKey_: parseKey_, whoIs_: whoIs_, ctx_: ctx_, policy_: policy_ };
+return { handle: handle, runDigest: runDigest, siteWanted_: siteWanted_, parseKey_: parseKey_, whoIs_: whoIs_, ctx_: ctx_, policy_: policy_ };
 
 
 };

@@ -103,7 +103,7 @@ function show(){
   keepDraft();
   $('login').hidden=true;var a=$('app');a.hidden=false;if(!TABS.some(function(t){return t[0]===tab}))tab='home';
   var h=(DEMO?'<div class="banner"><b>Demo data.</b> This page is not connected to the server. Nothing you do here is sent anywhere.</div>':'')+
-    '<div class="row"><div><h1>Hello, '+esc((D.profile&&D.profile.nickname)||D.name||D.email)+'</h1><div class="mut">'+esc(D.email)+'</div></div><span><button onclick="load()">&#8635; Refresh</button> <button onclick="location.href='/auth/logout'">Sign out</button></span></div>'+
+    '<div class="row"><div><h1>Hello, '+esc((D.profile&&D.profile.nickname)||D.name||D.email)+'</h1><div class="mut">'+esc(D.email)+'</div></div><span><button onclick="load()">&#8635; Refresh</button> <button onclick="location.href=&quot;/auth/logout&quot;">Sign out</button></span></div>'+
     '<nav class="main3">'+TABS.map(function(t){return '<button data-t="'+t[0]+'" class="'+(t[0]===tab?'on':'')+'">'+t[1]+'</button>'}).join('')+'</nav><div id="pg"></div>';
   a.innerHTML=h;
   a.querySelector('nav').onclick=function(e){var b=e.target.closest('button');if(b){tab=b.getAttribute('data-t');show();window.scrollTo(0,0)}};

@@ -23,6 +23,12 @@
     var e = B.keys[k]; if (!e || typeof e.v !== 'string') return;
     var m = /^s~([a-z0-9-]{1,30})~(.+)$/.exec(k); mem[m ? 'SITE::' + m[1] + '::' + m[2] : k] = e.v;
   });
+  var PK = ['totAppTheme', 'totAppStyle', 'totSoundPrefs', 'totMusicPrefs', 'totConsentV1', 'totLastSite', 'rememberSupervisor', 'supFirstName'], pst = null;
+  Object.keys(B.prefs || {}).forEach(function (k) { if (PK.indexOf(k) >= 0 && typeof B.prefs[k] === 'string') mem[k] = B.prefs[k]; });
+  function savePrefs() { clearTimeout(pst); pst = setTimeout(function () { var o = {}; PK.forEach(function (k) { if (k in mem) o[k] = mem[k]; }); try { window.fetch('/api/prefs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prefs: o }) }); } catch (e) {} }, 1500); }
+  var rawSet = S.prototype.setItem, rawRem = S.prototype.removeItem;
+  S.prototype.setItem = function (k, v) { rawSet.call(this, k, v); if (PK.indexOf(String(k)) >= 0 && this === ls) savePrefs(); };
+  S.prototype.removeItem = function (k) { rawRem.call(this, k); if (PK.indexOf(String(k)) >= 0 && this === ls) savePrefs(); };
   var u = B.user || {};
   mem.totSyncCfg = JSON.stringify(u.admin ? { url: '/api/rpc', key: 'sso' } : { url: '/api/rpc' });
   mem.totAuth = JSON.stringify({ email: u.email, pwHash: 'sso', t: Date.now() });
@@ -46,8 +52,13 @@
   window.__ptfLive = function () {
     try {
       var es = new EventSource('/api/events'); var last = window.__ptfSeq || 0;
-      es.onmessage = function (ev) { try { var s = JSON.parse(ev.data).seq; if (s > last) { last = s; if (window.totSyncNow) window.totSyncNow(); } } catch (e) {} };
+      /* spread the answers of many people over a few seconds, and never pull more often than every 4 s because of live notices */
+      var wait = null, lastRun = 0;
+      es.onmessage = function (ev) { try { var s = JSON.parse(ev.data).seq; if (s > last) { last = s; if (wait) return; var d = Math.max(Math.random() * 1500, lastRun + 4000 - Date.now()); wait = setTimeout(function () { wait = null; lastRun = Date.now(); if (window.totSyncNow) window.totSyncNow(); }, d); } } catch (e) {} };
     } catch (e) {}
   };
   window.addEventListener('load', function () { setTimeout(window.__ptfLive, 1500); });
+  /* unsent edits: ask before the tab is closed, and send them as soon as the tab is hidden */
+  window.addEventListener('beforeunload', function (e) { try { if (window.__ptfDirty && window.__ptfDirty()) { e.preventDefault(); e.returnValue = ''; return ''; } } catch (x) {} });
+  document.addEventListener('visibilitychange', function () { if (document.hidden && window.totSyncNow) window.totSyncNow(); });
 })();

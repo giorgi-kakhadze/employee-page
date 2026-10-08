@@ -27,8 +27,7 @@
 <meta name="description" content="Pass-to-Floor (PTF) · Gunda — site workforce & ops tool by Giorgi Kakhadze">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pass-to-Floor (PTF) · Gunda · Server Edition</title>
-<script src="/api/boot.js"></script>
-<script src="/static/shim.js"></script>
+<script src="/static/pre.js"></script>
 <script>
 /* v2.69 version number, SITES (separate data per location) and TEST MODE. Runs first.
    Sites: every location keeps its own data under its own prefix. The first site ("main") is the data you already had, stored exactly where it always was, so nothing is moved.
@@ -18380,11 +18379,12 @@ Storage.prototype.removeItem = function (k) { if (this === LS && String(k).index
 Storage.prototype.clear = function () { var me = this === LS; if (me) snap('before clear-all', true); var r = sClr.apply(this, arguments); if (me) log({ k: '*', a: 'clear all' }); return r; };
 
 /* ---- 3. Verified rolling backups (IndexedDB + optional real folder) ---- */
-var dbp = new Promise(function (res, rej) { if (!window.indexedDB) { rej(); return; } var r = indexedDB.open('tt16' + (window.__totTest ? '-test' : '') + (window.__totSite && window.__totSite !== 'main' ? '-' + window.__totSite : ''), 1); r.onupgradeneeded = function () { r.result.createObjectStore('b', { keyPath: 'id' }); r.result.createObjectStore('m'); }; r.onsuccess = function () { res(r.result); }; r.onerror = function () { rej(r.error); }; });
+var dbp = new Promise(function (res, rej) { if (true) { rej(); return; } var r = indexedDB.open('tt16' + (window.__totTest ? '-test' : '') + (window.__totSite && window.__totSite !== 'main' ? '-' + window.__totSite : ''), 1); r.onupgradeneeded = function () { r.result.createObjectStore('b', { keyPath: 'id' }); r.result.createObjectStore('m'); }; r.onsuccess = function () { res(r.result); }; r.onerror = function () { rej(r.error); }; });
 function tx(store, mode, fn) { return dbp.then(function (d) { return new Promise(function (res, rej) { var t = d.transaction(store, mode), q = fn(t.objectStore(store)); t.oncomplete = function () { res(q && q.result); }; t.onerror = t.onabort = function () { rej(t.error); }; }); }); }
 function dump() { var o = {}; for (var i = 0; i < LS.length; i++) { var k = LS.key(i); if (k.indexOf('tt16') !== 0) o[k] = raw(k); } return o; }
 function hash(s) { var h = 5381; for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return h + ':' + s.length; }
 function snap(why, force) {
+  if (window.TOT_EDITION === 'server') return Promise.resolve(false);   /* nothing is copied to this computer */
   var data = dump(), txt = JSON.stringify(data), h = hash(txt), bad = [];
   if (!force && h === st.hash) return Promise.resolve(false);
   Object.keys(data).forEach(function (k) { var v = data[k]; if (v && (v.charAt(0) === '{' || v.charAt(0) === '[')) { try { JSON.parse(v); } catch (e) { bad.push(k); } } });
@@ -19448,7 +19448,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
         var meta = jget(MK, {}); if (!window.__ptfSeeded && window.__PTF_BOOT) { window.__ptfSeeded = true; window.__ptfSince = window.__PTF_BOOT.seq || 0; KEYS.forEach(function (k) { var e = window.__PTF_BOOT.keys[sk(k)], v = localStorage.getItem(k); if (e && typeof e.v === 'string' && v === e.v) meta[k] = { h: hash(v), t: +e.t || 0 }; }); }
         var meta0 = JSON.parse(JSON.stringify(meta)), prev = {}, applied = [], push = {}, full = false, again = false, conf = {};
         function put(k, v) { window.__totSyncWriting = true; try { localStorage.setItem(k, v); return true; } catch (e) { try { localStorage.removeItem('totSyncPrev'); localStorage.setItem(k, v); return true; } catch (e2) { full = true; return false; } } finally { window.__totSyncWriting = false; } }   /* v3.28: the change journal ignores what sync brings in */
-        var res = await tfetch(cfg.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ action: 'pull', since: window.__ptfSince || 0 }, authBody())) }); var srv = await res.json(); if (srv.error) throw new Error(srv.error);
+        var res = await tfetch(cfg.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ action: 'pull', since: window.__ptfSince || 0, site: window.__totSite || '' }, authBody())) }); var srv = await res.json(); if (srv.error) throw new Error(srv.error);
         var remote = srv.keys || {}, now = Date.now(), delta = !!srv.delta, srvSeq = +srv.seq || 0;
         TB = jget(TK, {});
         try { var rt = remote[sk(TK)] && JSON.parse(remote[sk(TK)].v) || {}; Object.keys(rt).forEach(function (k) { TB[k] = TB[k] || {}; Object.keys(rt[k]).forEach(function (i) { var a = TB[k][i] || 0, b = rt[k][i] || 0; TB[k][i] = Math.abs(b) > Math.abs(a) ? b : a; }); }); } catch (e) {}
@@ -19490,6 +19490,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     var hc = {};
     function hashC(k, v) { var c = hc[k]; if (c && c.s === v) return c.h; var h = hash(v); hc[k] = { s: v, h: h }; return h; }
     function dirty() { var meta = jget(MK, {}); return KEYS.some(function (k) { var v = localStorage.getItem(k); return v != null && (!meta[k] || meta[k].h !== hashC(k, v)); }); }
+    window.__ptfDirty = function () { try { return busy || dirty(); } catch (e) { return false; } };
     window.totSyncNow = function () { try { if (!busy && cfg.url && authBody()) sync(false); } catch (e) {} };   /* v3.38: Community asks for a pull while open */
     function start() { if (!cfg.url || !authBody()) { say('not set up'); return; } say('connecting…'); sync(false); setInterval(function () { if (!busy && dirty() && !timer) timer = setTimeout(function () { timer = null; sync(false); }, 800); }, 1500); setInterval(function () { sync(false); }, 120000); document.addEventListener('visibilitychange', function () { if (!document.hidden) sync(false); }); }
     /* admin panel */

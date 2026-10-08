@@ -38,7 +38,7 @@ async function sendJson(req, res, status, obj, extra) {
 }
 async function sendBuf(req, res, status, buf, type, extra) {
   const h = Object.assign({ 'Content-Type': type, 'Vary': 'Accept-Encoding' }, extra || {});
-  if (buf.length > 1024 && /\bgzip\b/.test(req.headers['accept-encoding'] || '')) { buf = await gz(buf, { level: buf.length > 1e6 ? 4 : 6 }); h['Content-Encoding'] = 'gzip'; }
+  if (buf.length > 1024 && /\bgzip\b/.test(req.headers['accept-encoding'] || '')) { buf = await gz(buf, { level: buf.length > 1e6 ? 1 : 6 }); h['Content-Encoding'] = 'gzip'; }
   h['Content-Length'] = buf.length; res.writeHead(status, h); res.end(buf);
 }
 module.exports = { parseCookies, cookie, signer, limiter, readBody, sendJson, sendBuf };

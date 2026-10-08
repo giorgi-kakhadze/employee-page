@@ -9,6 +9,7 @@ module.exports = function ddl(d) {
     `CREATE INDEX IF NOT EXISTS sessions_email ON sessions(email)`,
     `CREATE TABLE IF NOT EXISTS audit (id ${d.idCol}, ts BIGINT NOT NULL, actor TEXT, action TEXT NOT NULL, detail TEXT, ip TEXT, prev TEXT, hash TEXT NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS outbox (id ${d.idCol}, ts BIGINT NOT NULL, to_addr TEXT NOT NULL, subject TEXT NOT NULL, body TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'queued', tries INTEGER NOT NULL DEFAULT 0, next_at BIGINT NOT NULL DEFAULT 0, err TEXT)`,
+    `CREATE TABLE IF NOT EXISTS prefs (email TEXT PRIMARY KEY, v TEXT NOT NULL, t BIGINT NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS files (id TEXT PRIMARY KEY, name TEXT, mime TEXT, size BIGINT, owner TEXT, kind TEXT, created BIGINT NOT NULL)`
   ];
 };
