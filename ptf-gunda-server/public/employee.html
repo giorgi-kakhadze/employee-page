@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My work page</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1d2330;--mut:#6b7385;--ac:#2b5cd9;--ok:#1f9d55;--warn:#d9822b;--bad:#c0392b;--bd:#e3e6ec}
+@media(prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b2030;--tx:#e8ebf2;--mut:#98a0b3;--bd:#2a3145;--ac:#6b8ff0}}
+*{box-sizing:border-box}body{margin:0;font:16px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--tx)}
+main{max-width:760px;margin:0 auto;padding:20px 16px 48px}
+h1,.mut,.row>div,.card b{min-width:0;overflow-wrap:anywhere}h1{font-size:1.4rem;margin:0 0 4px}h2{font-size:1.1rem;margin:24px 0 10px}h3{font-size:1rem;margin:0 0 6px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px 16px;margin-bottom:12px}
+.mut{color:var(--mut);font-size:.9rem}.row{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
+.big{font-size:1.6rem;font-weight:700}
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:.8rem;background:var(--bd);margin:2px 2px 2px 0}
+.fb{border-left:3px solid var(--ac);padding-left:10px;margin-top:10px;white-space:pre-wrap}
+.day{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd)}.day:last-child{border:0}
+.work{color:var(--ok);font-weight:600}.off{color:var(--mut)}.leave{color:var(--warn);font-weight:600}.bad{color:var(--bad);font-weight:600}
+button,select,input,textarea{font:inherit;color:var(--tx)}
+button{padding:8px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--card);cursor:pointer}
+button.pri{background:var(--ac);border-color:var(--ac);color:#fff}
+select,input,textarea{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--bd);background:var(--card)}
+label{display:block;font-size:.85rem;color:var(--mut);margin:10px 0 4px}
+#login{text-align:center;margin-top:60px}.err{color:var(--bad);margin:12px 0}
+nav{display:flex;gap:6px;overflow-x:auto;margin:16px 0 4px;padding-bottom:4px}
+nav button{white-space:nowrap;padding:6px 12px;border-radius:99px;font-size:.9rem}
+nav button.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.tile{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;cursor:pointer;text-align:left}
+.tile b{display:block;font-size:1.4rem}.tile span{font-size:.85rem;color:var(--mut)}
+dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;margin:0}dt{color:var(--mut)}dd{margin:0;overflow-wrap:anywhere;min-width:0}
+.banner{background:#fff4e0;color:#7a4a00;border:1px solid #f0c27a;border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:.9rem}
+@media(prefers-color-scheme:dark){.banner{background:#3a2a10;color:#f5d39b;border-color:#6b4d1d}}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+nav.main3{position:sticky;top:0;z-index:5;background:var(--bg);display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:8px 0}nav.main3 button{padding:10px 8px;font-size:1rem;font-weight:600;border-radius:12px}
+.tile.hl{border-color:var(--ac)}.tile.warnT b{color:var(--bad)}.tile.okT b{color:var(--ok)}.click{cursor:pointer}h2{scroll-margin-top:70px}td,th{padding:6px 8px;border-bottom:1px solid var(--bd);text-align:left}th{color:var(--mut);font-weight:600}
+</style></head><body><main>
+<div id="login"><h1>My work page</h1><p class="mut">Sign in with the Google account your trainer has on file.</p>
+<div id="gbtn" style="display:inline-block"></div><div id="err" class="err"></div></div>
+<div id="app" hidden></div>
+</main>
+<script>
+/* ===== SETTINGS ===== */
+var CLIENT_ID = '121975980339-fu9nd124kov2g6j94qiofOrkjkhbkee6.apps.googleusercontent.com';
+var SERVER_URL = '/api/employee', CSRF = '';   /* ends in /exec */
+/* ==================== */
+/* Employee self-service. Everything shown here comes from the Apps Script action "me", which checks the Google sign-in and returns ONLY this person's own data
+   (profile, shared evaluations with comments, retraining, game counts, schedule, rotation, own requests, v3.31: own pay statements, bonuses, incidents and the remarks staff chose to show). Nothing about other people is ever sent to this page. */
+var tok = null, D = null, tab = 'home', refreshT = null, DEMO = /[?&]demo\b/.test(location.search);
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function $(id){return document.getElementById(id)}
+function err(m){$('err').textContent=m}
+function say(m){if(!$('app').hidden){var t=$('toast');if(!t){t=document.createElement('div');t.id='toast';t.setAttribute('role','status');t.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);max-width:90vw;padding:10px 16px;border-radius:10px;background:var(--tx);color:var(--bg);z-index:9;font-size:.9rem;box-shadow:0 6px 20px rgba(0,0,0,.3)';document.body.appendChild(t)}t.textContent=m;t.hidden=false;clearTimeout(t._h);t._h=setTimeout(function(){t.hidden=true},4000)}else err(m)}
+function configured(){return true}
+function init(){
+  if(DEMO){D=demoData();show();return}
+  fetch('/api/session',{credentials:'same-origin'}).then(function(r){if(r.status===401){location.href='/auth/login?to=/employee';return null}return r.json()}).then(function(j){if(!j)return;CSRF=j.csrf;tok='sso';load()}).catch(function(){err('Could not reach the server. Please try again.')});
+}
+var ERRS={'no employee found for this email':'Your Microsoft account is not on the employee list. Ask your trainer to check your email.','sign-in invalid':'Your sign-in failed or expired. Please sign in again.','not configured':'The service is not set up yet.'};
+function call(body){
+  if(DEMO)return Promise.resolve(demoCall(body));
+  if(!configured())return Promise.reject(new Error('not configured'));
+  return fetch(SERVER_URL,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-PTF-CSRF':CSRF},body:JSON.stringify(body)}).then(function(r){if(r.status===401||r.status===403)return{error:'sign-in invalid'};return r.json()});
+}
+function signedOut(m){tok=null;if(!DEMO){location.href='/auth/login?to=/employee';return}if(refreshT){clearInterval(refreshT);refreshT=null}$('app').hidden=true;$('login').hidden=false;err(m)}
+function load(silent){
+  if(!silent&&$('app').hidden)err('Loading...');
+  call({action:'me'}).then(function(j){
+    if(j.error){if(j.error==='sign-in invalid')return signedOut(ERRS[j.error]);if(!silent)say(ERRS[j.error]||j.error);return}
+    D=j;show()}).catch(function(){if(!silent)say('Could not reach the server. Please try again.')});
+}
+
+/* ---------- helpers ---------- */
+var SH={morning:'Morning',afternoon:'Afternoon',night:'Night'},OFF={rest:'Day off',vacation:'Vacation',sick:'Sick leave',unpaid:'Unpaid leave'};
+var RT={swap:'Swap a shift',giveaway:'Give away a shift',annual:'Vacation / annual leave',sick:'Sick leave',dayoff:'Day off',payq:'Question about my pay'},RS={pending:'Waiting for a decision',approved:'Approved',rejected:'Declined',cancelled:'Cancelled'};
+function rtl(t){return Object.prototype.hasOwnProperty.call(RT,t)?RT[t]:'Request'}function rsl(t){return Object.prototype.hasOwnProperty.call(RS,t)?RS[t]:String(t||'')}
+function hh(n){n=((n%24)+24)%24;return String(Math.floor(n)).padStart(2,'0')+':'+(n%1?'30':'00')}
+function cellTxt(v){v=String(v||'').trim();if(!v)return '-';if(/^\d+$/.test(v))return 'Table '+v;if(/^(b|brk|break)$/i.test(v))return 'Break';if(/^(off|x|-)$/i.test(v))return 'Off';return v}
+function dLabel(d,long){var dt=new Date(d+'T12:00:00');return isNaN(dt)?esc(d):dt.toLocaleDateString(undefined,{weekday:long?'long':'short',day:'numeric',month:'short'})}
+function iso(dt){return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0')}
+function today(){return iso(new Date())}
+function when(ms){return ms?new Date(ms).toLocaleString(undefined,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):''}
+/* points lost per criterion: same rule as before (the best criterion score of that evaluation is the maximum, at least 1) */
+function lostOf(e){var mx=Math.max.apply(null,[1].concat(e.criteria.map(function(c){return c.score||0})));return e.criteria.filter(function(c){return c.score!=null&&c.score<mx}).map(function(c){return{name:c.name,group:c.group,lost:mx-c.score,score:c.score,max:mx}})}
+function mistakes(){
+  var m={};(D.evaluations||[]).forEach(function(e){lostOf(e).forEach(function(c){var k=(e.game||'Evaluation')+'|'+c.name;var x=m[k]=m[k]||{game:e.game||'Evaluation',name:c.name,n:0,last:'',lastTs:0};x.n++;if((e.ts||0)>=x.lastTs){x.lastTs=e.ts||0;x.last=e.date}})});
+  return Object.keys(m).map(function(k){return m[k]}).sort(function(a,b){return b.n-a.n||b.lastTs-a.lastTs});
+}
+function ended(y){if(y.d!==today()||y.f==null||y.t==null)return false;var f=+y.f,t=+y.t;if(t<=f)t+=24;var m=new Date(y.d+'T00:00:00');return Date.now()>=m.getTime()+t*36e5}
+function workDays(){return ((D.schedule&&D.schedule.days)||[]).filter(function(y){return SH[y.s]&&y.d>=today()&&!ended(y)})}
+
+/* ---------- pages (v3.31: three buttons: Home, Schedule, Rotation. Everything here is read-only; the only thing an employee can do is send requests) ---------- */
+var TABS=[['home','&#127968; Home'],['schedule','&#128197; Schedule'],['rotation','&#128260; Rotation']],openEv=null,openPay=false;
+var RK={positive:['&#128077;','Positive feedback','work'],remark:['&#128221;','Remark','leave'],violation:['&#9888;','Violation','bad'],disciplinary:['&#9940;','Disciplinary case','bad'],note:['&#128466;','Note','off']};
+function money(v,c){return (Math.round((+v||0)*100)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+' '+esc(c||'')}
+function monthName(ym){var dt=new Date(ym+'-01T12:00:00');return isNaN(dt)?esc(ym):dt.toLocaleDateString(undefined,{month:'long',year:'numeric'})}
+function normPay(x){if(!x)return null;var T=x.totals=x.totals||{};['shifts','hours','total','earned','leave','planned','plannedShifts','plannedHours'].forEach(function(k){if(T[k]==null)T[k]=0});x.days=x.days||[];x.upTo=x.upTo||today();x.bonus=x.bonus||[];x.extra=x.extra||[];return x}
+function payNow(){var p=D.pay||[],y=today().slice(0,7);return normPay(p.filter(function(x){return x&&x.ym===y})[0]||null)}
+function payLast(){var p=D.pay||[],y=today().slice(0,7);return normPay(p.filter(function(x){return x&&x.ym<y})[0]||null)}
+var DRAFT=null,NODRAFT=false;
+function keepDraft(){if(NODRAFT){NODRAFT=false;DRAFT=null;return}var f=['rqT','rqDay','rqW','rqF','rqTo','rqN'],o={},any=false;f.forEach(function(i){var e=$(i);if(e){o[i]=e.value;if(i!=='rqT'&&i!=='rqDay'&&e.value)any=true}});if(o.rqT!==undefined)DRAFT={v:o,any:any}}
+function restoreDraft(){if(!DRAFT)return;var o=DRAFT.v;['rqT','rqDay','rqW','rqF','rqTo','rqN'].forEach(function(i){var e=$(i);if(e&&o[i]!=null&&i!=='rqT')e.value=o[i]});var t=$('rqT');if(t&&o.rqT){t.value=o.rqT;t.dispatchEvent(new Event('change'));['rqDay','rqW','rqF','rqTo','rqN'].forEach(function(i){var e=$(i);if(e&&o[i]!=null)e.value=o[i]})}}
+function show(){
+  keepDraft();
+  $('login').hidden=true;var a=$('app');a.hidden=false;if(!TABS.some(function(t){return t[0]===tab}))tab='home';
+  var h=(DEMO?'<div class="banner"><b>Demo data.</b> This page is not connected to the server. Nothing you do here is sent anywhere.</div>':'')+
+    '<div class="row"><div><h1>Hello, '+esc((D.profile&&D.profile.nickname)||D.name||D.email)+'</h1><div class="mut">'+esc(D.email)+'</div></div><span><button onclick="load()">&#8635; Refresh</button> <button onclick="location.href='/auth/logout'">Sign out</button></span></div>'+
+    '<nav class="main3">'+TABS.map(function(t){return '<button data-t="'+t[0]+'" class="'+(t[0]===tab?'on':'')+'">'+t[1]+'</button>'}).join('')+'</nav><div id="pg"></div>';
+  a.innerHTML=h;
+  a.querySelector('nav').onclick=function(e){var b=e.target.closest('button');if(b){tab=b.getAttribute('data-t');show();window.scrollTo(0,0)}};
+  var P={home:pHome,schedule:pSchedule,rotation:pRotation};
+  $('pg').innerHTML=(P[tab]||pHome)();
+  if(tab==='schedule'){wireRequests();restoreDraft()}
+  [].forEach.call(document.querySelectorAll('[data-go]'),function(x){x.onclick=function(){var g=x.getAttribute('data-go');if(g.charAt(0)==='#'){var el=document.querySelector(g);if(el)el.scrollIntoView({behavior:'smooth'});return}tab=g;show();window.scrollTo(0,0)}});
+  [].forEach.call(document.querySelectorAll('[data-ev]'),function(x){x.onclick=function(){var i=+x.getAttribute('data-ev');openEv=openEv===i?null:i;show();var el=document.getElementById('ev'+i);if(el)el.scrollIntoView({block:'nearest'})}});
+  var ps=document.getElementById('payShifts');if(ps)ps.onclick=function(){openPay=!openPay;show();var el=document.getElementById('paycard');if(el)el.scrollIntoView({block:'start'})};
+  if(!refreshT&&!DEMO)refreshT=setInterval(function(){if(!document.querySelector('#rqForm:focus-within'))load(true)},60000);
+}
+function tile(go,n,l,cls){return '<button class="tile'+(cls?' '+cls:'')+'" data-go="'+go+'"><b>'+n+'</b><span>'+l+'</span></button>'}
+function pHome(){
+  var p=D.profile||{},ev=D.evaluations||[],last=ev[0],wd=workDays(),next=wd[0],mi=mistakes(),inc=D.incidents||[],rm=D.remarks||[],pn=payNow(),pl=payLast(),y=today().slice(0,7);
+  var incM=inc.filter(function(x){return x.date.slice(0,7)===y}).length,bad=rm.filter(function(x){return x.kind==='violation'||x.kind==='disciplinary'}).length,good=rm.filter(function(x){return x.kind==='positive'}).length;
+  var gm=(D.gameCounts||[]).filter(function(g){return g.period.slice(0,7)===y}).reduce(function(s,g){return s+g.count},0);
+  var h='<div class="tiles">'+
+    tile('#paycard',pn?money(pn.totals.total,pn.cur):pl?money(pl.totals.total,pl.cur):'-',pn?'Earned so far in '+monthName(pn.ym).split(' ')[0]:pl?'Salary for '+monthName(pl.ym):'Salary not published yet','hl')+
+    tile('#paycard',pn?pn.totals.shifts+' · '+pn.totals.hours+' h':'-','Shifts · hours this month')+
+    tile('#evals',last?(last.total==null?'-':esc(last.total)+'%'):'-',last?'Last evaluation: '+esc(last.game||''):'No evaluation shared yet')+
+    tile('#mistakes',mi.length+incM,'Mistakes (criteria with points lost + incidents this month)')+
+    tile('#remarks',bad,'Violations & disciplinary',bad?'warnT':'')+
+    tile('#remarks',good,'Positive feedback',good?'okT':'')+
+    tile('#games',gm?gm.toLocaleString():'-','Games this month')+
+    tile('schedule',next?dLabel(next.d):'-',next?'Next shift: '+SH[next.s]+(next.f!=null?' '+hh(next.f):''):'No upcoming shift sent')+'</div>';
+  /* personal information */
+  h+='<h2>My information</h2><div class="card"><dl>'+[['Name',p.name],['Nickname',p.nickname],['Employee ID',p.workId],['Position',p.position],['Team',p.team],['Team manager',p.manager],['Shift',p.shift],['Start date',p.startDate],['Status',p.status],['Phone',p.phone],['Email',p.email||D.email]].map(function(f){return '<dt>'+f[0]+'</dt><dd>'+(f[1]?esc(f[1]):'<span class="mut">not on file</span>')+'</dd>'}).join('')+'</dl>'+((p.games||[]).length?'<label>Games I am trained on</label>'+p.games.map(function(g){return '<span class="tag">'+esc(g)+'</span>'}).join(''):'')+'<div class="mut" style="margin-top:8px">Something wrong? Tell your manager or HR, or send a request from Schedule.</div></div>';
+  /* salary */
+  h+='<h2 id="paycard">My salary</h2>';
+  if(!pn&&!pl)h+='<div class="card mut">Your salary has not been published yet. It appears here after your manager\'s tool updates the pay pages.</div>';
+  [pn,pl].forEach(function(st,ix){if(!st)return;var T=st.totals,cur=ix===0;
+    h+='<div class="card"><div class="row"><div><b>'+monthName(st.ym)+'</b> <span class="tag">'+(st.final?'Final':cur?'So far (up to '+dLabel(st.upTo)+')':'Not final yet')+'</span><div class="mut">'+T.shifts+' shift'+(T.shifts===1?'':'s')+' · '+T.hours+' hours'+(st.unit==='hour'?' · paid per hour':' · paid per shift')+'</div></div><div class="big">'+money(T.total,st.cur)+'</div></div>'+
+      '<div class="day"><span>Shifts</span><span>'+money(T.earned,st.cur)+'</span></div>'+(T.leave?'<div class="day"><span>Paid leave</span><span>'+money(T.leave,st.cur)+'</span></div>':'')+
+      (st.bonus||[]).map(function(b){return '<div class="day"><span>&#127941; '+esc(b.name)+' <span class="tag">Level '+b.level+' of '+b.of+'</span></span><span class="work">+'+money(b.amount,st.cur)+'</span></div>'}).join('')+
+      (st.extra||[]).map(function(b){return '<div class="day"><span>&#127873; '+esc(b.name)+' <span class="mut">'+esc(b.date)+'</span></span><span class="work">+'+money(b.amount,st.cur)+'</span></div>'}).join('')+
+      (cur&&!st.final?'<div class="mut" style="margin-top:6px">'+(T.plannedShifts?'Still planned this month: '+T.plannedShifts+' shift'+(T.plannedShifts===1?'':'s')+' ('+T.plannedHours+' h, about '+money(T.planned,st.cur)+'). ':'')+'Bonuses are shown when your manager closes the month.</div>':'')+
+      (cur?'<div style="margin-top:8px"><button id="payShifts">'+(openPay?'Hide':'Show')+' each shift</button></div>':'')+
+      (cur&&openPay?'<table style="margin-top:8px"><tr><th>Day</th><th>Shift</th><th>Hours</th><th>Rate</th><th>Pay</th></tr>'+st.days.map(function(d){var w=d.k==='day'||d.k==='night';return '<tr><td>'+dLabel(d.d)+'</td><td>'+(w?esc(SH[d.s]||d.s||(d.k==='night'?'Night':'Day'))+' <span class="mut">'+(d.k==='night'?'night rate':'day rate')+'</span>':esc({vac:'Vacation',sick:'Sick leave',study:'Study leave',fam:'Family leave',unp:'Unpaid'}[d.k]||d.k))+(d.mult>1?' <span class="tag">×'+d.mult+'</span>':'')+'</td><td>'+(w?d.h+(d.act?' <span class="leave" title="Hours entered by your manager (e.g. left early)">*</span>':''):'')+'</td><td>'+(w?money(d.rate,''):'')+'</td><td><b>'+money(d.amt,'')+'</b></td></tr>'}).join('')+'</table><div class="mut">* hours changed by your manager (for example you left early). Questions? Send "Question about my pay" from Schedule.</div>':'')+'</div>'});
+  /* evaluations */
+  h+='<h2 id="evals">My evaluations</h2>';
+  if(!ev.length)h+='<div class="card mut">No results have been shared with you yet.</div>';
+  ev.forEach(function(e,i){var lost=lostOf(e),on=openEv===i,mx=Math.max.apply(null,[1].concat(e.criteria.map(function(c){return c.score||0})));
+    h+='<div class="card" id="ev'+i+'"><div class="row click" data-ev="'+i+'"><div><b>'+esc(e.game||'Evaluation')+'</b>'+(e.kind?' <span class="tag">'+esc(e.kind)+'</span>':'')+'<div class="mut">'+esc(e.date)+' · '+(lost.length?lost.length+' criteria with points lost':'full score')+' · '+(on?'tap to close':'tap for details and comments')+'</div></div><div class="big">'+(e.total==null?'-':esc(e.total))+'%</div></div>';
+    if(on){e.criteria.filter(function(c){return c.score!=null}).sort(function(x,y){return x.score-y.score}).forEach(function(c){var full=c.score>=mx;h+='<div class="day"><span>'+esc(c.name)+(c.note?'<div class="mut">&#128172; '+esc(c.note)+'</div>':'')+'</span><span class="'+(full?'work':'leave')+'">'+(full?'&#10003; Full':'&minus;'+(mx-c.score)+' ('+c.score+'/'+mx+')')+'</span></div>'});
+      if(e.improve&&e.improve.length)h+='<div style="margin-top:8px"><span class="mut">Focus on: </span>'+e.improve.map(function(x){return '<span class="tag">'+esc(x)+'</span>'}).join(' ')+'</div>';
+      if(e.feedback)h+='<div class="fb">'+esc(e.feedback)+'</div>'}
+    h+='</div>'});
+  /* mistakes */
+  h+='<h2 id="mistakes">My mistakes</h2>';
+  h+=(mi.length?'<div class="card"><h3>Procedural (points lost in evaluations)</h3><table><tr><th>Game</th><th>Criterion</th><th>Times</th><th>Last</th></tr>'+mi.map(function(m){return '<tr><td>'+esc(m.game)+'</td><td>'+esc(m.name)+'</td><td><b>'+m.n+'</b></td><td>'+esc(m.last)+'</td></tr>'}).join('')+'</table></div>':'<div class="card mut">No points lost in your shared evaluations.</div>');
+  h+=(inc.length?'<div class="card"><h3>Incidents on the floor ('+inc.length+')</h3>'+inc.slice(0,20).map(function(x){return '<div class="day"><span><b>'+dLabel(x.date)+'</b> · '+esc([x.type,x.game,x.table].filter(Boolean).join(' · '))+(x.summary?'<div class="mut">'+esc(x.summary)+(x.action?' — '+esc(x.action):'')+'</div>':'')+'</span><span class="'+(/critical|high/i.test(x.severity)?'bad':'leave')+'">'+esc(x.severity||'')+'</span></div>'}).join('')+'</div>':'');
+  /* remarks */
+  h+='<h2 id="remarks">Feedback, remarks and cases</h2>'+(rm.length?'<div class="card">'+rm.map(function(x){var k=RK[x.kind]||RK.note;return '<div class="day"><span><b>'+k[0]+' '+k[1]+'</b>'+(x.title?' · '+esc(x.title):'')+'<div class="mut">'+dLabel(x.date)+(x.by?' · '+esc(x.by):'')+'</div>'+(x.text?'<div class="fb">'+esc(x.text)+'</div>':'')+'</span><span class="'+k[2]+'">'+(x.kind==='positive'?'&#9733;':'')+'</span></div>'}).join('')+'</div>':'<div class="card mut">Nothing recorded.</div>');
+  /* games */
+  h+='<h2 id="games">My games</h2>'+gamesHtml();
+  var rt=D.retraining||[];if(rt.length)h+='<h2>My retraining</h2><div class="card">'+rt.map(function(x){return '<div class="day"><span><b>'+esc(x.date)+'</b><div class="mut">'+esc(x.reason||'')+'</div></span><span class="'+(x.status==='Completed'?'work':x.status==='Missed'?'bad':'leave')+'">'+esc(x.status)+'</span></div>'}).join('')+'</div>';
+  return h;
+}
+function gamesHtml(){
+  var g=D.gameCounts;
+  if(!g||!g.length)return '<div class="card mut">No game counts for you yet.</div>';
+  var per={},tot={};g.forEach(function(x){var m=x.period.slice(0,7);per[m]=per[m]||{};per[m][x.game]=(per[m][x.game]||0)+x.count;tot[m]=(tot[m]||0)+x.count});
+  var ms=Object.keys(per).sort().reverse().slice(0,3),mx=Math.max.apply(null,[1].concat(ms.map(function(m){return tot[m]})));
+  return ms.map(function(m){return '<div class="card"><div class="row"><b>'+monthName(m)+'</b><span class="big">'+tot[m].toLocaleString()+'</span></div><div style="height:6px;background:var(--bd);border-radius:3px;margin:6px 0"><div style="height:100%;width:'+(tot[m]/mx*100)+'%;background:var(--ac);border-radius:3px"></div></div>'+
+    Object.keys(per[m]).sort(function(a,b){return per[m][b]-per[m][a]}).map(function(k){return '<div class="day"><span>'+esc(k)+'</span><span>'+per[m][k].toLocaleString()+'</span></div>'}).join('')+'</div>'}).join('');
+}
+function pSchedule(){
+  var h='',x=D.schedule,pn=payNow();
+  h+='<div class="tiles">'+tile('#rqForm',pn?pn.totals.shifts:'-','Shifts worked this month')+tile('#rqForm',pn?pn.totals.hours:'-','Hours worked this month')+tile('#rqForm',pn?pn.totals.plannedShifts:'-','Shifts still planned')+tile('#myreq',(D.requests||[]).filter(function(r){return r.status==='pending'}).length,'Requests waiting')+'</div>';
+  h+='<h2>My schedule</h2>';
+  if(!x||!x.days.length)h+='<div class="card mut">Nothing has been sent to you yet.</div>';
+  else{h+='<div class="card">';x.days.forEach(function(y){var work=SH[y.s],txt=work?SH[y.s]+(y.f!=null?' &middot; '+hh(y.f)+'-'+hh(y.t):''):esc(OFF[y.s]||y.s);h+='<div class="day"><span>'+dLabel(y.d)+'</span><span class="'+(work?'work':y.s==='rest'?'off':'leave')+'">'+txt+'</span></div>'});h+='</div>'}
+  if(pn&&pn.days.length){h+='<h2>Worked this month</h2><div class="card">'+pn.days.filter(function(d){return d.k==='day'||d.k==='night'}).slice().reverse().map(function(d){return '<div class="day"><span>'+dLabel(d.d)+' · '+esc(SH[d.s]||d.s||'')+'</span><span>'+d.h+' h'+(d.act?' <span class="leave">*</span>':'')+'</span></div>'}).join('')+'</div>'}
+  return h+pRequests();
+}
+function pRotation(){
+  var r=D.rotation,h='<h2>My rotation</h2><div class="mut" style="margin-bottom:8px">Your tables for the coming days. View only: if something must change, send a request from Schedule.</div>';
+  if(!r||!(r.days||[]).length)return h+'<div class="card mut">No rotation has been shared with you yet.</div>';
+  r.days.forEach(function(e){
+    var c=e.c||[],grp=[],i,v;for(i=0;i<c.length;i++){v=cellTxt(c[i]);if(grp.length&&grp[grp.length-1].v===v)grp[grp.length-1].to=i+1;else grp.push({v:v,from:i,to:i+1})}
+    h+='<div class="card"><b>'+dLabel(e.d,true)+'</b><div class="mut">'+esc(SH[e.s]||e.s)+(e.f!=null?' &middot; starts '+hh(e.f):'')+'</div>';
+    if(!grp.length||e.f==null)h+='<div class="mut">No table plan for this day.</div>';
+    grp.forEach(function(g){var tb=/^Table/.test(g.v);h+='<div class="day"><span>'+hh(e.f+g.from/2)+' - '+hh(e.f+g.to/2)+'</span><span class="'+(tb?'work':'off')+'">'+esc(g.v)+'</span></div>'});
+    h+='</div>'});
+  return h;
+}
+function pRequests(){
+  var rq=D.requests||[],wd=workDays();
+  var h='<h2>Send a request</h2><div class="card" id="rqForm"><label>What do you need?</label><select id="rqT">'+Object.keys(RT).map(function(k){return '<option value="'+k+'">'+RT[k]+'</option>'}).join('')+'</select>'+
+    '<div id="rqShift"><label>Which shift?</label><select id="rqDay">'+(wd.length?wd.map(function(y){return '<option value="'+y.d+'" data-s="'+y.s+'">'+dLabel(y.d)+' · '+SH[y.s]+'</option>'}).join(''):'<option value="">No working days in the schedule sent to you</option>')+'</select></div>'+
+    '<div id="rqWith"><label>Swap with (colleague\'s name)</label><input id="rqW" maxlength="80"></div>'+
+    '<div id="rqRange" hidden><div class="row" style="flex-wrap:nowrap"><div style="flex:1"><label>From</label><input id="rqF" type="date"></div><div style="flex:1"><label>To</label><input id="rqTo" type="date"></div></div></div>'+
+    '<label id="rqNL">Note (optional)</label><textarea id="rqN" rows="2" maxlength="500"></textarea><div id="rqE" class="err"></div><button class="pri" id="rqGo">Send request</button></div>';
+  h+='<h2 id="myreq">My requests</h2>'+(rq.length?rq.map(function(r){var cls=r.status==='approved'?'work':r.status==='rejected'?'bad':r.status==='pending'?'leave':'off';
+    return '<div class="card"><div class="row"><b>'+esc(rtl(r.type))+'</b><span class="'+cls+'">'+esc(rsl(r.status))+'</span></div><div class="mut">'+(r.type==='payq'?'':esc(r.from)+(r.to&&r.to!==r.from?' → '+esc(r.to):'')+(r.shift?' · '+esc(SH[r.shift]||r.shift):'')+(r.withName?' · with '+esc(r.withName):'')+' · ')+'sent '+when(r.created)+'</div>'+
+      (r.note?'<div class="fb">'+esc(r.note)+'</div>':'')+(r.decisionNote?'<div class="fb" style="border-color:var(--warn)">'+esc(r.decisionNote)+'</div>':'')+(r.status==='pending'?'<div style="margin-top:8px"><button data-cx="'+esc(r.id)+'">Cancel request</button></div>':'')+'</div>'}).join(''):'<div class="card mut">You have not sent any requests.</div>');
+  return h;
+}
+function wireRequests(){
+  var t=$('rqT');
+  function sync(){var v=t.value,one=v==='swap'||v==='giveaway',pq=v==='payq';$('rqShift').hidden=!one;$('rqWith').hidden=v!=='swap';$('rqRange').hidden=one||pq;$('rqNL').textContent=pq?'Your question (which shift, which amount?)':'Note (optional)';var mn=v==='sick'?iso(new Date(Date.now()-14*864e5)):today();$('rqF').min=mn;$('rqTo').min=mn;$('rqE').textContent=''}
+  t.onchange=sync;sync();
+  $('rqGo').onclick=function(){
+    var v=t.value,b={action:'reqNew',type:v,note:$('rqN').value.trim()},e=$('rqE');
+    if(v==='swap'||v==='giveaway'){var o=$('rqDay').selectedOptions[0];if(!o||!o.value){e.textContent='There is no working day you can choose.';return}b.from=b.to=o.value;b.shift=o.getAttribute('data-s');if(v==='swap'){b.withName=$('rqW').value.trim();if(!b.withName){e.textContent='Write who you swap with.';return}}}
+    else if(v==='payq'){b.from=b.to=today();if(!b.note){e.textContent='Write your question.';return}}
+    else{b.from=$('rqF').value;b.to=$('rqTo').value||b.from;if(!b.from){e.textContent='Choose the first day.';return}if(b.to<b.from){e.textContent='The end date is before the start date.';return}}
+    this.disabled=true;e.textContent='Sending...';var btn=this;
+    call(b).then(function(j){btn.disabled=false;if(j.error){if(j.error==='sign-in invalid')return signedOut(ERRS[j.error]);e.textContent=j.error;return}D.requests=j.requests;NODRAFT=true;show()}).catch(function(){btn.disabled=false;e.textContent='Could not reach the server. Nothing was sent.'});
+  };
+  [].forEach.call(document.querySelectorAll('[data-cx]'),function(x){x.onclick=function(){if(!confirm('Cancel this request?'))return;x.disabled=true;
+    call({action:'reqCancel',id:x.getAttribute('data-cx')}).then(function(j){if(j.error){x.disabled=false;if(j.error==='sign-in invalid')return signedOut(ERRS[j.error]);alert(j.error);return}D.requests=j.requests;show()}).catch(function(){x.disabled=false;alert('Could not reach the server.')})}});
+}
+
+/* ---------- demo (only with ?demo in the address; clearly labelled, never talks to the server) ---------- */
+function demoData(){
+  var d=function(n){var x=new Date();x.setDate(x.getDate()+n);return iso(x)},S=['morning','morning','rest','afternoon','afternoon','night','rest'],days=[];
+  for(var i=0;i<14;i++){var s=S[i%7];days.push({d:d(i),s:s,f:s==='morning'?8:s==='afternoon'?16:s==='night'?0:null,t:s==='morning'?16:s==='afternoon'?24:s==='night'?8:null})}
+  var crit=function(a,n){return[{name:'Card handling',score:a[0],note:n&&n[0]||''},{name:'Payout accuracy',score:a[1],note:n&&n[1]||''},{name:'Game protection',score:a[2],note:''},{name:'Customer service',score:a[3],note:n&&n[2]||''}]};
+  var y=today().slice(0,7),dn=new Date().getDate(),pd=[],tot={shifts:0,hours:0,earned:0};
+  for(var k=1;k<=dn;k++){var ds=y+'-'+String(k).padStart(2,'0'),w=k%7,sh=w===3||w===0?null:w===6?'night':w===4||w===5?'afternoon':'morning';if(!sh)continue;var hrs=k===dn-3?5:8,rate=sh==='night'?14:11,amt=rate*hrs*(k===dn-1?2:1);pd.push({d:ds,k:sh==='night'?'night':'day',s:sh,h:hrs,act:hrs!==8,rate:rate,mult:k===dn-1?2:1,amt:amt});tot.shifts++;tot.hours+=hrs;tot.earned+=amt}
+  var lm=new Date();lm.setDate(1);lm.setMonth(lm.getMonth()-1);var ly=iso(lm).slice(0,7);
+  return{email:'ana.beridze@example.com',name:'Ana Beridze',profile:{name:'Ana Beridze',nickname:'Annie',workId:'W1000',status:'Employed',position:'VIP Game Presenter',team:'Team Red',shift:'Rotating',manager:'Nino Kapanadze',startDate:'2024-03-01',phone:'+995 555 12 34 56',email:'ana.beridze@example.com',games:['Roulette','Blackjack','Baccarat']},
+    evaluations:[{game:'Roulette',date:d(-5),ts:Date.now()-5*864e5,total:92,criteria:crit([3,2,3,3],['','Paid 35:1 on a split once; recheck the chip count','']),improve:['Payout accuracy'],feedback:'Great pace and energy. Count the chips twice on splits.',kind:'Regular'},{game:'Blackjack',date:d(-21),ts:Date.now()-21*864e5,total:100,criteria:crit([3,3,3,3]),improve:[],feedback:'Perfect round.',kind:'Close-up'}],
+    retraining:[{date:d(3),reason:'Payout accuracy on roulette',status:'Scheduled'}],
+    gameCounts:[{game:'Roulette',period:y,count:1240},{game:'Blackjack',period:y,count:860},{game:'Baccarat',period:y,count:310},{game:'Roulette',period:ly,count:1105},{game:'Blackjack',period:ly,count:990}],
+    incidents:[{date:d(-4),type:'Procedural mistake',game:'Roulette',table:'RO 2',severity:'Medium',summary:'Closed bets late',action:'Game resumed with the internal tool'}],
+    remarks:[{date:d(-2),kind:'positive',title:'Thank you from a VIP player',text:'Player wrote to support about the friendly game.',by:'Nino Kapanadze'},{date:d(-9),kind:'remark',title:'Late 10 minutes',text:'Please be at the table 5 minutes before the shift.',by:'Shift lead'},{date:d(-30),kind:'violation',title:'Phone on the floor',text:'Phones stay in the locker.',by:'Nino Kapanadze'}],
+    pay:[{ym:y,unit:'hour',cur:'GEL',final:false,upTo:today(),days:pd,bonus:[],extra:[],totals:{shifts:tot.shifts,hours:tot.hours,earned:tot.earned,leave:0,bonus:0,total:tot.earned,plannedShifts:9,plannedHours:72,planned:820}},
+      {ym:ly,unit:'hour',cur:'GEL',final:true,upTo:ly+'-28',days:[],bonus:[{name:'VIP quality bonus',type:'Performance',level:3,of:5,amount:150}],extra:[],totals:{shifts:20,hours:158,earned:1890,leave:88,bonus:150,total:2128,plannedShifts:0,plannedHours:0,planned:0}}],
+    schedule:{days:days},rotation:{days:[{d:d(0),s:'morning',f:8,c:['3','3','3','3','b','5','5','5','5','b','1','1','1','1','1','1']},{d:d(1),s:'morning',f:8,c:['7','7','7','7','b','2','2','2','2','b','4','4','4','4','4','4']}]},requests:[{id:'d1',type:'annual',from:d(20),to:d(24),status:'pending',created:Date.now()-864e5,note:'Family trip'}]};
+}
+function demoCall(b){
+  if(b.action==='me')return D;
+  if(b.action==='reqNew'){D.requests.unshift({id:'demo'+Date.now(),type:b.type,from:b.from,to:b.to,withName:b.withName||'',shift:b.shift||'',note:b.note||'',status:'pending',created:Date.now()});return{ok:true,requests:D.requests}}
+  if(b.action==='reqCancel'){D.requests.forEach(function(r){if(r.id===b.id)r.status='cancelled'});return{ok:true,requests:D.requests}}
+  return{error:'unknown'};
+}
+init();
+</script></body></html>
