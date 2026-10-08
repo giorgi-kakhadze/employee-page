@@ -19957,7 +19957,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     function zoneCellText(v, sk, sh, tid) { var m = /^Z:(.+)$/.exec(String(v || '').trim()); if (!m) return String(v || ''); var z = zoneList(sk, tid, sh).filter(function (q) { return String(q.n) === m[1]; })[0]; return 'Zone ' + m[1] + (z && z.t && z.t.length ? ' \u00B7 tables ' + tblsTxt(z.t) : ''); }
     function rotateZones(segs, zones, B) {
       var n = segs.length, m = zones.length; if (!n || !m) return; var L = Math.max(n, m), pos = [], j, q0 = 1e9, nb = L - m, isB = {}, zi = 0;
-      for (j = 0; j < nb; j++) isB[Math.floor((j + 0.5) * L / nb)] = 1;   /* breaks are spread evenly between the zones, so nobody gets two breaks in a row and everybody gets one */
+      for (j = 0; j < nb; j++) isB[Math.floor(j * L / nb)] = 1;   /* breaks are spread evenly between the zones, so nobody gets two breaks in a row and everybody gets one */
       for (j = 0; j < L; j++) pos.push(isB[j] ? 'B' : 'Z:' + zones[zi++].n);
       segs.forEach(function (x) { q0 = Math.min(q0, Math.round(x.from * 2)); });
       segs.forEach(function (x, i) { for (var q = Math.round(x.from * 2); q < slots(x); q++) x.cells[q] = pos[(i + Math.floor((q - q0) / B)) % L]; });
@@ -20036,6 +20036,28 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
         if (r.s === 'expired') return 0;
         if (r.s === 'lack') return 0;
         return 1;
+      }
+      /* v3.41 CHAIN ROTATION: when there are more people than tables, everybody moves one place forward every half hour in one circle:
+         break -> table 1 -> table 2 -> ... -> last table -> break. So every table always has somebody, the person coming back from a break takes table 1,
+         the person on table 1 moves to table 2 and so on; the breaks are spread evenly between the tables (never everybody on a break together).
+         Used when the whole team starts and ends together; otherwise (late starters, loans) the flexible planner below is used. */
+      if (N > T && T > 0) {
+        var s0 = st0(rs[0]), e0 = slots(rs[0]), same = true; rs.forEach(function (x) { if (st0(x) !== s0 || slots(x) !== e0) same = false; });
+        if (same && e0 > s0) {
+          var nb = N - T, L = N, pos = [], isB = {}, ti = 0, j, mr = 0, cr = 0;
+          for (j = 0; j < nb; j++) isB[Math.floor(j * L / nb)] = 1;   /* one break: the circle is  break, 1, 2, 3 ... last */
+          for (j = 0; j < L; j++) pos.push(isB[j] ? -1 : ti++);
+          for (j = 0; j < 2 * L; j++) { if (pos[j % L] >= 0) { cr++; mr = Math.max(mr, cr); } else cr = 0; } mr = Math.min(mr, T);
+          /* who starts where in the circle: the starting places are given out so that people get tables of the games they are qualified for */
+          var cand = [], taken = {}, startOf = [], got = {}, ci, cs, cq;
+          for (ci = 0; ci < N; ci++) { var nm0 = (rs[ci]._r && rs[ci]._r.name) || rs[ci].name || '';
+            for (cs = 0; cs < L; cs++) { var sc0 = 0; for (cq = s0; cq < e0; cq++) { var pv = pos[(cs + cq - s0) % L]; sc0 += pv < 0 ? 1 : scoreTable(nm0, pv); } cand.push({ i: ci, s: cs, v: sc0, d: (cs - ci + L) % L }); } }
+          cand.sort(function (a, b) { return b.v - a.v || a.d - b.d || a.i - b.i; });
+          cand.forEach(function (c) { if (got[c.i] || taken[c.s]) return; got[c.i] = 1; taken[c.s] = 1; startOf[c.i] = c.s; });
+          for (ci = 0; ci < N; ci++) for (cq = s0; cq < e0; cq++) { var pv2 = pos[(startOf[ci] + cq - s0) % L]; rs[ci].cells[cq] = pv2 < 0 ? 'B' : String(TB[pv2]); }
+          if (mr > K) { try { showShellToast('Every table is covered all the time. With ' + N + ' people on ' + T + ' tables, each person works up to ' + mr + ' tables in a row before a break (the limit is ' + K + '). Add people or use fewer tables to shorten it.', 'error'); } catch (e) {} }
+          return;
+        }
       }
       for (q = 0; q < S; q++) {
         var act = []; for (i = 0; i < N; i++) if (q >= st0(rs[i]) && q < slots(rs[i])) act.push(i);

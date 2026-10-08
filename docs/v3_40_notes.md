@@ -92,3 +92,10 @@ Give everyone the new `tool/PTF-pass-to-floor-Gunda.html`, **deploy the new `Cod
 - Employee page: Sign out now really signs out (it also tells Google not to pick the same account again automatically).
 - Server Edition: Sign out waits for pending changes, then ends the server session and the Microsoft sign-in (`/auth/logout`); nothing was stored on the computer anyway.
 - Test: `tests/signout.test.js`, `ptf-gunda-server/test/signout.test.js`.
+
+## Chain rotation: a table is never left without somebody
+- With more people than tables, the rotation is now one circle: everybody moves one place forward every half hour: **break → table 1 → table 2 → … → last table → break**. The person coming back from a break takes table 1, the person on table 1 goes to table 2, and so on. Every table has somebody in every half hour, and only (people − tables) are on a break at a time, never the whole team at the start. With several breaks per round they are spread evenly between the tables. Example: 5 people, 4 tables → one person on a break, four on tables, shifting one place each half hour.
+- Used when the team starts and ends together. With late starters or loans the older flexible planner is used.
+- Shufflers (zones) use the same circle: break → zone A → zone B → … → last zone → break.
+- If there are so few spare people that somebody works more tables in a row than the limit, the tool still covers every table and says how many in a row it needs.
+- Test: `tests/chain_rotation.test.js` (5/4, 8/4, 10/8, 13/10).
