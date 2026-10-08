@@ -70,3 +70,9 @@ The people below are in the access list (positions and departments) so that Assi
 | HR / Recruiter | Aleksandre Gvenetadze | aleksandre.gvenetadze@example.com |
 | Service manager | Eka Kobakhidze | eka.kobakhidze@example.com |
 | Service manager | Teona Gabunia | teona.gabunia@example.com |
+
+## Try the schedule and rotation with 200 fake people
+* `PTF-fake-employees-200.xlsx` (and `.csv`): 150 game presenters and 50 shufflers, three shifts, two sets, three teams. Fictional.
+* **Upload:** Home → Employee Data Source → ⬆️ Import Excel / CSV. Then FMD → Schedule → Roster: set **"Set 1 starts a 3-day work block on"** to a date (for example today), add a few tables to each team (Setup → Tables), press **Generate whole shift**.
+* **Shufflers** are all in **Team 3**: Setup → Tables → Team 3 → tick **Zone rotation** → **Split tables into zones**.
+* `PTF-demo-backup-with-rotation.json` (made by `build-rotation-demo.js`): the big demo company with a ready-made week of rotation for every shift (restore it with More → Restore from backup).
