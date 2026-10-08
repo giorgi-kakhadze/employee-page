@@ -21,6 +21,7 @@ let fails = 0; function ok(n, c, x) { if (!c) fails++; console.log((c ? '  ✅ '
   ok('each has a long random token', A.every(a => /^[A-Za-z0-9]{32}$/.test(a.token)) && A[0].token !== A[1].token);
   const link = await P.evaluate(() => document.querySelector('#scheduleView input[readonly]').value); ok('the link holds the token (single-file edition: page + script address + token)', link.indexOf(A[0].token) > 0 && /^PTF-tv\.html#/.test(link), link.slice(0, 80));
   await P.evaluate(() => { const i = document.querySelector('#scheduleView [data-tvf$="|zoom"]'); i.value = '1.8'; i.dispatchEvent(new Event('change', { bubbles: true })); }); await w(300);
+  ok('the screen can show zone tables in a map, in the cells or both (default: map)', await P.evaluate(() => !!document.querySelector('#scheduleView [data-tvf$="|zinfo"]')) && (await TV())[0].zinfo === undefined);
   ok('zoom is saved', (await TV())[0].zoom === 1.8);
   await P.evaluate(() => { const s = document.querySelector('#scheduleView [data-tvf$="|view"]'); s.value = 'full'; s.dispatchEvent(new Event('change', { bubbles: true })); const c = document.querySelector('#scheduleView [data-tvl$="|pos|shuf"]'); if (c) { c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); } }); await w(300);
   A = await TV(); ok('"whole shift" is saved', A[0].view === 'full');
@@ -31,6 +32,7 @@ let fails = 0; function ok(n, c, x) { if (!c) fails++; console.log((c ? '  ✅ '
   const key = gas.data().keys.totTvScreens; ok('the screen list reached the shared store', !!key);
   const r = gas.post({ action: 'tv', token: A[1].token, d: D, h: 10 }); ok('a screen link works without any sign-in', r.ok === true && r.shift === 'morning', JSON.stringify(r).slice(0, 120));
   ok('the Shufflers screen shows only shufflers and their zones', r.rows.length === 1 && r.rows[0].n === 'Sandro K.' && r.zones.t2.length === 2 && r.rows[0].c[0] === 'Z:A');
+  ok('the answer says how to show zone tables', r.screen.zinfo === 'legend');
   ok('nothing else leaves: no e-mail, work id, pay', !/@|workId|pay/i.test(JSON.stringify(r)));
   ok('the old link no longer works', gas.post({ action: 'tv', token: oldTok, d: D, h: 10 }).error === 'not found');
   ok('a made-up token does not either', gas.post({ action: 'tv', token: 'A'.repeat(32) }).error === 'not found' && gas.post({ action: 'tv' }).error === 'not found');

@@ -54,6 +54,7 @@ let fails = 0; function ok(n, c, x) { if (!c) fails++; console.log((c ? '  ✅ '
   ok('in every time slot each zone has exactly one person', [...Array(16).keys()].every(c => new Set(cells.map(r => r[c])).size === 8));
   ok('everybody visits different zones during the shift', cells.every(r => new Set(r).size >= 8), cells[0].join(','));
   const warn = await P.evaluate(() => document.querySelector('#scheduleView #scW').textContent); ok('the page says all zones are covered', /all 8 zones are covered/.test(warn), warn.slice(0, 160));
+  ok('a separate map lists every table of each zone (Zone A: 1, 2, 3, 4, 5)', /Which tables belong to which zone/.test(warn) && /Zone A: 1, 2, 3, 4, 5/.test(warn) && /Zone H: 36, 37, 38, 39, 40/.test(warn), warn.slice(0, 200));
   ok('no table clash or "gap" warning from the old table check', !/Table conflict|Gap on this shift/.test(warn));
 
   console.log('4. More people than zones, fewer people than zones');
@@ -70,7 +71,7 @@ let fails = 0; function ok(n, c, x) { if (!c) fails++; console.log((c ? '  ✅ '
   await people(8); await P.evaluate(() => { const S = JSON.parse(localStorage.getItem('totSchedule')); S.cfg.zoneTeams = { t2: { on: 1, slots: 2 } }; S.cfg.zones = { morning: { t2: Array.from({ length: 8 }, (_, i) => ({ n: String.fromCharCode(65 + i), t: [i * 5 + 1, i * 5 + 2, i * 5 + 3, i * 5 + 4, i * 5 + 5] })) } }; localStorage.setItem('totSchedule', JSON.stringify(S)); SchedMount(); }); await w(300);
   await click('[data-sub="rot"]'); await w(300); await click('[data-a="gen"]'); await w(900);
   const ent = await P.evaluate((day) => window.totRotEntry({ name: 'Shuf 1' }, day, 'morning'), day);
-  ok('what is sent to an employee says the zone and its tables, in words', ent && /^Zone [A-H] \u00B7 tables \d+\u2013\d+$/.test(ent.c[0]) && ent.c[0] === ent.c[1], ent && ent.c.slice(0, 3).join(' | '));
+  ok('what is sent to an employee says the zone and every one of its tables (1, 2, 3, 4, 5)', ent && /^Zone [A-H] \u00B7 tables \d+, \d+, \d+, \d+, \d+$/.test(ent.c[0]) && ent.c[0] === ent.c[1], ent && ent.c.slice(0, 3).join(' | '));
   ok('the rotation page does not complain about 41 tables needing 41 people for zone teams', true);
   ok('no page errors', H.errs.length === 0, H.errs.slice(0, 3).join(' | '));
   await H.close(); console.log('zones: ' + (fails ? fails + ' FAILED' : 'ALL PASSED')); process.exit(fails ? 1 : 0);

@@ -26,7 +26,11 @@ A team can switch to **zone rotation**: **FMD → Schedule → ⚙ Setup → Tab
 - **Fewer people than zones:** the page says how many zone-slots nobody covers, and from when.
 - The old table checks (gap, clash, "needs N people for N tables") no longer apply to zone teams; "people needed" is one per zone.
 
-**What employees see:** on their page and in Send rotation a zone reads **Zone A · tables 1–5**, shown like a table.
+**Every table number is written out** (1, 2, 3, 4, 5), never as a range like 1–5.
+
+**A separate zone map:** the Rotation tab shows a box **🗺 Which tables belong to which zone** (for the day and shift you are looking at, and it says when the zones were changed for this day).
+
+**What employees see:** on their page and in Send rotation a zone reads **Zone A · tables 1, 2, 3, 4, 5**, shown like a table.
 
 ## 2. Lobby screens (live rotation on a TV)
 **FMD → Schedule → 📺 Screens** (people who edit the schedule).
@@ -36,6 +40,7 @@ For each TV:
 - **Shift:** automatic (the shift that is running now, also after midnight), or morning / afternoon / night.
 - **Show:** *Now and the next hours* (big; you choose how many hours ahead) or *the whole shift*.
 - **Names:** first name and initial (default), first name only, or full name.
+- **Zone tables:** a separate **zone map under the table** (default: *Zone A: 1, 2, 3, 4, 5*), **inside each cell**, or both.
 - **Zoom:** 0.6 × to 2.5 ×, and rows per page (0 = as many as fit; more rows turn pages by themselves every 12 s).
 - **Title on screen**, **On/Off**, **Delete**, **New link** (the old link stops working at once).
 

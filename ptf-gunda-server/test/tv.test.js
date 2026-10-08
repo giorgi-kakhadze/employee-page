@@ -24,6 +24,7 @@ const screen = (o) => Object.assign({ id: 'tv1', name: 'Lobby', token: 'A'.repea
   ok('everybody in the rotation is there, with names shortened to first name and initial', r.j.rows.map((x) => x.n).sort().join('|') === 'Ana B.|Nika G.|Sandro K.|Tamar B.', r.j.rows.map((x) => x.n));
   ok('zone cells arrive with the zone list of their team', r.j.rows.find((x) => x.n === 'Sandro K.').c[0] === 'Z:A' && r.j.zones.t2.length === 4 && r.j.zones.t2[0].t.join() === '1,2,3,4,5');
   const body = JSON.stringify(r.j); ok('no e-mail, no pay, no ids of people in the answer', !/@|workId|pay|email/i.test(body), body.length);
+  ok('the answer tells the screen how to show zone tables (default: a map)', r.j.screen.zinfo === 'legend');
   ok('the answer is never cached', /no-store/.test(r.h.get('cache-control')));
   r = await get(T3); ok('a screen for one position shows only that position', r.j.rows.map((x) => x.n).sort().join('|') === 'Ana Beridze|Nika Gela', r.j.rows.map((x) => x.n));
   ok('and uses full names when it is set to', r.j.screen.names === 'full');

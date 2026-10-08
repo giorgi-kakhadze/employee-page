@@ -21,7 +21,7 @@ const { chromium } = (function () { try { return require('playwright'); } catch 
   ok('the title, the shift and the clock', /Floor rotation/.test(t) && /Morning shift/.test(t) && /10:0\d/.test(t), t.slice(0, 120).replace(/\n/g, ' | '));
   ok('all four people, shortened', ['Ana B.', 'Nika G.', 'Sandro K.', 'Tamar B.'].every((n) => t.includes(n)));
   ok('the current time slot is marked NOW', /NOW 10:00/.test(t));
-  ok('tables show as numbers; shufflers show zones with their tables', /Zone A/.test(t) && /tables 1–5/.test(t) && /Zone B/.test(t) && /tables 6–10/.test(t));
+  ok('tables show as numbers; shufflers show zones, and a separate zone map lists every table of each zone', /Zone A/.test(t) && /Zone B/.test(t) && /Zone A: 1, 2, 3, 4, 5/.test(t) && /Zone B: 6, 7, 8, 9, 10/.test(t) && /Which tables belong to which zone/.test(t));
   ok('team names are shown when there is more than one team', /Team 1/.test(t) && /Shufflers/.test(t));
   ok('"Now" view shows only the next hours (4): no 14:00 column', !/14:00/.test(t) && /13:30/.test(t), (t.match(/\d\d:\d\d/g) || []).join(' '));
   ok('no page errors', A.errs.length === 0, A.errs);
