@@ -183,12 +183,12 @@
 
   /* == LIGHT THEME == */
   :root[data-theme="light"] {
-    --navy:     #f4f6fa;
-    --navy2:    #ffffff;
-    --navy3:    #eef1f6;
-    --navy4:    #e2e7f0;
-    --border:   #d7dee8;
-    --border2:  #c3ccd9;
+    --navy:     #f6f2e8;
+    --navy2:    #fffdf8;
+    --navy3:    #f0ebde;
+    --navy4:    #e6dfcf;
+    --border:   #e1d9c6;
+    --border2:  #cfc6ae;
     --text:     #16202f;
     --text2:    #3c4657;
     --muted:    #66748a;
@@ -797,17 +797,17 @@
     --bg-color: var(--navy); --primary-color: var(--accent); --text-color: var(--text);
   }
   :root[data-theme="light"] {
-    --navy:#f3f4f9; --navy2:#ffffff; --navy3:#eceef6; --navy4:#dfe2ef;
-    --border:#dadeeb; --border2:#c5cadd;
+    --navy:#f6f2e8; --navy2:#fffdf8; --navy3:#f0ebde; --navy4:#e6dfcf;
+    --border:#e1d9c6; --border2:#cfc6ae;
     --text:#181b2a; --text2:#40455c; --muted:#5d6480;
     --accent:#2f5fdc; --accent2:#3f76ee;
     --green:#16a34a; --green2:#22a35c; --red:#dc2626;
     --warm:#e39a3b; --warm2:#f2b25c;
-    --surface-hi:#ffffff;
+    --surface-hi:#fffdf8;
     --surface:var(--navy2); --surface2:var(--navy3); /* v3.25 */
     --lift-line:rgba(255,255,255,.9);
     --glow-warm:rgba(242,178,92,.17); --glow-cool:rgba(59,112,232,.10); --glow-base:rgba(120,100,220,.06);
-    --bar-top:#ffffff; --bar-bottom:#f3f4f9;
+    --bar-top:#fffdf8; --bar-bottom:#f6f2e8;
     --shadow-1:0 1px 2px rgba(40,50,90,.08), 0 8px 22px rgba(40,50,90,.08);
     --shadow-2:0 2px 4px rgba(40,50,90,.10), 0 18px 44px rgba(40,50,90,.16);
     --bg-color: var(--navy); --primary-color: var(--accent); --text-color: var(--text);
@@ -2859,7 +2859,7 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
       const t = localStorage.getItem(THEME_KEY);
       if (t === 'light' || t === 'dark') return t;
     } catch (e) {}
-    return 'dark';
+    return 'light';   /* v3.41: the default is the creamy light theme; "Theme" in the More menu switches to dark and back */
   }
 
   function applyAppTheme(theme) {
@@ -7100,12 +7100,12 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
   }
 
   :root[data-theme="light"] {
-    --navy:     #f4f6fa;
-    --navy2:    #ffffff;
-    --navy3:    #eef1f6;
-    --navy4:    #e2e7f0;
-    --border:   #d7dee8;
-    --border2:  #c3ccd9;
+    --navy:     #f6f2e8;
+    --navy2:    #fffdf8;
+    --navy3:    #f0ebde;
+    --navy4:    #e6dfcf;
+    --border:   #e1d9c6;
+    --border2:  #cfc6ae;
     --text:     #16202f;
     --text2:    #3c4657;
     --muted:    #66748a;
@@ -12235,10 +12235,10 @@ loadConfig().then(() => {
 
   /* Light theme */
   :root[data-theme="light"] {
-    --bg: #EEF1F5;
-    --panel: #FFFFFF;
-    --border: #D7DCE3;
-    --border-soft: #E6E9EE;
+    --bg: #F6F2E8;
+    --panel: #fffdf8;
+    --border: #E1D9C6;
+    --border-soft: #EBE4D3;
     --ink: #1A2233;
     --ink-soft: #64707E;
     --ink-faint: #94A0AC;
@@ -17525,7 +17525,7 @@ if (sCopiesEl) {
   }
 
   /* ---------------------------------------------------------------- polish inside the Exam / ID frames */
-  var FRAME_CSS = "@media screen {\n  :root, :root[data-theme=\"dark\"] {\n    --navy:#12141d; --navy2:#1a1d2b; --navy3:#232739; --navy4:#2d3247;\n    --border:#313650; --border2:#424966; --border-soft:#2d3247;\n    --text:#edeef6; --text2:#cfd2e2; --muted:#8c93ae;\n    --accent:#3b70e8; --accent2:#88aaff; --accent-dark:#2f5fdc;\n    --accent-soft:rgba(59,112,232,.14);\n    --bg:#12141d; --panel:#1a1d2b; --score-bg:#0e1017;\n    --enh-glow-a:rgba(242,178,92,.07); --enh-glow-b:rgba(59,112,232,.10);\n    --enh-lift:rgba(255,255,255,.05);\n    --enh-shadow:0 1px 2px rgba(6,8,18,.35), 0 8px 22px rgba(6,8,18,.24);\n  }\n  :root[data-theme=\"light\"] {\n    --navy:#f3f4f9; --navy2:#ffffff; --navy3:#eceef6; --navy4:#dfe2ef;\n    --border:#dadeeb; --border2:#c5cadd; --border-soft:#e4e7f1;\n    --text:#181b2a; --text2:#40455c; --muted:#5d6480;\n    --accent:#2f5fdc; --accent2:#3f76ee; --accent-dark:#2450c4;\n    --accent-soft:rgba(59,112,232,.11);\n    --bg:#f3f4f9; --panel:#ffffff; --score-bg:#e8ebf4;\n    --enh-glow-a:rgba(242,178,92,.16); --enh-glow-b:rgba(59,112,232,.09);\n    --enh-lift:rgba(255,255,255,.9);\n    --enh-shadow:0 1px 2px rgba(40,50,90,.08), 0 8px 22px rgba(40,50,90,.08);\n  }\n  body {\n    background-image:\n      radial-gradient(900px 480px at 8% -10%, var(--enh-glow-a), transparent 62%),\n      radial-gradient(800px 520px at 102% 0%, var(--enh-glow-b), transparent 58%);\n    background-attachment: fixed;\n  }\n  ::selection { background: rgba(59,112,232,.35); }\n  * { scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }\n  .site-header, header.app-header {\n    background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 9%, var(--navy)), var(--navy));\n  }\n  .form-card, .panel, .bulk-add-panel, .editor-modal, .size-editor-modal {\n    border-radius: 14px;\n    box-shadow: var(--enh-shadow), inset 0 1px 0 var(--enh-lift);\n  }\n  .action-btn, .ed-btn, .export-row-btn, .change-type-btn, .add-game-btn, .duo-opt-btn,\n  .btn-row button, .mode-switch button, .size-editor-footer button {\n    transition: transform .12s ease, box-shadow .15s ease, background-color .15s ease, border-color .15s ease, color .15s ease, filter .15s ease;\n  }\n  .action-btn:not(:disabled):active, .ed-btn:not(:disabled):active, .export-row-btn:not(:disabled):active,\n  .btn-row button:not(:disabled):active { transform: translateY(1px) scale(.985); }\n  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible, [tabindex]:focus-visible {\n    outline: 2px solid var(--accent2); outline-offset: 2px;\n  }\n  @media (prefers-reduced-motion: reduce) {\n    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }\n  }\n}";
+  var FRAME_CSS = "@media screen {\n  :root, :root[data-theme=\"dark\"] {\n    --navy:#12141d; --navy2:#1a1d2b; --navy3:#232739; --navy4:#2d3247;\n    --border:#313650; --border2:#424966; --border-soft:#2d3247;\n    --text:#edeef6; --text2:#cfd2e2; --muted:#8c93ae;\n    --accent:#3b70e8; --accent2:#88aaff; --accent-dark:#2f5fdc;\n    --accent-soft:rgba(59,112,232,.14);\n    --bg:#12141d; --panel:#1a1d2b; --score-bg:#0e1017;\n    --enh-glow-a:rgba(242,178,92,.07); --enh-glow-b:rgba(59,112,232,.10);\n    --enh-lift:rgba(255,255,255,.05);\n    --enh-shadow:0 1px 2px rgba(6,8,18,.35), 0 8px 22px rgba(6,8,18,.24);\n  }\n  :root[data-theme=\"light\"] {\n    --navy:#f6f2e8; --navy2:#fffdf8; --navy3:#f0ebde; --navy4:#e6dfcf;\n    --border:#e1d9c6; --border2:#cfc6ae; --border-soft:#ebe4d3;\n    --text:#181b2a; --text2:#40455c; --muted:#5d6480;\n    --accent:#2f5fdc; --accent2:#3f76ee; --accent-dark:#2450c4;\n    --accent-soft:rgba(59,112,232,.11);\n    --bg:#f6f2e8; --panel:#fffdf8; --score-bg:#ebe4d3;\n    --enh-glow-a:rgba(242,178,92,.16); --enh-glow-b:rgba(59,112,232,.09);\n    --enh-lift:rgba(255,255,255,.9);\n    --enh-shadow:0 1px 2px rgba(40,50,90,.08), 0 8px 22px rgba(40,50,90,.08);\n  }\n  body {\n    background-image:\n      radial-gradient(900px 480px at 8% -10%, var(--enh-glow-a), transparent 62%),\n      radial-gradient(800px 520px at 102% 0%, var(--enh-glow-b), transparent 58%);\n    background-attachment: fixed;\n  }\n  ::selection { background: rgba(59,112,232,.35); }\n  * { scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }\n  .site-header, header.app-header {\n    background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 9%, var(--navy)), var(--navy));\n  }\n  .form-card, .panel, .bulk-add-panel, .editor-modal, .size-editor-modal {\n    border-radius: 14px;\n    box-shadow: var(--enh-shadow), inset 0 1px 0 var(--enh-lift);\n  }\n  .action-btn, .ed-btn, .export-row-btn, .change-type-btn, .add-game-btn, .duo-opt-btn,\n  .btn-row button, .mode-switch button, .size-editor-footer button {\n    transition: transform .12s ease, box-shadow .15s ease, background-color .15s ease, border-color .15s ease, color .15s ease, filter .15s ease;\n  }\n  .action-btn:not(:disabled):active, .ed-btn:not(:disabled):active, .export-row-btn:not(:disabled):active,\n  .btn-row button:not(:disabled):active { transform: translateY(1px) scale(.985); }\n  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible, [tabindex]:focus-visible {\n    outline: 2px solid var(--accent2); outline-offset: 2px;\n  }\n  @media (prefers-reduced-motion: reduce) {\n    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }\n  }\n}";
   function polishFrame(iframe) {
     try {
       var doc = iframe.contentDocument;

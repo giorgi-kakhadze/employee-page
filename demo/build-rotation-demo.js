@@ -12,15 +12,15 @@ const DAYS = (process.env.DAYS || '2026-10-05,2026-10-06,2026-10-07,2026-10-08,2
   await P.setInputFiles('#importFileInput', DEMO); await P.waitForSelector('#restoreModal.open', { timeout: 30000 });
   await P.evaluate(() => { HTMLAnchorElement.prototype.click = function () {}; applyRestore('replace'); }); await w(6000);
   /* teams, tables and zones */
-  const info = await P.evaluate(([SHIFTS]) => {
-    const S = JSON.parse(localStorage.getItem('totSchedule')), T = 'ABCDEFGH'.split('');
-    S.teams = T.map((x) => ({ id: 't' + x.toLowerCase(), name: 'Team ' + x })).concat([{ id: 'sh', name: 'Shufflers' }]);
+  const info = await P.evaluate(([SHIFTS, NUMTEAMS]) => {
+    const S = JSON.parse(localStorage.getItem('totSchedule')), NT = NUMTEAMS, T = 'ABCDEFGH'.slice(0, NT).split('');
+    S.teams = T.map((x, i) => ({ id: 't' + x.toLowerCase(), name: NT <= 4 ? 'Team ' + (i + 1) : 'Team ' + x })).concat([{ id: 'sh', name: 'Shufflers' }]);
     /* only game presenters (VIP, premium, regular, beginner) and shufflers are in this rotation; pit supervisors are left out */
     S.roster.people = S.roster.people.filter((p) => p.pos !== 'pit');
     /* the monthly grid follows the 3 days on / 3 days off sets of the roster, so every day has exactly one set per shift */
     const anchor = Date.UTC(2026, 9, 1), ymList = ['2026-09', '2026-10', '2026-11']; S.sched = {};
     ymList.forEach((ym) => { const dim = new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0).getDate(), m = {}; S.roster.people.forEach((p) => { const d = {}; for (let i = 1; i <= dim; i++) { const c = ((Math.floor((Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7) - 1, i) - anchor) / 864e5) % 6) + 6) % 6, work = p.g === 'B' ? c >= 3 : c < 3; d[i] = work ? { morning: 'M', afternoon: 'A', night: 'N' }[p.sh] : 'OFF'; } m[p.name.toLowerCase()] = { d, c: {} }; }); S.sched[ym] = m; });
-    S.roster.people.forEach((p) => { const m = /^Team ([A-H])$/.exec(String(p.t)); p.t = p.pos === 'shuf' ? 'sh' : 't' + (m ? m[1].toLowerCase() : 'abcdefgh'[Array.from(p.name).reduce((a, c) => a + c.charCodeAt(0), 0) % 8]); });
+    const rr = {}; S.roster.people.slice().sort((a, b) => a.name.localeCompare(b.name)).forEach((p) => { if (p.pos === 'shuf') { p.t = 'sh'; return; } const k = p.sh + '|' + p.g; rr[k] = (rr[k] || 0); p.t = 't' + 'abcdefgh'[rr[k] % NT]; rr[k]++; });   /* presenters are shared evenly over the teams in every shift and set */
     const cnt = {}; S.roster.people.forEach((p) => { if (p.pos === 'shuf') { const k = p.sh + p.g; cnt[k] = (cnt[k] || 0) + 1; } });
     S.cfg = { len: 8, tables: 400, maxrun: 4, auto: false, tbl: {}, zoneTeams: { sh: { on: 1, slots: 2 } }, zones: {} };
     SHIFTS.forEach((sk) => { S.cfg.tbl[sk] = {}; let next = 1; S.teams.forEach((t) => { if (t.id === 'sh') return;
@@ -28,7 +28,7 @@ const DAYS = (process.env.DAYS || '2026-10-05,2026-10-06,2026-10-07,2026-10-08,2
         const c = { A: 0, B: 0 }; S.roster.people.forEach((p) => { if (p.t === t.id && p.sh === sk) c[p.g]++; }); const n = Math.max(4, Math.floor(Math.max(c.A, c.B) * 0.8)); S.cfg.tbl[sk][t.id] = Array.from({ length: n }, (_, j) => next + j); next += n; });
       const n = Math.min(cnt[sk + 'A'], cnt[sk + 'B']), tabs = Array.from({ length: n * 5 }, (_, j) => next + j); S.cfg.tbl[sk].sh = tabs; S.cfg.zones[sk] = { sh: Array.from({ length: n }, (_, z) => ({ n: String.fromCharCode(65 + (z % 26)) + (z >= 26 ? Math.floor(z / 26) : ''), t: tabs.slice(z * 5, z * 5 + 5) })) }; });
     S.days = {}; localStorage.setItem('totSchedule', JSON.stringify(S)); SchedMount(); return cnt;
-  }, [SHIFTS]);
+  }, [SHIFTS, +process.env.TEAMS || 8]);
   console.log('shufflers by shift and set', JSON.stringify(info));
   const setDay = (d) => P.evaluate((d) => { const i = document.querySelector('#scheduleView #scD'); i.value = d; i.dispatchEvent(new Event('change', { bubbles: true })); }, d);
   const setShift = (s) => P.evaluate((s) => document.querySelector('#scheduleView [data-sh="' + s + '"]').click(), s);

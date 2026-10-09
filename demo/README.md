@@ -87,3 +87,6 @@ The people below are in the access list (positions and departments) so that Assi
 
 ## Lite backup (about 2 MB)
 `PTF-demo-backup-lite.json`: about 270 people, all three shifts, 3 days of rotation (presenters on tables, shufflers on zones), Community channels and chats, evaluations, tickets, pay, uniforms and the rest, in under 2 MB. Built by `make-lite-backup.py` → `build-rotation-demo.js` (with `IN`, `OUT`, `DAYS`) → `add-chat-to-demo.py` (with `IN`, `OUT`).
+
+## 200-person demo backup (1.5 MB)
+`PTF-demo-backup-200.json`: 200 people (100 in Set 1, 100 in Set 2), 3 shifts, a 6-day rotation, chat, a few tickets on every department board, onboarding and the rest. Shufflers have no nickname; game presenters have unique first-name nicknames. Restore it with Home → Backup → Import → Replace. Built by `make-demo200.py` → `build-rotation-demo.js` → `finish-demo200.py`.

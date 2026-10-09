@@ -99,3 +99,11 @@ Give everyone the new `tool/PTF-pass-to-floor-Gunda.html`, **deploy the new `Cod
 - Shufflers (zones) use the same circle: break → zone A → zone B → … → last zone → break.
 - If there are so few spare people that somebody works more tables in a row than the limit, the tool still covers every table and says how many in a row it needs.
 - Test: `tests/chain_rotation.test.js` (5/4, 8/4, 10/8, 13/10).
+
+## Default theme: creamy light
+- The tool (and the Server Edition) now opens in a **creamy light theme** by default instead of dark. **More → Theme** switches to dark and back; the choice is remembered (per person on the server). The cream colours were applied to the main tool and to the Exam and ID Creation screens. Lobby TV screens stay dark on purpose.
+
+## 200-person demo backup
+- `demo/PTF-demo-backup-200.json` (1.5 MB): 200 people (100 Set 1, 100 Set 2; 3 days on / 3 off; about 33 per shift and set: 8 shufflers + game presenters), a 6-day rotation (Set 1 for three days, then Set 2 for three days) on all three shifts, chain rotation for tables, zones for shufflers, Community chats, 7 tickets on every department board in all stages, onboarding groups, evaluations, pay, uniforms and more.
+- Nicknames: shufflers have none; every game presenter has a normal first name as nickname, one person per nickname, never the person's own first or last name.
+- Built by `make-demo200.py` → `build-rotation-demo.js` (`TEAMS=3 IN OUT DAYS`) → `finish-demo200.py`.
