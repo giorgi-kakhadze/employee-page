@@ -113,3 +113,8 @@ Give everyone the new `tool/PTF-pass-to-floor-Gunda.html`, **deploy the new `Cod
 - Zones made by hand on tables nobody deals (for example 21–60) still work: add them yourself as before.
 - Press the button again when the teams' tables change. Test: `tests/zones_from_teams.test.js`.
 - The 200-person demo uses this: teams Team 1–3 and VIP (5 VIP presenters per shift and set, 4 VIP tables), shufflers' zones are the teams' tables.
+
+## Step 1 of the operations roadmap: absence and cover
+- Rotation tab → **🚑 Absence / cover**. Choose who is sick, late or leaves early, from when and until when. The person shows OFF in that time, and the rest of the rotation is planned again from the next half hour with the people who are present (chain rotation for tables, zones for shufflers). Earlier slots never change, so the history of the day stays true. "Back at work" cancels an absence and plans again.
+- If there are then too few people for the tables, the panel says how many table-slots have nobody and lists the people who are **off today** (not on another shift, not on leave or sick; shufflers are offered only for shufflers) with a **Call in** button: they are added to the shift from the next half hour and the rotation is planned again.
+- Employees and the lobby screens see the new rotation through the normal sync. Test: `tests/cover.test.js`.
