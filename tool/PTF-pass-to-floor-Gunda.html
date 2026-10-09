@@ -19731,7 +19731,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
             if (q.kind === 'rot') { (q.shifts || []).forEach(function (k) { var dd = data.days[ds], s0 = dd && dd.shifts && dd.shifts[k], e = rotEntry(p, ds, k, releaseAt(q, ds, k, s0 ? +s0.start : startOf(k))); if (e) r.rx[ds + '|' + k] = e; }); }
             else { var e2 = dayEntry(p, ds, q.shifts); if (e2) { e2.at = q.when === 'at' ? (+q.at || 0) : 0; r.sx[ds] = e2; } }
           } }); });
-        Object.keys(by).forEach(function (m) { var r = by[m]; r.sx = Object.keys(r.sx).sort().map(function (k) { return r.sx[k]; }); r.rx = Object.keys(r.rx).sort().map(function (k) { return r.rx[k]; }); });
+        Object.keys(by).forEach(function (m) { var r = by[m]; r.sx = Object.keys(r.sx).sort().map(function (k) { return r.sx[k]; }); r.rx = Object.keys(r.rx).sort().map(function (k) { return r.rx[k]; }); try { var yb = today.slice(0, 4); r.bal = { y: yb, allow: leaveFor(r.name, yb), used: vacUsed(r.name, yb) }; } catch (eb) {} });
         var core = JSON.stringify({ shares: shares, byEmail: by }), oldCore = JSON.stringify({ shares: b.shares || [], byEmail: b.byEmail || {} });
         if (core !== oldCore || b.sent) localStorage.setItem(MYK, JSON.stringify({ updated: Date.now(), shares: shares, byEmail: by }));
         return Object.keys(by).length;
@@ -20341,9 +20341,9 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       el.innerHTML = (m.length ? '<div class="hint" style="color:#f59e0b;border:1px solid #f59e0b;border-radius:8px;padding:6px 10px;margin:0 0 6px">⚠ Over the monthly hour limit: ' + m.slice(0, 12).join(' · ') + (m.length > 12 ? ' · and ' + (m.length - 12) + ' more' : '') + '</div>' : '') + lbBannerHtml(y) + covBannerHtml(y); lbMark(y); }
     /* v2.105 labour rules (warn only): minimum rest between shifts, maximum working days in a row, weekly hour cap. data.labour = { rest, consec, week } (defaults 12 h, 3 days, 0 = no weekly cap).
        Rest is computed from the shift start hours (startOf) and the shift length (hrShift). Custom text codes count as working days but have no known start, so they are not used for the rest check. */
-    function lbCfg() { var L = data.labour || {}; return { rest: L.rest == null ? 12 : Math.max(0, +L.rest || 0), consec: L.consec == null ? 3 : Math.max(0, Math.round(+L.consec) || 0), week: L.week == null ? 0 : Math.max(0, +L.week || 0) }; }
+    function lbCfg() { var L = data.labour || {}; return { rest: L.rest == null ? 12 : Math.max(0, +L.rest || 0), consec: L.consec == null ? 3 : Math.max(0, Math.round(+L.consec) || 0), week: L.week == null ? 0 : Math.max(0, +L.week || 0), mode: L.mode === 'block' ? 'block' : 'warn' }; }
     function lbAdd(dt, n) { var d = new Date(dt + 'T12:00:00'); d.setDate(d.getDate() + n); return iso(d); }
-    function lbVal(name, dt, ov) { var k = String(name).toLowerCase() + '|' + dt; return ov && Object.prototype.hasOwnProperty.call(ov, k) ? ov[k] : dv(name, dt); }
+    function lbVal(name, dt, ov) { var k = String(name).toLowerCase() + '|' + dt; return ov && Object.prototype.hasOwnProperty.call(ov, k) ? ov[k] : (dv(name, dt) || effCode(name, dt)); }   /* v3.41: a day without an entry in the month grid follows the 3-on / 3-off pattern */
     function lbStart(c) { return c === 'sM' ? startOf('morning') : c === 'sA' ? startOf('afternoon') : c === 'sN' ? startOf('night') : null; }
     function lbWork(c) { return c === 'sM' || c === 'sA' || c === 'sN' || c === 'sX'; }
     /* issues for one person between dates a and b (inclusive): [{ dt, k, msg }], k = rule key used to compare before/after */
@@ -20358,13 +20358,14 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     function lbBannerHtml(y) { var r = lbMonth(y); if (!r.length) return ''; var lines = []; r.slice(0, 8).forEach(function (x) { lines.push(esc(x.name) + ': ' + esc(x.is[0].msg) + (x.is.length > 1 ? ' (+' + (x.is.length - 1) + ' more)' : '')); });
       return '<div class="hint" style="color:#f59e0b;border:1px solid #ef4444;border-radius:8px;padding:6px 10px;margin:0 0 6px">⚠ Labour rule warnings (' + r.length + ' ' + (r.length === 1 ? 'person' : 'people') + '): ' + lines.join(' · ') + (r.length > 8 ? ' · and ' + (r.length - 8) + ' more' : '') + '</div>'; }
     function lbMark(y) { root.querySelectorAll('td[data-lbx]').forEach(function (t) { t.style.boxShadow = ''; t.removeAttribute('data-lbx'); }); lbMonth(y).forEach(function (x) { x.is.forEach(function (it) { var t = sCell(x.i, +it.dt.slice(8) - 1); if (t) { t.style.boxShadow = 'inset 0 0 0 2px #ef4444'; t.setAttribute('data-lbx', '1'); } }); }); }
-    function lbSwapWarn(r) {
-      var n = r.name, w = r.with, a = dv(n, r.a), ov = {}, lo, hi; ov[n.toLowerCase() + '|' + r.a] = 'OFF'; ov[w.toLowerCase() + '|' + r.a] = a;
-      if (r.type === 'swap') { var b = dv(w, r.b); ov[w.toLowerCase() + '|' + r.b] = 'OFF'; ov[n.toLowerCase() + '|' + r.b] = b; }
+    function lbSwapIssues(r) {
+      var n = r.name, w = r.with, a = effCode(n, r.a), ov = {}, lo, hi; ov[n.toLowerCase() + '|' + r.a] = 'OFF'; ov[w.toLowerCase() + '|' + r.a] = a;
+      if (r.type === 'swap') { var b = effCode(w, r.b); ov[w.toLowerCase() + '|' + r.b] = 'OFF'; ov[n.toLowerCase() + '|' + r.b] = b; }
       lo = lbAdd(r.type === 'swap' && r.b < r.a ? r.b : r.a, -4); hi = lbAdd(r.type === 'swap' && r.b > r.a ? r.b : r.a, 4); var out = [];
       [n, w].forEach(function (nm) { var before = {}; lbIssues(nm, lo, hi, null).forEach(function (x) { before[x.k] = 1; }); lbIssues(nm, lo, hi, ov).forEach(function (x) { if (!before[x.k]) out.push(nm + ': ' + x.msg); }); });
-      return out.length ? 'Labour rule warning if this is approved:\n- ' + out.join('\n- ') : '';
+      return out;
     }
+    function lbSwapWarn(r) { var out = lbSwapIssues(r); return out.length ? 'Labour rule warning if this is approved:\n- ' + out.join('\n- ') : ''; }
     /* v2.110 Step H: team of a finished trainee comes from the Team field in Onboarding. Exact name first, then a unique partial match; otherwise no team (assigned by hand). */
     function teamFromText(tx) { var k = gNorm(tx); if (!k) return ''; var hit = ''; data.teams.forEach(function (t) { if (!hit && gNorm(t.name) === k) hit = t.id; }); if (hit) return hit; var c = data.teams.filter(function (t) { var n = gNorm(t.name); return n && (n.indexOf(k) >= 0 || k.indexOf(n) >= 0); }); return c.length === 1 ? c[0].id : ''; }
     function lateTeam(R, key, nm, x) { var td = R.teamDone || (R.teamDone = {}), p = person(nm); if (!p || p.src !== 'onboarding') return 0; var tx = String(x.team || '').trim(), ch = 0; if ((p.otTeam || '') !== tx) { p.otTeam = tx; ch = 1; } if (!td[key] && !p.t) { var tm = teamFromText(tx); if (tm) { p.t = tm; td[key] = 1; ch = 1; } } return ch; }
@@ -20442,6 +20443,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     root.addEventListener('change', function (e) { var t = e.target; if (sub === 'staff' && t && t.id === 'stT') { stT = t.value; stFill(); }
       else if (sub === 'staff' && t && t.hasAttribute && t.hasAttribute('data-hl') && canEdit()) { var pr = prof(t.getAttribute('data-hl'), true), v = String(t.value).trim(); if (v === '') delete pr.hoursLimit; else { var nv = Math.round(+v); if (nv >= 0 && nv <= 400) pr.hoursLimit = nv; } pr.u = Date.now(); persistProf(); stFill(); }
       else if (sub === 'staff' && t && t.hasAttribute && t.hasAttribute('data-ac') && canEdit()) { var an = t.getAttribute('data-ac'), av = String(t.value).trim(), ot = acodeTaken(av, an); if (ot) { alert('The code ' + av + ' already belongs to ' + ot + '.'); stFill(); return; } var apr = prof(an, true); if (av) apr.acode = av; else delete apr.acode; apr.u = Date.now(); persistProf(); stFill(); }
+      else if (sub === 'setup' && t && t.hasAttribute && t.hasAttribute('data-lbm') && canEdit()) { data.labour = data.labour || {}; data.labour.mode = t.value === 'block' ? 'block' : 'warn'; save(); renderSetup(); }
       else if (sub === 'setup' && t && t.hasAttribute && t.hasAttribute('data-lb') && canEdit()) { var lk = t.getAttribute('data-lb'), lv = Math.round(+t.value); if (lv >= 0 && lv <= 168) { data.labour = data.labour || {}; data.labour[lk] = lv; save(); renderSetup(); } }
       else if (sub === 'setup' && t && t.id === 'hrDef' && canEdit()) { var dv0 = Math.round(+t.value); if (dv0 >= 0 && dv0 <= 400) { data.hoursDef = dv0; save(); renderSetup(); } } });
     /* v2.106 Step D: editable default shift times. Start hours may be half hours (07:30 = 7.5). data.cfg.starts[k] = default start; data.cfg.startsWas[k] = value before the first unapplied change (used by "Apply to planned days"). */
@@ -20503,7 +20505,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
         card('Calendar rules (public holidays)', holCard()) +
         card('Hour limits', 'Default monthly limit: <input id="hrDef" type="number" min="0" max="400" value="' + (+data.hoursDef || 0) + '" style="width:70px"> hours (0 = no limit). Planned hours = scheduled workdays x shift length (' + hrShift() + ' h, set in the Rotation tab). Personal limits are set in Staff.') +
         card('Prospect shifts', pspCard()) +
-        card('Labour rules (warnings only)', (function () { var C = lbCfg(); return 'Minimum rest between shifts <input data-lb="rest" type="number" min="0" max="48" value="' + C.rest + '" style="width:60px"> h · max working days in a row <input data-lb="consec" type="number" min="0" max="31" value="' + C.consec + '" style="width:60px"> · max hours per week <input data-lb="week" type="number" min="0" max="168" value="' + C.week + '" style="width:60px"> (0 = no rule). Shown in the Schedule grid (red cells and a banner) and when a swap is approved. Rest uses the shift start times (' + startOf("morning") + ':00, ' + startOf("afternoon") + ':00, ' + startOf("night") + ':00) and shift lengths (M ' + hrShift('morning') + 'h · A ' + hrShift('afternoon') + 'h · N ' + hrShift('night') + 'h).'; })()) +
+        card('Labour rules', (function () { var C = lbCfg(); return '<div class="bar"><b>When a rule is broken</b><select data-lbm="1"><option value="warn"' + (C.mode === "warn" ? ' selected' : '') + '>Only warn (the manager can approve anyway)</option><option value="block"' + (C.mode === "block" ? ' selected' : '') + '>Block (the manager must type a reason to override)</option></select></div>Minimum rest between shifts <input data-lb="rest" type="number" min="0" max="48" value="' + C.rest + '" style="width:60px"> h · max working days in a row <input data-lb="consec" type="number" min="0" max="31" value="' + C.consec + '" style="width:60px"> · max hours per week <input data-lb="week" type="number" min="0" max="168" value="' + C.week + '" style="width:60px"> (0 = no rule). Shown in the Schedule grid (red cells and a banner) and when a swap is approved. Rest uses the shift start times (' + startOf("morning") + ':00, ' + startOf("afternoon") + ':00, ' + startOf("night") + ':00) and shift lengths (M ' + hrShift('morning') + 'h · A ' + hrShift('afternoon') + 'h · N ' + hrShift('night') + 'h).'; })()) +
         card('Shift times (defaults)', (function () { var pend = sstApplyList(iso(new Date())).length; return SHK.map(function (k) { var L = hrShift(k); return '<div style=\"margin:3px 0\">' + esc(SH[k]) + ' &nbsp;start <input type=\"time\" step=\"1800\" data-sst=\"' + k + '\" value=\"' + hhmm(startOf(k) * 60) + '\"> length <input type=\"number\" min=\"1\" max=\"24\" step=\"0.5\" data-slen=\"' + k + '\" value=\"' + L + '\" style=\"width:64px\"> h · end <b>' + hhmm((startOf(k) + L) * 60) + '</b></div>'; }).join('') + '<div class=\"hint\" style=\"margin:6px 0\">Each shift type can have its own length (e.g. night 7h, morning 8h). Fallback default is still <input id=\"sLen\" type=\"number\" min=\"1\" max=\"24\" step=\"0.5\" value=\"' + hrShift() + '\" style=\"width:64px\"> h when a type has no own length.</div>New days use these times. Days already planned keep theirs' + (pend ? ' <b>(' + pend + ' planned shift(s) still use the old time)</b>' : '') + '.'; })(), (sstApplyList(iso(new Date())).length ? '<button data-sapply=\"1\">Apply to planned days from today</button>' : '')) +
         (canPay() ? card('Pay', 'Pay positions, vacation and sick pay.', go('pay', 'Open Pay')) : '') +
         card('Games on tables', 'Each table can have a game (Blackjack, Roulette, Baccarat…). Set them per shift in the Tables tab; change one day only in the rotation view. The rotation then warns when someone stands on a game they are not qualified for.', go('tables', 'Open Tables')) +
@@ -21295,7 +21297,12 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     function leaveFor(n, y) { return leaveAllow() + (+((data.leaveAdj || {})[String(n).toLowerCase() + '|' + y]) || 0); }
     function leaveAllow() { return +data.leaveDays > 0 ? +data.leaveDays : 28; }
     function wdays(name, from, to) { var q = pf(name), n = 0, d = new Date(from + 'T12:00:00'); if (!q) return utc(to) - utc(from) + 1; while (iso(d) <= to) { if (isWork(q.g, iso(d)) && !isHol(iso(d))) n++; d.setDate(d.getDate() + 1); } return n; }
-    function vacUsed(name, yr, skipId) { var t = 0; live().forEach(function (r) { if (r.type === 'vacation' && r.id !== skipId && String(r.name).toLowerCase() === String(name).toLowerCase() && (r.status === 'approved' || r.status === 'pending') && String(r.from).slice(0, 4) === String(yr)) t += wdays(r.name, r.from, r.to); }); return t; }
+    function vacUsed(name, yr, skipId) {   /* v3.41: the schedule is the truth: every working day marked VAC in the year, plus the requests that are still waiting */
+      var t = 0, k = String(name).toLowerCase(), q = pf(name);
+      for (var m = 1; m <= 12; m++) { var mk = yr + '-' + ('0' + m).slice(-2), rec = data.sched && data.sched[mk] && data.sched[mk][k]; if (!rec || !rec.d) continue; Object.keys(rec.d).forEach(function (d) { if (scl(rec.d[d]) !== 'sV') return; var ds = mk + '-' + ('0' + d).slice(-2); if (!q || (isWork(q.g, ds) && !isHol(ds))) t++; }); }
+      live().forEach(function (r) { if (r.type === 'vacation' && r.id !== skipId && String(r.name).toLowerCase() === k && (r.status === 'pending' || r.status === 'awaiting') && String(r.from).slice(0, 4) === String(yr)) t += wdays(r.name, r.from, r.to); });
+      return t;
+    }
     function balTxt(name) { var y = String(new Date().getFullYear()), u = vacUsed(name, y), a = leaveFor(name, y); return 'Vacation ' + y + ': ' + u + ' of ' + a + ' working days used, ' + Math.max(0, a - u) + ' left'; }
     function coverWarn(r) { var a = coverWarn0(r), b = ''; try { b = covLeaveWarn(r); } catch (x) {} return a ? (b ? a + ' ' + b : a) : b; }
     function coverWarn0(r) { var lim = +data.minCover || 0, me = pf(r.name); if (!lim || !me || !RANGE[r.type]) return ''; var sh = me.sh || 'morning', d = new Date(r.from + 'T12:00:00'); while (iso(d) <= r.to) { var ds = iso(d); if (isWork(me.g, ds) && !isHol(ds)) { var n = 0; data.roster.people.forEach(function (p) { if (p.name !== me.name && (!me.t || p.t === me.t) && onShift(p, ds, sh)) n++; }); if (n < lim) return 'Only ' + n + ' colleague' + (n === 1 ? '' : 's') + ' left on the ' + sh + ' shift' + (me.t ? ' (' + teamName(me.t) + ')' : '') + ' on ' + ds + ' (minimum ' + lim + ').'; } d.setDate(d.getDate() + 1); } return ''; }
@@ -21512,6 +21519,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       c = pf(r.with); if (!c) return 'Pick a colleague from the list.'; if (c.name.toLowerCase() === r.name.toLowerCase()) return 'Choose another colleague.';
       if (!isW(dv(r.name, r.a))) return 'You have no shift on ' + r.a + '.'; if (!isFree(dv(c.name, r.a))) return c.name + ' already works on ' + r.a + '.';
       if (r.type === 'swap') { if (!okD(r.b)) return 'Choose the date of your colleague\'s shift.'; if (!isW(dv(c.name, r.b))) return c.name + ' has no shift on ' + r.b + '.'; if (!isFree(dv(r.name, r.b))) return 'You already work on ' + r.b + '.'; }
+      if (submit && lbCfg().mode === 'block') { var lbi = []; try { lbi = lbSwapIssues(r); } catch (e) {} if (lbi.length) return 'The labour rules do not allow this: ' + lbi.join('; ') + '.'; }   /* v3.41 rules set to "block": stopped at once */
       return '';
     }
     function applyReq(r) {
@@ -21520,6 +21528,51 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       else { var a = dv(n, r.a), b = r.type === 'swap' ? dv(r.with, r.b) : ''; dset(n, r.a, 'OFF', r.type === 'swap' ? 'Swapped with ' + r.with : 'Given to ' + r.with); dset(r.with, r.a, a, (r.type === 'swap' ? 'Swap with ' : 'Taken from ') + n); if (r.type === 'swap') { dset(r.with, r.b, 'OFF', 'Swapped with ' + n); dset(n, r.b, b, 'Swap with ' + r.with); } }
       return '';
     }
+    /* ===== v3.41 REQUESTS FROM THE EMPLOYEE PAGE get the same rules as the schedule's own requests, and an approval changes the schedule.
+       report(r) -> [{ lvl: 'ok' | 'warn' | 'block' | 'stop', msg }]: block = breaks a rule (only when the labour rules are set to "block"; a manager may override with a reason),
+       stop = cannot be done at all (colleague busy, no shift that day). apply(r) writes the days into the schedule. ===== */
+    function effCode(name, dt) { var v = dv(name, dt); if (v) return v; var p = pf(name); return p && isWork(p.g, dt) ? { morning: 'M', afternoon: 'A', night: 'N' }[p.sh || 'morning'] : ''; }
+    function adaptEmp(r) {
+      if (!r) return null; var o = { id: r.id, name: String(r.name || ''), note: r.note || '' }, T = r.type;
+      if (T === 'annual') o.type = 'vacation'; else if (T === 'sick') o.type = 'sick'; else if (T === 'dayoff') o.type = 'dayoff'; else if (T === 'swap' || T === 'giveaway') { o.type = 'give'; o.with = String(r.with || ''); o.a = r.from; return o; } else return null;
+      o.from = r.from; o.to = r.to || r.from; return o;
+    }
+    function nDays(a, b) { return Math.max(1, utc(b) - utc(a) + 1); }
+    function empReport(r) {
+      var o = adaptEmp(r), out = []; if (!o) return out; var C = lbCfg(), lv = C.mode === 'block' ? 'block' : 'warn', me = pf(o.name);
+      if (!me) return [{ lvl: 'warn', msg: (o.name || 'This person') + ' is not in the schedule roster: the decision is recorded, but the schedule cannot be changed by it.' }];
+      if (o.type === 'vacation') {
+        var yr = String(o.from).slice(0, 4), need = wdays(o.name, o.from, o.to), used = vacUsed(o.name, yr, o.id), al = leaveFor(o.name, yr);
+        out.push(used + need > al ? { lvl: lv, msg: 'Vacation balance: ' + used + ' of ' + al + ' working days already used in ' + yr + ', this request needs ' + need + ' (' + Math.max(0, al - used) + ' left).' } : { lvl: 'ok', msg: 'Vacation balance: ' + need + ' working day' + (need === 1 ? '' : 's') + ' needed, ' + (al - used - need) + ' of ' + al + ' left after this request.' });
+        var tc = ''; try { tc = teamClash(o, true); } catch (e) {} if (tc) out.push({ lvl: lv, msg: tc }); var cw = ''; try { cw = coverWarn(o); } catch (e) {} if (cw) out.push({ lvl: 'warn', msg: cw });
+        if (!tc && !cw) out.push({ lvl: 'ok', msg: 'Team leave limit and minimum cover are respected.' });
+      } else if (o.type === 'sick') out.push({ lvl: 'ok', msg: 'Sick leave for ' + nDays(o.from, o.to) + ' day(s): the days are marked SICK in the schedule.' });
+      else if (o.type === 'dayoff') { var w = effCode(o.name, o.from), cw2 = ''; if (!isW(w)) out.push({ lvl: 'ok', msg: o.name + ' has no shift on ' + o.from + ' anyway.' }); else { out.push({ lvl: 'ok', msg: 'The shift on ' + o.from + ' becomes a day off.' }); try { cw2 = coverWarn({ type: 'vacation', name: o.name, from: o.from, to: o.to || o.from, id: o.id }); } catch (e) {} if (cw2) out.push({ lvl: 'warn', msg: cw2 }); } }
+      else if (o.type === 'give') {
+        var c = pf(o.with);
+        if (!c) out.push({ lvl: 'stop', msg: o.with ? 'The colleague "' + o.with + '" is not in the roster.' : 'No colleague is named: pick who takes the shift (give-away) or ask the employee to name one.' });
+        else if (c.name.toLowerCase() === o.name.toLowerCase()) out.push({ lvl: 'stop', msg: 'The colleague is the same person.' });
+        else if (!isW(effCode(o.name, o.a))) out.push({ lvl: 'stop', msg: o.name + ' has no shift on ' + o.a + '.' });
+        else if (!isFree(effCode(c.name, o.a))) out.push({ lvl: 'stop', msg: c.name + ' already works or is on leave on ' + o.a + '.' });
+        else {
+          var is = lbSwapIssues(o); is.forEach(function (m) { out.push({ lvl: lv, msg: m }); }); if (!is.length) out.push({ lvl: 'ok', msg: 'Rest between shifts, days in a row and weekly hours stay within the rules for both people.' });
+          if (me.t && c.t && me.t !== c.t) out.push({ lvl: 'warn', msg: c.name + ' is in ' + teamName(c.t) + ', ' + o.name + ' in ' + teamName(me.t) + ': the colleague takes a place in another team.' });
+          if ((me.pos === 'shuf') !== (c.pos === 'shuf')) out.push({ lvl: 'warn', msg: 'One is a shuffler and the other is not: the work is different.' });
+          var st = hrState(c.name, o.a.slice(0, 7)); if (st.over) out.push({ lvl: 'warn', msg: c.name + ' is already over the monthly hour limit (' + st.h + '/' + st.lim + ' h).' });
+        }
+      }
+      return out;
+    }
+    function empApply(r) {
+      var o = adaptEmp(r); if (!o) return { applied: false, msg: '' }; if (!canEdit()) return { applied: false, msg: 'Only a schedule editor can change the schedule: the decision is recorded, please update the schedule.' };
+      var me = pf(o.name); if (!me) return { applied: false, msg: o.name + ' is not in the schedule roster: update the schedule by hand.' }; var d, n = o.name;
+      if (o.type === 'vacation' || o.type === 'sick') { d = new Date(o.from + 'T12:00:00'); while (iso(d) <= o.to) { dset(n, iso(d), o.type === 'vacation' ? 'VAC' : 'SICK', 'From the employee request'); d.setDate(d.getDate() + 1); } }
+      else if (o.type === 'dayoff') { d = new Date(o.from + 'T12:00:00'); while (iso(d) <= o.to) { if (isW(effCode(n, iso(d)))) dset(n, iso(d), 'OFF', 'Day off (employee request)'); d.setDate(d.getDate() + 1); } }
+      else if (o.type === 'give') { var c = pf(o.with); if (!c) return { applied: false, msg: 'The colleague is not in the roster: update the schedule by hand.' }; var a = effCode(n, o.a); dset(n, o.a, 'OFF', 'Given to ' + c.name); dset(c.name, o.a, a, 'Taken from ' + n); }
+      clearTimeout(tm); tm = null; try { var j = JSON.stringify(data); localStorage.setItem(K, j); lastRaw = j; } catch (eW) { return { applied: false, msg: 'Browser storage is full: the schedule could not be saved.' }; }   /* written at once: the next refresh must not read the old copy */
+      return { applied: true, msg: 'The schedule was updated.' };
+    }
+    window.totSchedApi = { refresh: function () { try { load(); } catch (e) {} }, report: empReport, apply: empApply, mode: function () { return lbCfg().mode; }, balance: function (name, y) { return { y: y, allow: leaveFor(name, y), used: vacUsed(name, y) }; } };
     function reqDesc(r) {
       if (RANGE[r.type]) return r.from + (r.to !== r.from ? ' → ' + r.to : '');
       return r.type === 'swap' ? 'my ' + r.a + ' ↔ ' + esc(r.with) + '\'s ' + r.b : 'my ' + r.a + ' → ' + esc(r.with);
@@ -21614,7 +21667,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       else if (a === 'racc' && r.status === 'awaiting') { var e1 = vReq(r, false); if (e1) { alert(e1); return; } r.status = 'pending'; r.u = Date.now(); persistReqs(); renderMy(); }
       else if (a === 'rdec' && r.status === 'awaiting') { r.status = 'declined'; r.u = Date.now(); persistReqs(); renderMy(); }
       else if (!canEdit()) return;
-      else if (a === 'appr' && (r.status === 'pending' || r.status === 'awaiting')) { if ((r.type === 'swap' || r.type === 'give') && r.with && r.a) { var lw2 = ''; try { lw2 = lbSwapWarn(r); } catch (x) {} if (lw2 && !confirm(lw2 + '\n\nApprove anyway?')) return; } var tc2 = r.type === 'vacation' ? teamClash(r, true) : ''; if (tc2) { alert('Cannot approve: ' + tc2); return; } var e2 = applyReq(r); if (e2) { alert('Cannot approve: ' + e2); return; } r.status = 'approved'; r.u = Date.now(); save(); renderReq(); }
+      else if (a === 'appr' && (r.status === 'pending' || r.status === 'awaiting')) { if ((r.type === 'swap' || r.type === 'give') && r.with && r.a) { var lw2 = ''; try { lw2 = lbSwapWarn(r); } catch (x) {} if (lw2 && lbCfg().mode === 'block') { var why2 = (prompt(lw2 + '\n\nThe labour rules are set to BLOCK. Type the reason to approve anyway (Cancel = do not approve):', '') || '').trim(); if (!why2) return; r.override = { by: (function () { try { return getTrainerName() || 'Manager'; } catch (e) { return 'Manager'; } })(), why: why2.slice(0, 200), ts: Date.now() }; } else if (lw2 && !confirm(lw2 + '\n\nApprove anyway?')) return; } var tc2 = r.type === 'vacation' ? teamClash(r, true) : ''; if (tc2) { alert('Cannot approve: ' + tc2); return; } var e2 = applyReq(r); if (e2) { alert('Cannot approve: ' + e2); return; } r.status = 'approved'; r.u = Date.now(); save(); renderReq(); }
       else if (a === 'rej' && r.status === 'pending') { var why = prompt('Reason (optional):', ''); if (why === null) return; r.status = 'rejected'; r.reply = why.trim(); r.u = Date.now(); save(); renderReq(); }
       else if (a === 'rdel') { r.del = 1; r.u = Date.now(); save(); renderReq(); }
     });
@@ -24690,6 +24743,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 (function () {
   'use strict';
   var K = 'totEmpRequests', host = document.getElementById('requestsView'); if (!host) return;
+  var API = null; function api() { API = window.totSchedApi || null; if (API) { try { API.refresh(); } catch (e) {} } return API; }   /* v3.41: the schedule module checks the rules and writes the schedule */
   var st = { f: 'pending', t: '', q: '' };
   var TYPES = { swap: 'Swap a shift', giveaway: 'Give away a shift', annual: 'Annual leave', sick: 'Sick leave', dayoff: 'Day off', payq: 'Question about my pay' };   /* v3.31: day off, pay question */
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -24709,11 +24763,11 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     document.head.appendChild(s);
   }
   function render() {
-    css();
+    css(); api();
     if (!allowed()) { host.innerHTML = '<div style="padding:30px;text-align:center"><h2>Employee requests</h2><p>Only managers, seniors, scheduling coordinators and the admin can open this.</p></div>'; return; }
     var all = rd(), q = st.q.trim().toLowerCase();
     var list = all.filter(function (r) { return r && (st.f === 'all' || r.status === st.f) && (!st.t || r.type === st.t) && (!q || [r.name, r.workId, r.note, r.with, TYPES[r.type]].join(' ').toLowerCase().indexOf(q) >= 0); }).sort(function (a, b) { return st.f === 'pending' ? (a.created || 0) - (b.created || 0) : (b.u || 0) - (a.u || 0); });
-    var h = '<h2 style="margin:0 0 4px">📨 Employee requests</h2><div class="rqNote">Requests employees send from their own board: swap a shift, give a shift away, annual leave, sick leave. <b>Approving or rejecting records your decision and shows it to the employee. It does not change the schedule — update the schedule yourself.</b></div><div class="rqBar">';
+    var h = '<h2 style="margin:0 0 4px">📨 Employee requests</h2><div class="rqNote">Requests employees send from their own board. Every request is checked against the rules (vacation balance, team leave limit, minimum cover, rest between shifts, days in a row, weekly hours). <b>Approving records your decision, shows it to the employee and changes the schedule</b> (annual leave \u2192 VAC, sick leave \u2192 SICK, day off \u2192 OFF, swap / give-away \u2192 the colleague takes the shift). Rejecting changes nothing.</div><div class="rqBar">';
     [['pending', 'Pending (' + pending() + ')'], ['approved', 'Approved'], ['rejected', 'Rejected'], ['cancelled', 'Cancelled'], ['all', 'All']].forEach(function (x) { h += '<button data-rq="f" data-v="' + x[0] + '" class="' + (st.f === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; });
     h += '<select id="rqType"><option value="">All types</option>' + Object.keys(TYPES).map(function (k) { return '<option value="' + k + '"' + (st.t === k ? ' selected' : '') + '>' + TYPES[k] + '</option>'; }).join('') + '</select><input id="rqQ" placeholder="Search name / ID / note" value="' + esc(st.q) + '"></div>';
     if (!list.length) h += '<div class="rqNote">Nothing here.</div>';
@@ -24722,6 +24776,8 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       h += '<div style="margin:4px 0"><b>' + esc(TYPES[r.type] || r.type) + '</b> · ' + esc(range(r)) + (r.shift ? ' · ' + esc(r.shift) + ' shift' : '') + (r.with ? ' · with ' + esc(r.with) : '') + '</div>';
       if (r.note) h += '<div style="margin:4px 0">“' + esc(r.note) + '”</div>';
       h += '<div class="rqNote">Sent ' + esc(fmt(r.created)) + (r.status !== 'pending' && r.decidedBy ? ' · ' + esc(r.status) + ' by ' + esc(r.decidedBy) + ' ' + esc(fmt(r.decidedAt)) : '') + (r.decisionNote ? ' · note: ' + esc(r.decisionNote) : '') + '</div>';
+      if (r.status === 'pending' && API) { var rl = []; try { rl = API.report(r); } catch (e) {} if (rl.length) h += '<div style="margin:6px 0;font-size:13px;border-left:3px solid var(--border,#cbd5e1);padding-left:8px"><b>Rules check</b>' + rl.map(function (q) { var ic = { ok: '\u2714', warn: '\u26A0', block: '\u2716', stop: '\u26D4' }[q.lvl] || '\u2022', co = { ok: '#16a34a', warn: '#d97706', block: '#dc2626', stop: '#dc2626' }[q.lvl] || 'inherit'; return '<div style="color:' + co + '">' + ic + ' ' + esc(q.msg) + '</div>'; }).join('') + '</div>'; }
+      if (r.status !== 'pending' && r.applied != null) h += '<div class="rqNote">' + (r.applied ? '\uD83D\uDCC5 The schedule was updated.' : '\u26A0 The schedule was not changed' + (r.applyMsg ? ': ' + esc(r.applyMsg) : '.')) + (r.override ? ' \u00B7 Rule override by ' + esc(r.override.by) + ': \u201C' + esc(r.override.why) + '\u201D' : '') + '</div>';
       if (r.status === 'pending') h += '<div class="rqBar" style="margin:6px 0 0"><button data-rq="ok" data-id="' + esc(r.id) + '">✔ Approve</button><button data-rq="no" data-id="' + esc(r.id) + '">✖ Reject</button><button data-rq="sch">📅 Open schedule</button></div>';
     });
     host.innerHTML = h;
@@ -24733,9 +24789,17 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     if (a === 'f') { st.f = b.getAttribute('data-v'); render(); return; }
     if (a === 'sch') { try { switchView('schedule'); } catch (x) {} return; }
     var arr = rd(), r = arr.filter(function (x) { return x && x.id === b.getAttribute('data-id'); })[0]; if (!r || r.status !== 'pending') { alert('This request was already handled or withdrawn.'); render(); return; }
-    var note = '';
+    var note = '', rep0 = [];
+    if (a === 'ok' && api()) {
+      try { rep0 = API.report(r); } catch (e) { rep0 = []; }
+      var stops = rep0.filter(function (q) { return q.lvl === 'stop'; }), blocks = rep0.filter(function (q) { return q.lvl === 'block'; }), warns = rep0.filter(function (q) { return q.lvl === 'warn'; });
+      if (stops.length) { alert('This cannot be approved:\n- ' + stops.map(function (q) { return q.msg; }).join('\n- ') + '\n\nReject it with a reason, or ask the employee to send a new request.'); return; }
+      if (blocks.length) { var why = (prompt('This request breaks a rule:\n- ' + blocks.map(function (q) { return q.msg; }).join('\n- ') + '\n\nType the reason to approve it anyway (Cancel = do not approve):') || '').trim(); if (!why) return; r.override = { by: who(), why: why.slice(0, 200), ts: Date.now() }; }
+      else if (warns.length && !confirm('Warnings:\n- ' + warns.map(function (q) { return q.msg; }).join('\n- ') + '\n\nApprove anyway?')) return;
+    }
     if (a === 'no') { note = (prompt('Reason for rejecting (the employee will see this):') || '').trim(); if (!note) { alert('A reason is required to reject.'); return; } }
     else { note = (prompt('Optional note for the employee (leave empty for none):') || '').trim(); }
+    var ap = null; if (a === 'ok' && API) { try { ap = API.apply(r); } catch (e) { ap = { applied: false, msg: 'The schedule could not be changed (' + e.message + ').' }; } if (ap) { r.applied = !!ap.applied; r.applyMsg = String(ap.msg || '').slice(0, 200); } }
     var now = Date.now(); r.status = a === 'ok' ? 'approved' : 'rejected'; r.decidedBy = who(); r.decidedAt = now; r.decisionNote = note.slice(0, 300); r.u = now; r.hist = (r.hist || []).concat([{ ts: now, who: who(), act: r.status + (note ? ': ' + note.slice(0, 100) : '') }]);
     if (wr(arr)) gAudit('Request ' + r.status + ': ' + (TYPES[r.type] || r.type) + ' for ' + (r.name || '?') + ' ' + range(r)); render();
   });

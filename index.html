@@ -179,7 +179,7 @@ function gamesHtml(){
 }
 function pSchedule(){
   var h='',x=D.schedule,pn=payNow();
-  h+='<div class="tiles">'+tile('#rqForm',pn?pn.totals.shifts:'-','Shifts worked this month')+tile('#rqForm',pn?pn.totals.hours:'-','Hours worked this month')+tile('#rqForm',pn?pn.totals.plannedShifts:'-','Shifts still planned')+tile('#myreq',(D.requests||[]).filter(function(r){return r.status==='pending'}).length,'Requests waiting')+'</div>';
+  h+='<div class="tiles">'+tile('#rqForm',pn?pn.totals.shifts:'-','Shifts worked this month')+tile('#rqForm',pn?pn.totals.hours:'-','Hours worked this month')+tile('#rqForm',pn?pn.totals.plannedShifts:'-','Shifts still planned')+tile('#myreq',(D.requests||[]).filter(function(r){return r.status==='pending'}).length,'Requests waiting')+(D.leave?tile('#rqForm',Math.max(0,D.leave.allow-D.leave.used),'Vacation days left in '+esc(D.leave.y)):'')+'</div>';
   h+='<h2>My schedule</h2>';
   if(!x||!x.days.length)h+='<div class="card mut">Nothing has been sent to you yet.</div>';
   else{h+='<div class="card">';x.days.forEach(function(y){var work=SH[y.s],txt=work?SH[y.s]+(y.f!=null?' &middot; '+hh(y.f)+'-'+hh(y.t):''):esc(OFF[y.s]||y.s);h+='<div class="day"><span>'+dLabel(y.d)+'</span><span class="'+(work?'work':y.s==='rest'?'off':'leave')+'">'+txt+'</span></div>'});h+='</div>'}
@@ -267,7 +267,7 @@ function demoData(kind){
     gameCounts:gc,incidents:inc,remarks:rem,
     pay:[{ym:y,unit:'hour',cur:'GEL',final:false,upTo:today(),days:pd,bonus:[],extra:[],totals:{shifts:tot2.shifts,hours:tot2.hours,earned:tot2.earned,leave:0,bonus:0,total:tot2.earned,plannedShifts:6+R(6),plannedHours:72,planned:600+R(400)}},
       {ym:ly,unit:'hour',cur:'GEL',final:true,upTo:ly+'-28',days:[],bonus:[{name:pos.indexOf('VIP')>=0?'VIP quality bonus':'Quality bonus',type:'Performance',level:lv,of:5,amount:lb}],extra:[],totals:{shifts:lsh,hours:lsh*8-R(10),earned:le,leave:ll,bonus:lb,total:le+ll+lb,plannedShifts:0,plannedHours:0,planned:0}}],
-    schedule:{days:days},rotation:{days:rot},requests:(rf=10+R(10),Math.random()<.6)?[{id:'d1',type:P(['annual','swap','dayoff']),from:d(rf),to:d(rf+R(3)),status:P(['pending','approved']),created:Date.now()-864e5,note:'Family event',decisionNote:''}]:[]};
+    schedule:{days:days},rotation:{days:rot},leave:{y:y,allow:28,used:4+R(18)},requests:(rf=10+R(10),Math.random()<.6)?[{id:'d1',type:P(['annual','swap','dayoff']),from:d(rf),to:d(rf+R(3)),status:P(['pending','approved']),created:Date.now()-864e5,note:'Family event',decisionNote:''}]:[]};
 }
 function demoCall(b){
   if(b.action==='me')return D;

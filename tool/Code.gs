@@ -123,6 +123,7 @@ function me_(tok) {
     var nowMs = Date.now(), rel = function (d) { return d && /^\d{4}-\d{2}-\d{2}$/.test(String(d.d || '')) && d.d >= today && (!(+d.at > 0) || +d.at <= nowMs); };
     var sx = Array.isArray(m.sx) ? m.sx : (sent.sch ? m.days : null), rx = Array.isArray(m.rx) ? m.rx : (sent.rot ? m.rot : null);
     if (sx) out.schedule = { group: String(m.group || ''), team: String(m.team || ''), shift: String(m.shift || ''), days: sx.filter(rel).slice(0, 28).map(function (d) { return { d: d.d, s: String(d.s || ''), f: d.f == null ? null : +d.f, t: d.t == null ? null : +d.t }; }) };
+    if (m.bal && isFinite(+m.bal.allow)) out.leave = { y: String(m.bal.y || '').slice(0, 4), allow: Math.max(0, +m.bal.allow || 0), used: Math.max(0, +m.bal.used || 0) };   /* v3.41: vacation days used / allowed, worked out by the tool from the schedule */
     if (rx) out.rotation = { group: String(m.group || ''), shift: String(m.shift || ''), days: rx.filter(rel).slice(0, 28).map(function (d) { return { d: d.d, s: String(d.s || ''), f: d.f == null ? null : +d.f, c: (Array.isArray(d.c) ? d.c : []).slice(0, 48).map(function (c) { return String(c || '').slice(0, 160); }) }; }) };
   });
   if (!found) return { error: 'no employee found for this email' };

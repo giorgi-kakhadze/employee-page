@@ -118,3 +118,14 @@ Give everyone the new `tool/PTF-pass-to-floor-Gunda.html`, **deploy the new `Cod
 - Rotation tab → **🚑 Absence / cover**. Choose who is sick, late or leaves early, from when and until when. The person shows OFF in that time, and the rest of the rotation is planned again from the next half hour with the people who are present (chain rotation for tables, zones for shufflers). Earlier slots never change, so the history of the day stays true. "Back at work" cancels an absence and plans again.
 - If there are then too few people for the tables, the panel says how many table-slots have nobody and lists the people who are **off today** (not on another shift, not on leave or sick; shufflers are offered only for shufflers) with a **Call in** button: they are added to the shift from the next half hour and the rotation is planned again.
 - Employees and the lobby screens see the new rotation through the normal sync. Test: `tests/cover.test.js`.
+
+## Step 2: requests with real rules (the employee page and the schedule now agree)
+- FMD → **Employee requests** (what employees send from their own page) used to record a decision only. Now each pending request shows a **Rules check** and approving it **changes the schedule**:
+  - annual leave → days marked VAC (balance of vacation days, team leave limit, minimum cover);
+  - sick leave → SICK; day off → OFF (only on days the person works);
+  - swap / give-away → the colleague takes the shift (rest between shifts, days in a row, weekly hours, monthly hour limit for the colleague, same team / same kind of work);
+  - impossible requests (colleague busy, no shift that day) cannot be approved; reject them with a reason.
+- **Labour rules** (Setup) have a new switch: *Only warn* (as before) or *Block*: a request that breaks a rule can then only be approved if the manager types a reason; the reason is stored on the request and shown on the card. In block mode the schedule's own swap requests are stopped as soon as the employee sends them.
+- The vacation balance counts the working days really marked VAC in the schedule plus requests still waiting. Days without an entry in the month grid follow the 3-on / 3-off pattern for the rule checks.
+- The employee page shows **Vacation days left** (worked out by the tool, sent with the schedule). Server Edition rules updated.
+- Test: `tests/request_rules.test.js`.
