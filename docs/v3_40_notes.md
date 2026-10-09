@@ -107,3 +107,9 @@ Give everyone the new `tool/PTF-pass-to-floor-Gunda.html`, **deploy the new `Cod
 - `demo/PTF-demo-backup-200.json` (1.5 MB): 200 people (100 Set 1, 100 Set 2; 3 days on / 3 off; about 33 per shift and set: 8 shufflers + game presenters), a 6-day rotation (Set 1 for three days, then Set 2 for three days) on all three shifts, chain rotation for tables, zones for shufflers, Community chats, 7 tickets on every department board in all stages, onboarding groups, evaluations, pay, uniforms and more.
 - Nicknames: shufflers have none; every game presenter has a normal first name as nickname, one person per nickname, never the person's own first or last name.
 - Built by `make-demo200.py` → `build-rotation-demo.js` (`TEAMS=3 IN OUT DAYS`) → `finish-demo200.py`.
+
+## Zones follow the teams (shufflers shuffle the tables the presenters deal)
+- Setup → Tables → the Shufflers team (Zone rotation on) has a new green box **"Zones follow the teams"**: **Zones from the teams** makes one zone per team (Team 1 tables 1–4 = zone A, Team 2 tables 5–8 = zone B, VIP tables = zone D …); with "Most tables in one zone" a big team is cut into smaller zones (never across two teams); **… fit to N shufflers** chooses the size so that there are not more zones than shufflers (so somebody can always be on a break). The zone map shows which team each zone belongs to.
+- Zones made by hand on tables nobody deals (for example 21–60) still work: add them yourself as before.
+- Press the button again when the teams' tables change. Test: `tests/zones_from_teams.test.js`.
+- The 200-person demo uses this: teams Team 1–3 and VIP (5 VIP presenters per shift and set, 4 VIP tables), shufflers' zones are the teams' tables.

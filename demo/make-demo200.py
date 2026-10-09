@@ -18,8 +18,8 @@ for p in people:
     groups[(p['sh'], p['g'])].append(p)
 keep = set(); order = [('morning', 'A', 34), ('morning', 'B', 34), ('afternoon', 'A', 33), ('afternoon', 'B', 33), ('night', 'A', 33), ('night', 'B', 33)]
 for sh, g, n in order:
-    L = groups[(sh, g)]; shuf = [p for p in L if p.get('pos') == 'shuf'][:8]; gp = [p for p in L if p.get('pos') != 'shuf']
-    pick = shuf + gp[:n - len(shuf)]
+    L = groups[(sh, g)]; shuf = [p for p in L if p.get('pos') == 'shuf'][:8]; vip = [p for p in L if p.get('pos') == 'vip'][:5]; gp = [p for p in L if p.get('pos') not in ('shuf', 'vip')]   # 5 VIP presenters per shift and set make a VIP team
+    pick = shuf + vip + gp[:n - len(shuf) - len(vip)]
     assert len(pick) == n, (sh, g, len(pick))
     keep |= {p['name'].lower() for p in pick}
 assert len(keep) == 200

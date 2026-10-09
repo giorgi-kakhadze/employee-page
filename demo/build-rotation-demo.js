@@ -12,24 +12,27 @@ const DAYS = (process.env.DAYS || '2026-10-05,2026-10-06,2026-10-07,2026-10-08,2
   await P.setInputFiles('#importFileInput', DEMO); await P.waitForSelector('#restoreModal.open', { timeout: 30000 });
   await P.evaluate(() => { HTMLAnchorElement.prototype.click = function () {}; applyRestore('replace'); }); await w(6000);
   /* teams, tables and zones */
-  const info = await P.evaluate(([SHIFTS, NUMTEAMS]) => {
+  const info = await P.evaluate(([SHIFTS, NUMTEAMS, VIP]) => {
     const S = JSON.parse(localStorage.getItem('totSchedule')), NT = NUMTEAMS, T = 'ABCDEFGH'.slice(0, NT).split('');
-    S.teams = T.map((x, i) => ({ id: 't' + x.toLowerCase(), name: NT <= 4 ? 'Team ' + (i + 1) : 'Team ' + x })).concat([{ id: 'sh', name: 'Shufflers' }]);
+    S.teams = T.map((x, i) => ({ id: 't' + x.toLowerCase(), name: NT <= 4 ? 'Team ' + (i + 1) : 'Team ' + x })).concat(VIP ? [{ id: 'tv', name: 'VIP' }] : [], [{ id: 'sh', name: 'Shufflers' }]);
     /* only game presenters (VIP, premium, regular, beginner) and shufflers are in this rotation; pit supervisors are left out */
     S.roster.people = S.roster.people.filter((p) => p.pos !== 'pit');
     /* the monthly grid follows the 3 days on / 3 days off sets of the roster, so every day has exactly one set per shift */
     const anchor = Date.UTC(2026, 9, 1), ymList = ['2026-09', '2026-10', '2026-11']; S.sched = {};
     ymList.forEach((ym) => { const dim = new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0).getDate(), m = {}; S.roster.people.forEach((p) => { const d = {}; for (let i = 1; i <= dim; i++) { const c = ((Math.floor((Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7) - 1, i) - anchor) / 864e5) % 6) + 6) % 6, work = p.g === 'B' ? c >= 3 : c < 3; d[i] = work ? { morning: 'M', afternoon: 'A', night: 'N' }[p.sh] : 'OFF'; } m[p.name.toLowerCase()] = { d, c: {} }; }); S.sched[ym] = m; });
-    const rr = {}; S.roster.people.slice().sort((a, b) => a.name.localeCompare(b.name)).forEach((p) => { if (p.pos === 'shuf') { p.t = 'sh'; return; } const k = p.sh + '|' + p.g; rr[k] = (rr[k] || 0); p.t = 't' + 'abcdefgh'[rr[k] % NT]; rr[k]++; });   /* presenters are shared evenly over the teams in every shift and set */
+    const rr = {}; S.roster.people.slice().sort((a, b) => a.name.localeCompare(b.name)).forEach((p) => { if (p.pos === 'shuf') { p.t = 'sh'; return; } if (VIP && p.pos === 'vip') { p.t = 'tv'; return; } const k = p.sh + '|' + p.g; rr[k] = (rr[k] || 0); p.t = 't' + 'abcdefgh'[rr[k] % NT]; rr[k]++; });   /* presenters are shared evenly over the teams in every shift and set */
     const cnt = {}; S.roster.people.forEach((p) => { if (p.pos === 'shuf') { const k = p.sh + p.g; cnt[k] = (cnt[k] || 0) + 1; } });
     S.cfg = { len: 8, tables: 400, maxrun: 4, auto: false, tbl: {}, zoneTeams: { sh: { on: 1, slots: 2 } }, zones: {} };
     SHIFTS.forEach((sk) => { S.cfg.tbl[sk] = {}; let next = 1; S.teams.forEach((t) => { if (t.id === 'sh') return;
         /* tables = what the people of the bigger set can keep covered with a break after every 4 tables (people x 4/5) */
         const c = { A: 0, B: 0 }; S.roster.people.forEach((p) => { if (p.t === t.id && p.sh === sk) c[p.g]++; }); const n = Math.max(4, Math.floor(Math.max(c.A, c.B) * 0.8)); S.cfg.tbl[sk][t.id] = Array.from({ length: n }, (_, j) => next + j); next += n; });
-      const n = Math.min(cnt[sk + 'A'], cnt[sk + 'B']), tabs = Array.from({ length: n * 5 }, (_, j) => next + j); S.cfg.tbl[sk].sh = tabs; S.cfg.zones[sk] = { sh: Array.from({ length: n }, (_, z) => ({ n: String.fromCharCode(65 + (z % 26)) + (z >= 26 ? Math.floor(z / 26) : ''), t: tabs.slice(z * 5, z * 5 + 5) })) }; });
+      S.cfg.tbl[sk].sh = []; });   /* the shufflers have no tables of their own: their zones are the tables of the teams (made below) */
     S.days = {}; localStorage.setItem('totSchedule', JSON.stringify(S)); SchedMount(); return cnt;
-  }, [SHIFTS, +process.env.TEAMS || 8]);
+  }, [SHIFTS, +process.env.TEAMS || 8, !!process.env.VIP]);
   console.log('shufflers by shift and set', JSON.stringify(info));
+  /* zones follow the teams: each team's tables become zone(s); zone size is chosen so that there is one shuffler more than zones (one on a break at a time) */
+  const zinfo = await P.evaluate(([SHIFTS, cnt]) => { const o = {}; SHIFTS.forEach((sk) => { const N = Math.min(cnt[sk + 'A'], cnt[sk + 'B']); o[sk] = window.totZonesFromTeams(sk, 'sh', 0, Math.max(1, N - 1)).map((z) => z.n + ':' + z.team + ':' + z.t.join('.')); }); return o; }, [SHIFTS, info]);
+  console.log('zones', JSON.stringify(zinfo.morning)); await w(600);
   const setDay = (d) => P.evaluate((d) => { const i = document.querySelector('#scheduleView #scD'); i.value = d; i.dispatchEvent(new Event('change', { bubbles: true })); }, d);
   const setShift = (s) => P.evaluate((s) => document.querySelector('#scheduleView [data-sh="' + s + '"]').click(), s);
   const gen = async () => { await P.evaluate(() => document.querySelector('#scheduleView [data-a="gen"]').click()); await w(1500); };
@@ -38,9 +41,7 @@ const DAYS = (process.env.DAYS || '2026-10-05,2026-10-06,2026-10-07,2026-10-08,2
     await setDay(d); await w(300); await setShift(sk); await w(300); await gen();
     /* more people than zones that day: smaller zones for that day only ("Fit to N people") */
     await w(800);
-    const fix = await P.evaluate(([d, sk]) => { const S = JSON.parse(localStorage.getItem('totSchedule')), sh = S.days[d] && S.days[d].shifts[sk]; if (!sh) return null; const n = sh.rows.filter((r) => r.t === 'sh').length, tabs = S.cfg.tbl[sk].sh, base = S.cfg.zones[sk].sh.length; if (n <= base) return { n, zones: base, day: false };
-      const size = Math.max(1, Math.ceil(tabs.length / n)); sh.zones = { sh: [] }; for (let z = 0; z * size < tabs.length; z++) sh.zones.sh.push({ n: String.fromCharCode(65 + (z % 26)) + (z >= 26 ? Math.floor(z / 26) : ''), t: tabs.slice(z * size, z * size + size) });
-      localStorage.setItem('totSchedule', JSON.stringify(S)); return { n, zones: sh.zones.sh.length, size, day: true }; }, [d, sk]);
+    const fix = null;   /* the zones follow the teams and are the same every day */
     if (fix && fix.day) { await P.evaluate(() => SchedMount()); await w(500); await P.evaluate(() => { const b = document.querySelector('#scheduleView [data-sub="rot"]'); if (b) b.click(); }); await w(400); await setDay(d); await w(300); await setShift(sk); await w(300); await gen(); await w(600); }
     console.log(d, sk, JSON.stringify(fix));
   }
