@@ -1,0 +1,113 @@
+#!/usr/bin/env node
+'use strict';
+/* Derives src/rules/rules.js from ../tool/Code.gs (the Google Apps Script server of the single-file edition).
+
+   Why a derived file and not a rewrite: Code.gs holds every permission rule of the tool (who may read or write which key, record-level
+   filtering of tickets, projects, chats, pay stripping, employee-page privacy), and it is covered by hundreds of tests. The server edition
+   must enforce exactly the same rules, so the rule code is taken from Code.gs mechanically. Only the Google-specific parts are replaced:
+   Drive file storage, the password/access-request flow, Google token check, UrlFetch uploads, triggers and the global script lock.
+   Every replacement below must match exactly once; if Code.gs changes in a way that breaks a replacement this script stops with an error,
+   so the two editions cannot drift apart unnoticed.
+
+   Usage: node tools/port-code-gs.js [path/to/Code.gs]      (writes src/rules/rules.js) */
+const fs = require('fs'), path = require('path');
+const root0 = path.join(__dirname, '..', '..');
+const srcPath = process.argv[2] || path.join(__dirname, '..', '..', 'tool', 'Code.gs');
+let s = fs.readFileSync(srcPath, 'utf8');
+const ver = (/Pass-to-Floor[^\n]*v?(\d+\.\d+)/.exec(s) || [])[1] || '';
+
+function rep(from, to) { const i = s.indexOf(from); if (i < 0) throw new Error('port: anchor not found: ' + from.slice(0, 70)); if (s.indexOf(from, i + 1) >= 0) throw new Error('port: anchor not unique: ' + from.slice(0, 70)); s = s.slice(0, i) + to + s.slice(i + from.length); }
+function cut(a, b, to) { const i = s.indexOf(a); if (i < 0) throw new Error('port: cut start not found: ' + a.slice(0, 70)); const j = b == null ? s.length : s.indexOf(b, i); if (j < 0) throw new Error('port: cut end not found: ' + b.slice(0, 70)); s = s.slice(0, i) + to + s.slice(j); }
+
+/* 1. constants that no longer apply */
+rep("const ADMIN_SECRET = 'CHANGE-ME-ADMIN-KEY';", "const ADMIN_SECRET = null;   /* server edition: the admin is an Entra ID sign-in, there is no shared key */");
+rep("const SERVER_SALT = 'CHANGE-ME-SALT';", "const SERVER_SALT = ENV.salt;");
+rep(/const GOOGLE_CLIENT_ID = '[^']*';/.exec(s)[0], "const GOOGLE_CLIENT_ID = 'sso';");
+
+/* 2. storage: the data lives in memory (ENV.state.cur), saved by the server after each write */
+cut('function folder_() {', 'function sh_(s)', "function file_(name) { return { mem: ENV.state.cur, setContent: function () {} }; }\nfunction readJ_(f, def) { return f && f.mem ? f.mem : def; }\n");
+rep("function out_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }", "function out_(o) { return o; }");
+
+/* 3. identity: the verified e-mail comes from the Entra ID session, never from the request */
+cut('/* Checks a Google sign-in token with Google', '/* What ONE employee may see', "function verifyGoogle_() { return ENV.id && ENV.id.email ? { email: String(ENV.id.email).trim().toLowerCase(), name: String(ENV.id.name || '') } : null; }\n\n");
+
+/* 3b. the employee page (me_, empOf_) only reads what it parses, so parsed copies of the big lists are cached (the single-file edition parsed 2 MB per request) */
+rep("function jp_(s, d) { try { var v = JSON.parse(s); return v == null ? d : v; } catch (e) { return d; } }", "function jp_(s, d) { try { var v = JSON.parse(s); return v == null ? d : v; } catch (e) { return d; } }\nvar JPC_ = new Map(), JPCB_ = 0;   /* parsed-copy cache for read-only use (callers must not change what they get), least recently used first, at most 60 million characters of source text (a parsed copy is several times larger) */\nfunction jpc_(s, d) { if (typeof s !== 'string' || s.length < 2000) return jp_(s, d); var c = JPC_.get(s); if (c === undefined) { c = { v: jp_(s, null) }; JPC_.set(s, c); JPCB_ += s.length; while (JPCB_ > 60000000 && JPC_.size > 1) { var o = JPC_.keys().next().value; JPCB_ -= o.length; JPC_.delete(o); } } else { JPC_.delete(s); JPC_.set(s, c); } return c.v == null ? d : c.v; }");
+{ const a = s.indexOf('function me_(tok) {'), b = s.indexOf('/* ===== v3.16 employee requests ===== */'); if (a < 0 || b < a) throw new Error('port: me_ anchors not found'); s = s.slice(0, a) + s.slice(a, b).split('jp_(').join('jpc_(') + s.slice(b); }
+{ const a = s.indexOf('function tvFind_('), b = s.indexOf('/* ===== v3.16 employee requests ===== */'); if (a < 0 || b < a) throw new Error('port: tv anchors not found'); s = s.slice(0, a) + s.slice(a, b).split('jp_(').join('jpc_(') + s.slice(b); }
+{ const a = s.indexOf('function empOf_(K, email) {'), b = s.indexOf('function isoOk_('); if (a < 0 || b < a) throw new Error('port: empOf_ anchors not found'); s = s.slice(0, a) + s.slice(a, b).split('jp_(').join('jpc_(') + s.slice(b); }
+
+/* 3b2. what a manager wrote into a pay statement is shown on the employee page: pass on numbers and short plain text only */
+rep("if (pm && pm.months) out.pay = Object.keys(pm.months).sort().reverse().slice(0, 6).map(function (k) { return pm.months[k]; });", "function scrubPay_(v, d) { if (typeof v === 'number' || typeof v === 'boolean' || v == null) return v; if (typeof v === 'string') return v.replace(/[<>&\"']/g, '').slice(0, 120); if (d > 4) return null; if (Array.isArray(v)) return v.slice(0, 60).map(function (x) { return scrubPay_(x, d + 1); }); var o = {}; Object.keys(v).slice(0, 80).forEach(function (k) { o[String(k).replace(/[^\\w.-]/g, '').slice(0, 40)] = scrubPay_(v[k], d + 1); }); return o; }\n  if (pm && pm.months) out.pay = Object.keys(pm.months).sort().reverse().slice(0, 6).map(function (k) { return scrubPay_(pm.months[k], 0); });");
+
+/* 3c. every position below Manager gets the schedule without pay: strip it once per version, not once per person */
+rep("function stripPay_(e) {", "var SPC_ = new Map();\nfunction stripPay_(e) { var c = SPC_.get(e.v); if (c !== undefined) return { v: c, t: e.t }; var r = stripPay0_(e); if (SPC_.size >= 16) SPC_.clear(); SPC_.set(e.v, r.v); return r; }\nfunction stripPay0_(e) {");
+
+/* 3d. the access policy and the grants are read many times per request; parse each version once (callers only read them) */
+rep("function policy_(cur) { try { var e = cur.keys.totAccessPolicy; var p = e && JSON.parse(e.v); return p && typeof p === 'object' ? p : { users: {}, roles: {} }; } catch (x) { return { users: {}, roles: {} }; } }",
+    "var POL_ = { v: null, p: null };\nfunction policy_(cur) { try { var e = cur.keys.totAccessPolicy; if (!e) return { users: {}, roles: {} }; if (POL_.v !== e.v) { var q = JSON.parse(e.v); POL_ = { v: e.v, p: q && typeof q === 'object' ? q : { users: {}, roles: {} } }; } return POL_.p; } catch (x) { return { users: {}, roles: {} }; } }");
+rep("function grants_(cur) { try { var e = cur.keys.totAccessGrants, g = e && JSON.parse(e.v); return g && typeof g === 'object' ? g : {}; } catch (x) { return {}; } }",
+    "var GRN_ = { v: null, g: null };\nfunction grants_(cur) { try { var e = cur.keys.totAccessGrants; if (!e) return {}; if (GRN_.v !== e.v) { var q = JSON.parse(e.v); GRN_ = { v: e.v, g: q && typeof q === 'object' ? q : {} }; } return GRN_.g; } catch (x) { return {}; } }");
+
+/* 3e. filtering for one person parsed whole lists again and again. Managers and the admin read these lists unfiltered, so they need no parse at all; the others share one parsed copy per version (callers only read it) */
+rep("var a = jp_(v, null); if (!Array.isArray(a)) return all ? v : '[]'; return all ? v : JSON.stringify(", "if (all) return v; var a = jpc_(v, null); if (!Array.isArray(a)) return '[]'; return JSON.stringify(");
+rep("function journalPull_(v, c, okSrc) { var a = jp_(v, null);", "function journalPull_(v, c, okSrc) { if (c.all && typeof v === 'string' && v.charAt(0) === '[') return v; var a = jpc_(v, null);");
+rep("function auditPull_(v, c) { var a = jp_(v, null);", "function auditPull_(v, c) { var a = jpc_(v, null);");
+rep("var o = {}, a = jp_(cur.keys[k] && cur.keys[k].v, []);", "var o = {}, a = jpc_(cur.keys[k] && cur.keys[k].v, []);");
+rep("var o = { t: {}, d: {} }, a = jp_(cur.keys[pre + 'totTeams'] && cur.keys[pre + 'totTeams'].v, []);", "var o = { t: {}, d: {} }, a = jpc_(cur.keys[pre + 'totTeams'] && cur.keys[pre + 'totTeams'].v, []);");
+
+/* 4. the Google Apps Script services that remain are provided by src/rules/env.js (Utilities, Session, CacheService, PropertiesService, MailApp) */
+
+/* 5. project files: stored by the file service instead of Drive */
+cut('function pjFileUp_(b, cx, me) {', '/* Run ONCE from the Apps Script editor', `function pjFileUp_(b, cx, me) {
+  var pre = pjPre_(b, me); if (pre == null) return { error: 'not allowed' };
+  var ix = cx.idx(pre, 'totProjects'), p = ix[String(b.pid || '')]; if (!p || pjLevel_(p, cx, ix, 0) < 2) return { error: 'not allowed' };
+  var up = String(b.up || '').replace(/[^\\w]/g, '').slice(0, 40), i = +b.i, n = +b.n, size = +b.size;
+  if (!up || !(size > 0) || !(n >= 1) || !(i >= 0) || i >= n) return { error: 'bad upload' }; if (size > PJ_FILE_MAX) return { error: 'The file is larger than 25 MB.' };
+  var mime = String(b.mime || 'application/octet-stream').replace(/[^\\w.+\\/-]/g, '').slice(0, 100) || 'application/octet-stream';
+  var nm = 'pjfile-' + String(p.id).replace(/[^\\w-]/g, '') + '-' + String(b.name || 'file').replace(/[\\\\/:*?"<>|]/g, '_').slice(0, 100);
+  return ENV.files.chunk({ up: 'pf' + up, i: i, n: n, size: size, mime: mime, name: nm, owner: cx.em, kind: 'project', data: String(b.data || '') });
+}
+function pjFileGet_(b, cx, me) {
+  var pre = pjPre_(b, me); if (pre == null) return { error: 'not allowed' };
+  var it = cx.idx(pre, 'totProjItems')[String(b.id || '')]; if (!it || !it.fileId) return { error: 'gone' };
+  if (pjRecLevel_('totProjItems', it, cx, cx.idx(pre, 'totProjects')) < 1) return { error: 'not allowed' };
+  var fid = String(it.fileId); if (!/^[\\w-]+$/.test(fid)) return { error: 'bad id' };
+  var f = ENV.files.info(fid); if (!f) return { error: 'gone' };
+  if (String(f.name).indexOf('pjfile-' + String(it.pid).replace(/[^\\w-]/g, '') + '-') !== 0) return { error: 'not allowed' };   /* only files uploaded to this project */
+  var r = ENV.files.read(fid, Math.max(0, +b.i || 0)); if (!r) return { error: 'bad range' };
+  return { ok: true, n: r.n, mime: f.mime, name: String(it.fileName || it.title || 'file'), data: r.data };
+}
+`);
+cut('/* Run ONCE from the Apps Script editor', 'function delMap_', '');
+
+/* 6. everything from backup_ to the end (Drive backups, doPost, video cleanup, triggers) is replaced by the server handler */
+cut('function backup_(df) {', null, '/*__HANDLER__*/\n');
+
+/* names of the keys the tool really syncs (taken from its own sync code): staff cannot create any other key */
+const toolHtml = fs.readFileSync(path.join(root0, 'tool', 'PTF-pass-to-floor-Gunda.html'), 'utf8'), names = new Set(['totTombstones']);
+['UNION', 'LWW'].forEach((n) => { const m = new RegExp('var ' + n + ' = \\[([^\\]]*)\\]').exec(toolHtml); if (!m) throw new Error('port: ' + n + ' list not found in the tool'); m[1].split(',').forEach((x) => { const v = x.trim().replace(/^'|'$/g, ''); if (v) names.add(v); }); });
+Object.keys({}).length;
+const head = s;
+const handler = fs.readFileSync(path.join(__dirname, 'handler.template.js'), 'utf8');
+const orig = fs.readFileSync(srcPath, 'utf8');
+/* the pull / push / project actions of doPost are reused verbatim */
+const a = orig.indexOf("    var cx = ctx_(cur, em, admin);"), b = orig.indexOf("    return out_({ error: 'unknown' });");
+if (a < 0 || b < 0 || b < a) throw new Error('port: doPost body anchors not found');
+let body = orig.slice(a, b);
+function brep(from, to) { const i = body.indexOf(from); if (i < 0) throw new Error('port: body anchor not found: ' + from.slice(0, 70)); if (body.indexOf(from, i + 1) >= 0) throw new Error('port: body anchor not unique: ' + from.slice(0, 70)); body = body.slice(0, i) + to + body.slice(i + from.length); }
+/* delta pull: a browser that already holds sequence N receives only the keys saved after N */
+brep("      if (admin) return out_({ keys: cur.keys, updatedAt: cur.updatedAt || 0 });\n      var res = { keys: {}, updatedAt: cur.updatedAt || 0 };",
+     "      var dl = deltaPlan_(+b.since || 0);\n      if (admin) { var ak = {}; Object.keys(cur.keys).forEach(function (k) { if (!dl.delta || dl.sent(k, parseKey_(k))) ak[k] = cur.keys[k]; }); return out_({ keys: ak, updatedAt: cur.updatedAt || 0, seq: ENV.seq(), delta: dl.delta }); }\n      var res = { keys: {}, updatedAt: cur.updatedAt || 0, seq: ENV.seq(), delta: dl.delta };");
+brep("var p = parseKey_(k), en = cur.keys[k]; if (!p || !en) return;\n        if (k === 'totAccessPolicy')", "var p = parseKey_(k), en = cur.keys[k]; if (!p || !en) return;\n        if (dl.delta && !dl.sent(k, p)) return;\n        if (!siteWanted_(b, p)) return;\n        if (k === 'totAccessPolicy')");
+brep("Object.keys(cur.keys).forEach(function (k) { if (!dl.delta || dl.sent(k, parseKey_(k))) ak[k] = cur.keys[k]; });", "Object.keys(cur.keys).forEach(function (k) { var q = parseKey_(k); if (q && (!dl.delta || dl.sent(k, q)) && siteWanted_(b, q)) ak[k] = cur.keys[k]; });");
+brep("if (!p || !n || typeof n.v !== 'string' || n.v.length > 4500000) { denied.push(k); return; }", "if (!p || !n || typeof n.v !== 'string' || n.v.length > 4500000) { denied.push(k); return; }\n        if (!admin && KNOWN_NAMES.indexOf(p.name) < 0) { denied.push(k); return; }   /* staff can only write the keys the tool uses (no junk keys) */");
+brep("if (changed) { backup_(df); cur.updatedAt = now; df.setContent(JSON.stringify(cur)); try { projDigest_(cur, false); } catch (x) {} }   /* v3.32 daily project digest */", "if (changed) { cur.updatedAt = now; }");
+
+const out = '/* GENERATED by tools/port-code-gs.js from tool/Code.gs' + (ver ? ' (v' + ver + ')' : '') + '. Do not edit; edit the source and run:  npm run build:rules */\n\'use strict\';\n' +
+  'module.exports = function createRules(ENV) {\n' +
+  'var Utilities = ENV.Utilities, Session = ENV.Session, CacheService = ENV.CacheService, PropertiesService = ENV.PropertiesService, MailApp = ENV.MailApp, Logger = ENV.Logger;\n' +
+  head.replace('/*__HANDLER__*/', 'var KNOWN_NAMES = ' + JSON.stringify(Array.from(names)) + ';\n' + handler.replace('/*__BODY__*/', body)) + '\n};\n';
+fs.mkdirSync(path.join(__dirname, '..', 'src', 'rules'), { recursive: true });
+fs.writeFileSync(path.join(__dirname, '..', 'src', 'rules', 'rules.js'), out);
+console.log('rules.js written (' + out.length + ' bytes) from ' + path.relative(process.cwd(), srcPath));

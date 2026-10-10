@@ -1,0 +1,1128 @@
+Universal Prompt: Evolve Existing PTF/Gunda Tool into an Integrated Company Operations Platform
+
+Context
+
+I already have an existing internal tool called PTF / Gunda. The tool is already functional and contains many departments, workflows, data structures, workspaces, onboarding features, workshop features, performance features, FMD/scheduling features, ID generation, logbooks, appearance/uniform management, tasks, employee profiles, reporting, backups, and other functionality.
+
+DO NOT build a new application from scratch.
+
+The existing tool is the foundation. Modify, extend, reorganize, and improve the existing tool while preserving everything that already works.
+
+The long-term goal is to make this tool function as an internal company operations platform that can eventually integrate naturally with the Microsoft environment we already use, including Microsoft company accounts, Microsoft/Entra-style identity and role-based access, SharePoint, Power Apps, Microsoft-style employee profiles and self-service, Jira-style ticket/task management, Excel/Google Sheets-style workbooks, and other internal systems where technically possible.
+
+Do not assume that every external system has an available API. Where a real integration is not currently possible, create a clean integration interface or connector architecture without inventing an API.
+
+Goal
+
+Transform the existing PTF/Gunda tool into a unified internal company operations platform where different departments can work inside their own controlled spaces while still collaborating.
+
+Core concept:
+
+One employee record + multiple department workspaces + shared tasks/tickets + controlled access + interconnected workflows + workbook-style data management.
+
+The tool should feel like a combination of Microsoft/Entra identity, SharePoint, Power Apps, Jira, Excel/Google Sheets, internal HR/recruitment systems, internal scheduling systems, and existing PTF/Gunda functionality.
+
+This is NOT a request to create fake copies of these products. Reproduce the useful workflows and user experience needed by the company inside the existing tool.
+
+1. Preserve the Existing Tool
+
+Before changing anything:
+
+- Inspect the existing application and architecture.
+- Identify current data structures, departments, workspaces, employee records, tasks, workbook/grid functionality, permissions, roles, backups, restore, audit, and local storage.
+- Identify existing onboarding, workshop, performance, FMD, appearance, ID, logbook, and other modules.
+
+Then extend the existing architecture.
+
+Critical requirements:
+
+- Do not unnecessarily rewrite working modules.
+- Do not replace existing functionality simply because a different implementation is easier.
+- Do not remove existing features.
+- Do not reset existing data structures unless absolutely necessary.
+- Do not create duplicate employee databases when the existing employee/person structure can be extended.
+- Do not create duplicate task systems when the existing task functionality can be expanded.
+- Do not create separate unrelated databases for each department.
+- Make the platform more connected, not more fragmented.
+
+2. Company Account / Microsoft-Ready Identity
+
+The company normally uses Microsoft accounts.
+
+Design the authentication and identity layer so the application can eventually work with Microsoft company accounts / Microsoft Entra ID.
+
+Support or prepare for:
+
+- Company user identity
+- User profile
+- Employee ID / Workday ID
+- Name
+- Email
+- Department
+- Position
+- Team
+- Manager
+- Role
+- Permissions
+- Active/inactive status
+- Site/location
+- Access scope
+
+Design the architecture so Microsoft authentication can be connected later without rebuilding the application.
+
+If real Microsoft authentication is not currently available, create the correct abstraction/interface rather than pretending it is already implemented.
+
+3. Role-Based Access
+
+Access must be based on role and department.
+
+Employees should see only employee-facing information such as their profile, evaluations, scores, procedural mistakes, retraining targets, relevant training information, personal schedule, and authorized personal tasks/requests.
+
+Employees must not see other employees' confidential information, HR recruitment information, manager-only information, confidential evaluation notes, HR records, or private department boards.
+
+Managers / Shift Managers should have appropriate access to employee profiles, evaluations, re-evaluation requests, performance information, team information, requests, and tasks.
+
+Performance Coaches should have access to evaluations, re-evaluations, performance records, procedural mistakes, retraining, assigned performance tasks, and relevant employee information.
+
+HR should have access to employee lifecycle, recruitment, hiring information, termination workflows, HR tasks, required department notifications, and appropriate employee records.
+
+Recruiting should have access to candidates, interview workbooks, candidate evaluations, interview comments, hiring decisions, recruitment pipeline, and recruitment tasks.
+
+Appearance should have access to uniform inventory, assignments, returns, missing uniforms, employee uniform records, and related termination tasks.
+
+FMD/Scheduling should have access to scheduling, shifts, rotation, attendance, access/presence information, team assignments, labour rules, and related tasks.
+
+The architecture must allow additional departments to be added without rebuilding the system.
+
+4. Department Workspaces
+
+Every department should have its own workspace.
+
+Each workspace should feel like:
+
+Jira board + SharePoint department space + task manager + relevant workbook/data area.
+
+Examples:
+
+- HR
+- Recruiting
+- Performance
+- Training / Academy
+- FMD
+- Appearance
+- Fingerprint / Building Access
+- Management
+- IT
+- Other departments added later
+
+Each department should have:
+
+- Dashboard
+- Tickets / Tasks
+- Board
+- Assigned to me
+- Team queue
+- Completed
+- Cancelled
+- Delayed / Waiting
+- Search
+- Filters
+- Reports where applicable
+- Relevant files/workbooks
+- Relevant employee records
+- Activity/history
+- Notifications
+
+5. Jira-Like Ticket and Task System
+
+Expand the existing task system into a proper internal ticket system.
+
+Each department should have its own board.
+
+Each ticket should support at minimum:
+
+- Ticket ID
+- Title
+- Description
+- Created by
+- Created date/time
+- Department
+- Assigned department
+- Assigned person
+- Priority
+- Status
+- Due date
+- Related employee
+- Related employee ID
+- Related record
+- Comments
+- Attachments/files where supported
+- Activity history
+- Created/updated timestamps
+- Completion date
+- Cancellation reason
+- Delay reason
+- Reassignment
+- Escalation where appropriate
+
+Support statuses such as:
+
+- New
+- Open
+- Assigned
+- In Progress
+- Waiting
+- Delayed
+- Completed
+- Cancelled
+- Reopened
+
+Do not force every department to use exactly the same workflow. Allow departments to configure appropriate statuses while maintaining common system-level states.
+
+6. Department Boards
+
+Each department should have a Jira-like board.
+
+Examples:
+
+Performance:
+- New Re-evaluation Request
+- Assigned
+- In Progress
+- Waiting
+- Completed
+
+HR:
+- New
+- Reviewing
+- Action Required
+- Waiting for Department
+- Processing
+- Completed
+
+Appearance:
+- New
+- Uniform Return Pending
+- Investigation
+- Waiting
+- Completed
+
+Fingerprint / Access:
+- New Access Request
+- Access Change Required
+- Removal Required
+- Waiting
+- Completed
+
+Boards should support:
+
+- Drag/drop where appropriate
+- Filtering
+- Search
+- Sorting
+- Priority
+- Assignee
+- Department
+- Employee
+- Due date
+- Ticket age
+- Overdue highlighting
+
+7. Inter-Department Workflow
+
+This is one of the most important requirements.
+
+Departments must be able to automatically create and exchange tasks.
+
+Example: Employee Termination.
+
+When an employee is being terminated, HR starts the termination process. The system can generate related tasks for:
+
+HR:
+- Process termination
+
+Appearance:
+- Collect uniform
+- Confirm uniform returned
+
+Fingerprint / Access:
+- Remove building/fingerprint access
+
+FMD:
+- Remove employee from future schedules where appropriate
+
+IT:
+- Remove or disable required access where applicable
+
+Management:
+- Complete management actions
+
+Each department receives its own task, while all tasks remain connected to the same employee termination process.
+
+Use a parent process such as:
+
+Employee Termination Case
+
+with linked child tasks:
+
+- HR Task
+- Appearance Task
+- Access Task
+- FMD Task
+- IT Task
+- Management Task
+
+Maintain a clear audit trail.
+
+8. Department Comments and Exceptions
+
+Departments must be able to communicate through tickets.
+
+Example:
+
+HR creates a termination process and Appearance receives "Return company uniform."
+
+If the uniform was not returned, Appearance should be able to:
+
+- Comment on the task
+- Mark the uniform as missing
+- Add the reason
+- Attach relevant information
+- Change task status
+- Escalate if required
+
+Example comment:
+
+"Uniform was not returned."
+
+This information must remain attached to the termination workflow and visible to authorized HR/users.
+
+The same principle must work across departments.
+
+9. Performance Re-Evaluation Workflow
+
+Create a proper workflow for performance re-evaluations.
+
+Example:
+
+A Shift Manager requests a re-evaluation for an employee.
+
+The manager creates a Re-evaluation Request.
+
+The request appears on the Performance Coach board.
+
+The Performance Coach can:
+
+- Accept
+- Assign
+- Start evaluation
+- Add comments
+- Perform evaluation
+- Save results
+- Complete the request
+- Return for clarification
+- Cancel with reason
+
+The employee should eventually see the appropriate result through the employee-facing profile.
+
+Managers should see appropriate management information. Performance Coaches should see the operational information needed to complete the evaluation. Confidential information must remain role-restricted.
+
+10. Employee Self-Service / Power Apps-Like View
+
+Create a dedicated employee-facing experience similar in purpose to an employee Power Apps portal.
+
+An employee should have a personal profile and dashboard.
+
+My Profile:
+- Name
+- Employee ID
+- Position
+- Team
+- Manager
+- Start date
+- Relevant employment information
+
+My Evaluations:
+- Evaluation date
+- Game
+- Score
+- Result
+- Relevant feedback
+- Appropriate mistakes/procedural issues
+
+My Procedural Mistakes:
+- Game
+- Date
+- Mistake type
+- Description
+- Relevant status
+- Count where appropriate
+
+My Retraining:
+- Retraining target
+- Reason
+- Assigned date
+- Status
+- Relevant game/process
+- Completion/result
+
+My Performance:
+- Appropriate performance statistics
+
+Do not expose confidential management notes.
+
+11. Game-Based Performance Data
+
+This is an iGaming environment.
+
+Employees work with different games, and game activity is counted. Each game should be treated as an individual game/work activity where appropriate.
+
+Performance information may include:
+
+- Game name
+- Number of games
+- Period
+- Employee
+- Relevant performance metrics
+- Evaluation score
+- Mistakes
+- Retraining information
+
+The company currently receives some game-count/performance data from a system such as Grafana or another internal analytics source.
+
+Do NOT invent a Grafana API.
+
+Instead, design a clean data-import/integration layer so the source can eventually be connected.
+
+Support:
+
+- Import
+- API integration when an actual API is available
+- Scheduled synchronization when supported
+- Manual import as fallback
+- Data validation
+- Employee matching
+- Date/time period
+- Game matching
+- Duplicate detection
+- Import history
+
+The source system should be configurable.
+
+12. Recruitment Workspace
+
+Create a dedicated Recruiting / HR area.
+
+Recruiting relies heavily on Excel-style interview sheets.
+
+Do not force recruiters into a complicated database form if a workbook is more appropriate.
+
+The Recruiting workspace should support a professional workbook experience.
+
+Example structure:
+
+Candidate | Interview Date | Interviewer | Communication | Game Knowledge | Appearance | Comments | Hire?
+
+The exact fields must remain configurable.
+
+Recruiters should be able to:
+
+- Add candidates
+- Edit candidates
+- Add comments
+- Rate candidates
+- Sort
+- Filter
+- Search
+- Add columns
+- Delete rows/columns
+- Copy/paste
+- Duplicate workbooks
+- Create templates
+- Save versions
+- Export/import
+- Print
+- Mark candidate as hired/not hired
+- Move candidates through recruitment stages
+
+The workbook should feel like a professional Excel/Google Sheets experience, not a basic HTML table.
+
+13. Workbook Engine
+
+This requirement applies to Recruiting and other departments that use spreadsheets heavily.
+
+Expand the existing workbook/grid functionality rather than replacing it.
+
+Support as much practical spreadsheet functionality as the current architecture can safely provide:
+
+- Rows
+- Columns
+- Cells
+- Range selection
+- Copy/paste
+- Delete cells
+- Delete rows
+- Delete columns
+- Insert rows
+- Insert columns
+- Resize columns
+- Resize rows where appropriate
+- Sorting
+- Filtering
+- Search
+- Find/replace
+- Freeze headers
+- Fill down
+- Fill right
+- Duplicate sheets
+- Rename sheets
+- Add sheets
+- Delete sheets
+- Import Excel
+- Export Excel/CSV where technically supported
+- Printing
+- Basic formulas if a real formula engine is implemented
+- Conditional formatting if implemented correctly
+- Validation
+- Dropdown/choice cells
+- Date fields
+- Number fields
+- Boolean fields
+
+Do NOT claim Excel functionality that is not actually implemented.
+
+If formulas are not calculated, do not pretend they are.
+
+If VBA cannot execute, do not pretend it can.
+
+If advanced Excel functionality requires an actual spreadsheet engine, identify that limitation clearly and design an integration path instead.
+
+14. SharePoint-Ready Architecture
+
+Design the application so departments can eventually use SharePoint as a document/data layer where appropriate.
+
+Potential mapping:
+
+SharePoint Lists:
+- Employees
+- Tasks
+- Tickets
+- Candidates
+- Evaluations
+- Retraining
+- Uniforms
+- Requests
+- Attendance
+- Department records
+
+SharePoint Document Libraries:
+- Excel workbooks
+- Templates
+- Training documents
+- Forms
+- Attachments
+- Reports
+- Other department files
+
+Power Apps:
+- Employee self-service
+- Manager dashboards
+- Mobile interfaces
+- Department-specific forms
+
+Power Automate:
+- Notifications
+- Ticket creation
+- Approval workflows
+- Department handoffs
+- Employee lifecycle workflows
+- Scheduled synchronization
+
+Do not implement fake SharePoint functionality.
+
+Create integration interfaces and adapters so these systems can be connected when actual credentials, APIs, or Microsoft environments are available.
+
+15. Jira-Ready Architecture
+
+Design the internal ticket system so Jira can eventually be connected.
+
+Possible integration:
+
+PTF/Gunda → Jira
+
+or
+
+Jira → PTF/Gunda
+
+or bidirectional synchronization where technically supported.
+
+Potential synchronized information:
+
+- Issue key
+- Summary
+- Description
+- Employee
+- Department
+- Assignee
+- Status
+- Priority
+- Comments
+- Due date
+- Resolution
+- Created/updated timestamps
+
+Do not invent Jira API endpoints or credentials.
+
+Create a clean integration layer.
+
+If no live Jira connection is available, the application should continue working independently.
+
+16. Unified Employee Record
+
+The employee must become the central object connecting departments.
+
+One employee should be able to have linked records such as:
+
+- Employee profile
+- Recruitment history
+- Onboarding
+- Training
+- Workshop
+- Evaluations
+- Performance
+- Procedural mistakes
+- Retraining
+- FMD schedule
+- Attendance
+- Uniform
+- Building access
+- ID card
+- Logbooks
+- Tasks
+- HR lifecycle
+- Termination
+- Department history
+
+Avoid duplicate employee records. Where possible, departments should reference the same employee record.
+
+17. Employee Lifecycle
+
+Build the architecture around:
+
+Candidate → Hired → Onboarding → Training → Qualified → Working → Performance Management → Retraining/Re-evaluation → Transfer/Change → Termination → Archived
+
+Different departments should contribute to the lifecycle.
+
+The lifecycle should trigger relevant workflows without automatically performing destructive actions.
+
+18. Notifications
+
+Create a unified notification system.
+
+Notify users when:
+
+- A ticket is assigned
+- A ticket is reassigned
+- A ticket is overdue
+- Someone comments
+- A department task is created
+- A re-evaluation is requested
+- A termination task is created
+- A uniform return is missing
+- Access removal is required
+- An employee action is required
+- A request is approved/rejected
+- A task is completed
+
+The architecture should support future Microsoft notifications/email/Teams/Power Automate integration.
+
+Do not invent live email or Teams functionality if there is no real connection.
+
+19. Audit Trail
+
+Every important action should be auditable.
+
+Record:
+
+- Who created it
+- Who changed it
+- What changed
+- Previous value
+- New value
+- Date/time
+- Related employee
+- Related ticket
+- Related department
+
+This is particularly important for HR, Recruitment, Performance, Termination, Access Control, Payroll-related information, and Employee Records.
+
+20. Files and Documents
+
+Departments should be able to store or link relevant documents.
+
+Examples:
+
+Recruiting:
+Interview workbooks and candidate documents.
+
+Training:
+Training templates, checklists, documents.
+
+HR:
+Appropriate HR documentation.
+
+Appearance:
+Uniform forms.
+
+Performance:
+Appropriate evaluation documents.
+
+Use the existing local/file architecture where it is currently available.
+
+Prepare the application for future SharePoint Document Library integration.
+
+21. Department Templates
+
+Each department should be able to create templates.
+
+Examples:
+
+Recruiting:
+Candidate interview workbook.
+
+HR:
+Termination checklist.
+
+Performance:
+Re-evaluation request.
+
+Appearance:
+Uniform return/termination checklist.
+
+Access:
+Fingerprint/access removal checklist.
+
+Training:
+Onboarding workbook.
+
+Templates should be duplicable.
+
+When a new process begins, users should be able to choose Create from Template rather than rebuilding the structure.
+
+22. Cross-Department Process Templates
+
+Support reusable processes.
+
+Example: Termination Process.
+
+Create a process template:
+
+1. HR termination task
+2. Appearance uniform return task
+3. FMD schedule task
+4. Access removal task
+5. IT access task
+6. Management task
+
+Each task has:
+
+- Department
+- Responsible role
+- Due time
+- Status
+- Completion requirement
+
+The process should display overall progress.
+
+Example:
+
+Termination Case: 4/6 tasks completed
+
+This makes cross-department collaboration visible.
+
+23. Dashboards
+
+Create dashboards appropriate to each role.
+
+Employee Dashboard:
+- My profile
+- My evaluations
+- My performance
+- My mistakes
+- My retraining
+- My schedule
+- My requests
+
+Manager Dashboard:
+- Team status
+- Evaluations
+- Re-evaluations
+- Performance
+- Attendance
+- Open tasks
+- Issues requiring attention
+
+Department Dashboard:
+- Open tickets
+- Assigned to me
+- Overdue
+- Waiting
+- Completed
+- Workload
+- Recent activity
+
+Management Dashboard:
+High-level cross-department status.
+
+Do not expose confidential information to users who should not have access.
+
+24. Search
+
+Expand the existing global search into a unified search.
+
+Search authorized information across:
+
+- Employees
+- Candidates
+- Tickets
+- Tasks
+- Evaluations
+- Retraining
+- Training groups
+- Workbooks
+- Uniforms
+- Schedules
+- Requests
+- Documents
+- Department records
+
+Search results must respect permissions.
+
+A user must never discover a record merely because they know the person's name.
+
+25. Data Integration Layer
+
+Create a proper integration architecture.
+
+Instead of hard-coding every external system directly into every module, use connectors/adapters.
+
+Possible connectors:
+
+- Microsoft / Entra ID
+- SharePoint
+- Power Apps
+- Power Automate
+- Jira
+- Grafana / analytics source
+- Building access system
+- HR systems
+- Other internal systems
+
+Each connector should have:
+
+- Connection configuration
+- Authentication abstraction
+- Import
+- Export
+- Synchronization
+- Error handling
+- Logging
+- Retry handling where appropriate
+- Mapping configuration
+- Last synchronization status
+
+If an external system is not currently available, use a mock/local adapter only for development and clearly label it as such.
+
+26. Offline and Local Operation
+
+The existing tool has local/offline capabilities.
+
+Do not remove them.
+
+The tool should continue functioning locally where possible.
+
+Future Microsoft/Jira/SharePoint integrations should be optional integrations rather than making the entire application unusable without internet access.
+
+Clearly separate:
+
+Core local application
+
+from
+
+External integrations
+
+This keeps the system resilient.
+
+27. Data Synchronization
+
+Where synchronization is implemented, define clearly:
+
+- Source of truth
+- Direction of synchronization
+- Frequency
+- Conflict handling
+- Duplicate handling
+- Missing employee handling
+- Deleted record handling
+- Failed synchronization
+- Audit trail
+
+Never silently overwrite important employee information.
+
+For each synchronized field, define whether it is:
+
+- Local source
+- External source
+- Bidirectional
+- Calculated
+- Read-only
+
+28. Security
+
+This is an internal company platform containing sensitive employee information.
+
+Implement proper access boundaries.
+
+At minimum:
+
+- Authentication
+- Authorization
+- Department access
+- Role access
+- Record-level restrictions where required
+- Employee self-service restrictions
+- Audit logging
+- Secure configuration
+- No hard-coded passwords
+- No hard-coded API secrets
+- No exposed credentials
+- No biometric templates stored unnecessarily
+- No confidential HR information exposed to normal employees
+
+Do not treat UI hiding as sufficient security.
+
+If a function is restricted, the underlying data/action must also be protected.
+
+29. UI/UX Requirements
+
+The application should feel like a professional internal business platform.
+
+Keep the existing visual language where practical.
+
+Do not redesign everything unnecessarily.
+
+Improve:
+
+- Navigation
+- Department switching
+- Employee search
+- Ticket boards
+- Workbooks
+- Notifications
+- Dashboards
+- Forms
+- Status indicators
+- Mobile usability where appropriate
+
+Avoid creating dozens of disconnected screens.
+
+The user should understand:
+
+- Where am I?
+- What do I need to do?
+- What is waiting for me?
+- What is overdue?
+- What information can I access?
+
+30. Do Not Create Fake Functionality
+
+This is a critical requirement.
+
+Never create a button that only looks functional.
+
+Never claim:
+
+- Microsoft login works if it does not
+- SharePoint synchronization works if it does not
+- Jira synchronization works if it does not
+- Grafana integration works if no real connector exists
+- Power Apps synchronization works if it does not
+- Excel formulas work if they are only stored as text
+- VBA works if there is no VBA execution engine
+- Email/Teams notifications work if there is no real connection
+
+If something cannot currently be connected:
+
+1. Build the architecture for it.
+2. Build the UI/configuration needed.
+3. Clearly mark the integration as unavailable/not connected.
+4. Keep the local workflow functional.
+5. Do not fabricate successful synchronization.
+
+31. Backward Compatibility
+
+Existing functionality must continue working.
+
+Before modifying a module:
+
+1. Understand how it currently works.
+2. Preserve existing data.
+3. Preserve existing workflows.
+4. Preserve existing navigation where practical.
+5. Extend instead of replacing.
+6. Test existing features after changes.
+
+Do not break:
+
+- Onboarding
+- Workshop
+- Performance
+- FMD
+- Appearance
+- ID Generator
+- Logbooks
+- Tasks
+- Employee records
+- Scheduling
+- Backups
+- Printing
+- Existing workbook functionality
+
+unless a change is absolutely required and clearly justified.
+
+32. Migration Strategy
+
+Do not immediately convert all existing data into a new structure.
+
+First create a compatibility layer.
+
+Then gradually extend existing structures.
+
+Where migration is required:
+
+- Create backup
+- Validate data
+- Migrate
+- Verify
+- Keep rollback capability
+- Report migration results
+
+Never silently discard existing information.
+
+33. Implementation Approach
+
+Work incrementally.
+
+Phase 1: Analyze the existing tool.
+
+Produce an internal architecture map covering:
+
+- Modules
+- Data
+- Employee records
+- Roles
+- Permissions
+- Existing task system
+- Existing workbook engine
+- Existing integrations
+- Existing storage
+- Existing backups
+
+Phase 2: Create the unified employee/task architecture.
+
+Phase 3: Improve department workspaces.
+
+Phase 4: Expand Jira-like ticketing.
+
+Phase 5: Add cross-department workflows.
+
+Phase 6: Improve employee self-service.
+
+Phase 7: Improve workbook functionality.
+
+Phase 8: Create Microsoft/SharePoint/Power Apps/Power Automate integration interfaces.
+
+Phase 9: Create Jira and analytics integration interfaces.
+
+Phase 10: Testing, migration, security review, performance review, and regression testing.
+
+Do not attempt to implement everything in one uncontrolled rewrite.
+
+34. Acceptance Criteria
+
+The modified application should satisfy these principles:
+
+Existing functionality:
+All existing working functionality remains available.
+
+Employee:
+One employee record can connect to all authorized department information.
+
+Department:
+Each department has its own controlled workspace.
+
+Tickets:
+Each department can create, receive, assign, process, delay, cancel, complete, reopen, and comment on tickets.
+
+Collaboration:
+One business process can generate tasks for multiple departments.
+
+Recruitment:
+Recruiters can work in Excel-like interview workbooks.
+
+Performance:
+Managers can request re-evaluations and Performance Coaches can process them.
+
+Employee self-service:
+Employees can see only their authorized information.
+
+Microsoft readiness:
+The architecture can connect to Microsoft/Entra, SharePoint, Power Apps, and Power Automate without rebuilding the application.
+
+Jira readiness:
+The architecture can connect to Jira without rebuilding the task system.
+
+Analytics readiness:
+The architecture can receive game-count/performance information from an external analytics system such as Grafana when an actual integration is available.
+
+Security:
+Users cannot access information outside their permissions simply by manipulating the UI.
+
+Reliability:
+Existing backups, local persistence, and recovery functionality remain intact.
+
+35. Most Important Design Principle
+
+Think of this application as a company operating system, not a collection of unrelated pages.
+
+The employee is the central object.
+
+Departments are connected through workflows.
+
+Tickets/tasks connect departments.
+
+Workbooks handle processes that genuinely benefit from spreadsheet-style work.
+
+Dashboards show relevant information.
+
+External systems provide data through controlled connectors.
+
+Microsoft/SharePoint/Power Apps/Jira should be treated as systems this platform can integrate with, not as reasons to rebuild the entire application.
+
+The final result should be:
+
+One platform → one employee record → multiple departments → shared workflows → controlled access → connected tasks → reusable workbooks → external integrations.
+
+Before making major architectural changes, inspect the existing code and identify what can be reused. Prefer extension and refactoring over replacement.
+
+When you encounter an existing feature that already solves part of the requirement, reuse it.
+
+When a requested feature conflicts with an existing implementation, explain the conflict and propose the smallest safe architectural change.
+
+Do not invent technical capabilities that are not present.
+
+Do not silently remove existing functionality.
+
+Do not create fake integrations.
+
+Build the system progressively, safely, and in a way that can eventually operate alongside the company's real Microsoft and internal systems.
