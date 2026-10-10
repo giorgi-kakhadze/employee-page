@@ -10,7 +10,7 @@ const U = require('./http/util'), securityHeaders = require('./http/headers');
 const PREF_KEYS = ['totAppTheme', 'totAppStyle', 'totSoundPrefs', 'totMusicPrefs', 'totConsentV1', 'totLastSite', 'rememberSupervisor', 'supFirstName'];
 const EMPLOYEE_ACTIONS = ['me', 'reqNew', 'reqCancel', 'ack'];
 const WRITE_ACTIONS = ['push', 'reqNew', 'reqCancel', 'ack'];
-const KNOWN_ACTIONS = ['pull', 'push', 'me', 'reqNew', 'reqCancel', 'ack', 'login', 'video', 'videoGet', 'projNotify', 'pjFileUp', 'pjFileGet', 'list', 'setStatus', 'remove', 'request'];
+const KNOWN_ACTIONS = ['pull', 'push', 'me', 'reqNew', 'reqCancel', 'ack', 'login', 'video', 'videoGet', 'projNotify', 'ackRemind', 'reqMail', 'pjFileUp', 'pjFileGet', 'list', 'setStatus', 'remove', 'request'];
 
 async function createApp(cfg, opts) {
   opts = opts || {};
@@ -19,6 +19,7 @@ async function createApp(cfg, opts) {
   const files = filesFactory(cfg.dataDir), audit = auditFactory(db), sessions = sessionsFactory(db, cfg);
   const mail = mailFactory(db, cfg, opts.sentMail);
   const props = {}; for (const r of await db.q(`SELECT k,v FROM meta WHERE k LIKE 'prop:%'`)) props[r.k.slice(5)] = r.v;
+  if (props.EMPLOYEE_PAGE_URL == null && cfg.publicUrl && !/:0$/.test(cfg.publicUrl)) props.EMPLOYEE_PAGE_URL = cfg.publicUrl.replace(/\/$/, '') + '/employee';   /* the link in reminder e-mails */
   const env = makeEnv({ salt: cfg.salt, tz: cfg.tz, files, props, seq: () => state.seq, seqOf: () => state.seqOf, log: (m) => console.error(m),
     onProp: (k, v) => { db.q(`INSERT INTO meta(k,v,seq) VALUES(?,?,0) ON CONFLICT(k) DO UPDATE SET v=excluded.v`, ['prop:' + k, v]).catch(() => {}); },
     onMail: (to, s, b) => mail.enqueue(to, s, b) });

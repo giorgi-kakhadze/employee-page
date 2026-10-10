@@ -113,11 +113,12 @@ function show(){
   if(!refreshT&&!DEMO)refreshT=setInterval(function(){if(!document.querySelector('#rqForm:focus-within'))load(true)},60000);
 }
 function tile(go,n,l,cls){return '<button class="tile'+(cls?' '+cls:'')+'" data-go="'+go+'"><b>'+n+'</b><span>'+l+'</span></button>'}
+function updatesHtml(){var L=(D.requests||[]).filter(function(r){return(r.status==='approved'||r.status==='rejected')&&r.decidedAt&&Date.now()-r.decidedAt<7*864e5}).sort(function(a,b){return b.decidedAt-a.decidedAt});if(!L.length)return '';return '<div class="card"><b>&#128276; Updates for you</b>'+L.map(function(r){var ok=r.status==='approved';return '<div class="day"><span>'+(ok?'&#10003; ':'&#10007; ')+esc(rtl(r.type))+' '+esc(r.from)+(r.to&&r.to!==r.from?' &rarr; '+esc(r.to):'')+' was <b>'+(ok?'approved':'rejected')+'</b>'+(r.decisionNote?'<div class="mut">'+esc(r.decisionNote)+'</div>':'')+'<div class="mut">'+esc(new Date(r.decidedAt).toLocaleString())+'</div></span><span class="'+(ok?'work':'bad')+'"></span></div>'}).join('')+'</div>'}
 function pHome(){
   var p=D.profile||{},ev=D.evaluations||[],last=ev[0],wd=workDays(),next=wd[0],mi=mistakes(),inc=D.incidents||[],rm=D.remarks||[],pn=payNow(),pl=payLast(),y=today().slice(0,7);
   var incM=inc.filter(function(x){return x.date.slice(0,7)===y}).length,bad=rm.filter(function(x){return x.kind==='violation'||x.kind==='disciplinary'}).length,good=rm.filter(function(x){return x.kind==='positive'}).length;
   var gm=(D.gameCounts||[]).filter(function(g){return g.period.slice(0,7)===y}).reduce(function(s,g){return s+g.count},0);
-  var h='<div class="tiles">'+
+  var h=updatesHtml()+'<div class="tiles">'+
     tile('#paycard',pn?money(pn.totals.total,pn.cur):pl?money(pl.totals.total,pl.cur):'-',pn?'Earned so far in '+monthName(pn.ym).split(' ')[0]:pl?'Salary for '+monthName(pl.ym):'Salary not published yet','hl')+
     tile('#paycard',pn?pn.totals.shifts+' · '+pn.totals.hours+' h':'-','Shifts · hours this month')+
     tile('#evals',last?(last.total==null?'-':esc(last.total)+'%'):'-',last?'Last evaluation: '+esc(last.game||''):'No evaluation shared yet')+
@@ -259,7 +260,7 @@ function demoData(kind){
     gameCounts:gc,incidents:inc,remarks:rem,
     pay:[{ym:y,unit:'hour',cur:'GEL',final:false,upTo:today(),days:pd,bonus:[],extra:[],totals:{shifts:tot2.shifts,hours:tot2.hours,earned:tot2.earned,leave:0,bonus:0,total:tot2.earned,plannedShifts:6+R(6),plannedHours:72,planned:600+R(400)}},
       {ym:ly,unit:'hour',cur:'GEL',final:true,upTo:ly+'-28',days:[],bonus:[{name:pos.indexOf('VIP')>=0?'VIP quality bonus':'Quality bonus',type:'Performance',level:lv,of:5,amount:lb}],extra:[],totals:{shifts:lsh,hours:lsh*8-R(10),earned:le,leave:ll,bonus:lb,total:le+ll+lb,plannedShifts:0,plannedHours:0,planned:0}}],
-    schedule:{days:days},rotation:{days:rot},leave:{y:y,allow:28,used:4+R(18)},pub:{ver:'v1',at:Date.now()-36e5*3,ack:Math.random()<.5?'v1':'',ackAt:Date.now()-36e5},requests:(rf=10+R(10),Math.random()<.6)?[{id:'d1',type:P(['annual','swap','dayoff']),from:d(rf),to:d(rf+R(3)),status:P(['pending','approved']),created:Date.now()-864e5,note:'Family event',decisionNote:''}]:[]};
+    schedule:{days:days},rotation:{days:rot},leave:{y:y,allow:28,used:4+R(18)},pub:{ver:'v1',at:Date.now()-36e5*3,ack:Math.random()<.5?'v1':'',ackAt:Date.now()-36e5},requests:(rf=10+R(10),Math.random()<.6)?[{id:'d1',type:P(['annual','swap','dayoff']),from:d(rf),to:d(rf+R(3)),status:P(['pending','approved']),created:Date.now()-864e5,note:'Family event',decisionNote:'Enjoy your time off',decidedAt:Date.now()-36e5*5}]:[]};
 }
 function demoCall(b){
   if(b.action==='me')return D;

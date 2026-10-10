@@ -631,6 +631,29 @@ function projDigest_(cur, force) {
   Object.keys(per).forEach(function (e) { try { MailApp.sendEmail(e, 'Projects: your daily update (' + per[e].length + ')', 'Hello ' + who.name(e) + ',\n\nWhat changed in your projects in the last 24 hours, and what is blocked, needs help or is overdue:\n\n' + per[e].join('\n\n') + '\n\nOpen the tool > Projects for details. You receive this because you own, manage or work on these projects.'); sent++; } catch (x) {} });
   return sent;
 }
+/* ----- v3.41 e-mail reminders. The people to write to are worked out HERE from the data (never taken from the caller), so the tool cannot be used to send mail to arbitrary addresses.
+   ackRemind: everybody who was sent a schedule / rotation and has not confirmed the current version (optionally one team). At most once every 10 minutes per site.
+   reqMail: tell the employee that their request was approved or rejected (the request must already have that status, and is mailed once). ----- */
+function firstName_(n) { return String(n || '').trim().split(/\s+/)[0] || 'colleague'; }
+function ackRemind_(cur, cx, b, me) {
+  var pre = pjPre_(b, me); if (pre == null) return { error: 'not allowed' };
+  var ck = CacheService.getScriptCache(), rk = 'ar:' + sh_(pre); if (ck.get(rk)) return { error: 'A reminder was sent less than 10 minutes ago.' };
+  var blob = jp_(cur.keys[pre + 'totMySchedules'] && cur.keys[pre + 'totMySchedules'].v, {}), by = (blob && blob.byEmail) || {}, acks = jp_(cur.keys[pre + 'totScheduleAcks'] && cur.keys[pre + 'totScheduleAcks'].v, []), A = {};
+  (Array.isArray(acks) ? acks : []).forEach(function (x) { if (x && x.id) A[String(x.id).toLowerCase()] = x; });
+  var team = String(b.team || ''), link = ''; try { link = String(PropertiesService.getScriptProperties().getProperty('EMPLOYEE_PAGE_URL') || ''); } catch (e) {}
+  var to = Object.keys(by).filter(function (e) { var m = by[e]; return m && m.ver && /^[^@\s]+@[^@\s]+$/.test(e) && (!team || String(m.team) === team) && !(A[e.toLowerCase()] && A[e.toLowerCase()].ver === m.ver); }).slice(0, 200), n = 0;
+  to.forEach(function (e) { try { MailApp.sendEmail(e, 'Please confirm your schedule', 'Hello ' + firstName_(by[e].name) + ',\n\nYour schedule or rotation was updated. Please open your work page and tap "I have seen it".' + (link ? '\n\n' + link : '') + '\n\nThank you.'); n++; } catch (x) {} });
+  ck.put(rk, '1', 600); return { ok: true, sent: n, total: to.length };
+}
+function reqMail_(cur, cx, b, me) {
+  var pre = pjPre_(b, me); if (pre == null) return { error: 'not allowed' };
+  var arr = jp_(cur.keys[pre + 'totEmpRequests'] && cur.keys[pre + 'totEmpRequests'].v, []), id = String(b.id || ''), r = (Array.isArray(arr) ? arr : []).filter(function (x) { return x && x.id === id; })[0];
+  if (!r || (r.status !== 'approved' && r.status !== 'rejected') || !/^[^@\s]+@[^@\s]+$/.test(String(r.email || ''))) return { error: 'nothing to send' };
+  var ck = CacheService.getScriptCache(), rk = 'rm:' + sh_(pre + '|' + id); if (ck.get(rk)) return { ok: true, sent: 0 };
+  var T = { annual: 'annual leave', sick: 'sick leave', dayoff: 'day off', swap: 'shift swap', giveaway: 'give-away of a shift', payq: 'pay question' }, what = T[r.type] || 'request', when = r.from ? ' for ' + r.from + (r.to && r.to !== r.from ? ' to ' + r.to : '') : '';
+  try { MailApp.sendEmail(String(r.email), 'Your request was ' + r.status, 'Hello ' + firstName_(r.name) + ',\n\nYour ' + what + ' request' + when + ' was ' + r.status + '.' + (r.decisionNote ? '\n\nNote: ' + String(r.decisionNote).slice(0, 300) : '') + '\n\nYou can see it on your work page.'); } catch (x) { return { error: 'mail failed' }; }
+  ck.put(rk, '1', 21600); return { ok: true, sent: 1 };
+}
 function projNotify_(cur, cx, b, me) {
   var site = String(b.site || 'main').replace(/[^a-z0-9-]/g, ''), pre = site === 'main' ? '' : 's~' + site + '~'; if (me && me.sites.indexOf(site) < 0) return { error: 'not allowed' };
   var ix = cx.idx(pre, 'totProjects'), p = ix[String(b.pid || '')];
@@ -787,6 +810,9 @@ function doPost(e) {
     var cx = ctx_(cur, em, admin);   /* v3.23 who is asking, for record-level filtering */
     if (me && /^(projNotify|pjFileUp|pjFileGet)$/.test(act) && !keyOk_(cur, em, me, cx, 'totProjects', act === 'pjFileGet' ? 'read' : 'write')) return out_({ error: 'not allowed' });   /* v3.36: Projects hidden or View only */
     if (act === 'projNotify') return out_(projNotify_(cur, cx, b, me));   /* v3.32 */
+    if (me && /^(ackRemind|reqMail)$/.test(act) && !keyOk_(cur, em, me, cx, act === 'ackRemind' ? 'totScheduleAcks' : 'totEmpRequests', 'write')) return out_({ error: 'not allowed' });   /* v3.41 */
+    if (act === 'ackRemind') return out_(ackRemind_(cur, cx, b, me));
+    if (act === 'reqMail') return out_(reqMail_(cur, cx, b, me));
     if (act === 'pjFileUp') return out_(pjFileUp_(b, cx, me));   /* v3.33 */
     if (act === 'pjFileGet') return out_(pjFileGet_(b, cx, me));
     if (act === 'pull') {

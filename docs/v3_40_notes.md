@@ -135,3 +135,11 @@ Give everyone the new `tool/PTF-pass-to-floor-Gunda.html`, **deploy the new `Cod
 - FMD → Schedule → **✅ Confirmations** (new tab): how many were sent, confirmed, not yet, or changed since they confirmed; filter by status and team; **Copy names that still need to confirm** (paste into a message) and **CSV**. The tab updates by itself while it is open.
 - New data key `totScheduleAcks` (one record per person), new employee action `ack` (tool Apps Script and Server Edition), employee page demo updated. Tests: `tests/ack.test.js`, Server Edition `test/signout.test.js` part 3.
 - Not included yet: automatic reminders (that is the next step, notifications).
+
+## Step 4: notifications
+- **Bell (🔔) for people who run the schedule:** "N of M people have not confirmed their schedule or rotation" and "N employee requests are waiting for a decision". They stay on the bell until done and open the right screen when clicked.
+- **E-mail reminders:** Confirmations tab → **✉ Remind by e-mail** writes to everybody in the view who has not confirmed the current version (once every 10 minutes; the people are worked out on the server, never taken from the browser). The mail carries the link to the employee page (Server Edition: your public URL + /employee; single-file edition: set the script property `EMPLOYEE_PAGE_URL`).
+- **E-mail about decisions:** a switch in the Employee requests screen, "✉ E-mail the employee when I decide" (on by default): approving or rejecting sends the employee a short mail with the manager's note, once. If the server has no e-mail, nothing is sent and nothing breaks.
+- **Employee page:** Home shows **Updates for you**: requests decided in the last 7 days with the manager's note (the schedule banner from step 3 is still there).
+- New staff actions `ackRemind` and `reqMail` (tool Apps Script and Server Edition; need edit rights on the schedule / requests). Tests: `tests/notify.test.js`, Server Edition `test/signout.test.js` part 4.
+- Not included: push messages to phones (they need a service worker and a push service, see the next steps), and e-mail on every small schedule change.

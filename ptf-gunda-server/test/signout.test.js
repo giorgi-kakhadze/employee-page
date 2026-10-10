@@ -22,5 +22,11 @@ const { ok, section, done, sample } = require('./util'); const { start } = requi
   j = await who.emp({ action: 'ack', ver: 'v7' }); ok('the right version is accepted', j.ok && j.pub.ack === 'v7', JSON.stringify(j));
   j = await who.emp({ action: 'me' }); ok('and is remembered', j.pub && j.pub.ack === 'v7' && j.pub.ackAt > 0, JSON.stringify(j.pub));
   const acks = JSON.parse(S.state.cur.keys.totScheduleAcks.v); ok('one record for the person in totScheduleAcks', acks.length === 1 && acks[0].id === em, JSON.stringify(acks));
+  section('4. E-mail reminders (staff action): only people who have not confirmed, at most every 10 minutes');
+  const K2 = Object.assign({}, S.state.cur.keys, { totMySchedules: { v: JSON.stringify({ byEmail: { 'p@x.com': { name: 'Pia Pp', team: 't1', ver: 'a1', vat: now, sx: [], rx: [] }, 'q@x.com': { name: 'Quin Qq', team: 't1', ver: 'a1', vat: now, sx: [], rx: [] } }, sent: {} }), t: now + 10 }, totScheduleAcks: { v: JSON.stringify([{ id: 'q@x.com', email: 'q@x.com', ver: 'a1', ts: now, u: now }]), t: now + 10 } });
+  await S.state.replaceAll({ keys: K2 }); const boss = await S.client('mgr@x.com');
+  j = await boss.rpc({ action: 'ackRemind', site: 'main' }); ok('a manager can send the reminder: one person had not confirmed', j.ok && j.sent === 1 && j.total === 1, JSON.stringify(j));
+  j = await boss.rpc({ action: 'ackRemind', site: 'main' }); ok('a second one right away is refused', /10 minutes/.test(j.error || ''), JSON.stringify(j));
+  const lead = await S.client('lead@x.com'); j = await lead.rpc({ action: 'ackRemind', site: 'main' }); ok('a shift lead without schedule rights cannot send it', !!j.error, JSON.stringify(j));
   await S.close(); done('signout');
 })().catch((e) => { console.error(e); process.exit(1); });

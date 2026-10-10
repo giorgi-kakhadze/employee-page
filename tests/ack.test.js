@@ -10,12 +10,13 @@ const iso = (d) => { const x = new Date(Date.now() + d * 864e5); return x.getFul
   const br = await chromium.launch(), perr = [];
   const emp = (mail) => ({ id: 'e1', fullName: 'Test Person', nickname: 'Tess', workId: 'W1', status: 'Employed', email: mail, ext: { email: mail, position: 'Game presenter' } });
   const blob = (ver) => P({ byEmail: { 'tester@x.com': { name: 'Test Person', team: 't1', shift: 'morning', ver, vat: now - 3600e3, sx: [{ d: iso(1), s: 'morning', f: 8, t: 16 }], rx: [] }, 'other@x.com': { name: 'Other Person', team: 't1', shift: 'morning', ver: 'zz1', vat: now - 7200e3, sx: [{ d: iso(1), s: 'morning', f: 8, t: 16 }], rx: [] } }, sent: {} });
-  gas.setData({ updatedAt: now, keys: { totAccessPolicy: P({ users: {}, roles: {} }), employeeDataSource: P([emp('tester@x.com')]), totMySchedules: blob('v1') } });
+  gas.setData({ updatedAt: now, keys: { totAccessPolicy: P({ users: {}, roles: {} }), employeeDataSource: P([emp('tester@x.com')]), totMySchedules: blob('v1'), totEmpRequests: P([{ id: 'er9', workId: 'W1', name: 'Test Person', email: 'tester@x.com', type: 'annual', from: iso(10), to: iso(12), status: 'approved', created: now, u: now, decidedAt: now - 3600e3, decisionNote: 'Enjoy your time off' }]) } });
   const open = async () => { const E = await (await br.newContext({ viewport: { width: 390, height: 844 } })).newPage(); E.on('pageerror', (e) => perr.push(e.message)); E.on('dialog', (d) => d.accept());
     await E.route(URL + '**', async (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(gas.post(r.request().postData())) }));
     await E.addInitScript(() => { window.google = { accounts: { id: { initialize: (c) => { window.__gcb = c.callback; }, renderButton: () => setTimeout(() => window.__gcb({ credential: 'gtok:tester@x.com' }), 30) } } }; }); await E.goto('file://' + tmp); await E.waitForTimeout(900); return E; };
   let E = await open(); let t = await E.evaluate(() => document.body.innerText);
   ok('the employee sees "Your schedule or rotation was updated" with a confirm button', /schedule or rotation was updated/.test(t) && !!(await E.$('#ackBtn')), t.slice(0, 200));
+  ok('a request decided in the last days shows under "Updates for you" on Home', /Updates for you/.test(t) && /approved/.test(t) && /Enjoy your time off/.test(t), t.slice(0, 400));
   await E.click('#ackBtn'); await E.waitForTimeout(900); t = await E.evaluate(() => document.body.innerText);
   ok('after tapping it the banner turns into "You confirmed …"', /You confirmed your schedule/.test(t) && !(await E.$('#ackBtn')), t.slice(0, 200));
   const acks = JSON.parse(gas.data().keys.totScheduleAcks.v);
