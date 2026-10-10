@@ -143,3 +143,11 @@ Give everyone the new `tool/PTF-pass-to-floor-Gunda.html`, **deploy the new `Cod
 - **Employee page:** Home shows **Updates for you**: requests decided in the last 7 days with the manager's note (the schedule banner from step 3 is still there).
 - New staff actions `ackRemind` and `reqMail` (tool Apps Script and Server Edition; need edit rights on the schedule / requests). Tests: `tests/notify.test.js`, Server Edition `test/signout.test.js` part 4.
 - Not included: push messages to phones (they need a service worker and a push service, see the next steps), and e-mail on every small schedule change.
+
+## Step 5: the employee page as a phone app (PWA)
+- **Installable:** the page now has a web app manifest, icons (192, 512, maskable, Apple touch) and a service worker. On Android/Chrome the Home screen shows **Install this page on my phone**; on iPhone it explains **Share → Add to Home Screen**. It then opens full screen like an app.
+- **Opens without a connection:** the service worker keeps only the page itself (the "shell") and the icons. It never caches the API or any data.
+- **Optional offline copy:** Home → **My phone** → "Keep my schedule and rotation on this phone". Only the schedule, rotation, vacation days and the confirmation state are saved (no pay, results or remarks). Offline, the page shows them with a banner "You are offline … saved on …" and Try again. **Signing out removes the copy and the choice.** Off by default, with a warning not to switch it on for shared devices.
+- **Single-file edition:** put `manifest.webmanifest`, `sw.js` and the `icons/` folder next to `index.html` on your web host (https is required for installing). **Server Edition:** served automatically (`/employee.webmanifest`, `/employee-sw.js`, `/pwa-icon-*.png`; public, no personal data; the security policy allows `manifest-src 'self'`).
+- Tests: `tests/pwa.test.js` (real service worker over http://127.0.0.1, offline reload), Server Edition `test/pwa.test.js` (found and fixed: the Server Edition's sign-out button skipped removing the copy).
+- Not included: push messages (they need a push service and permission handling on each phone; the e-mail reminders from step 4 cover the need for now). I could not test installing on a real phone here: the install button depends on the phone's browser.

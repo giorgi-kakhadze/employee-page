@@ -65,12 +65,19 @@ function erep(from, to) { const i = e.indexOf(from); if (i < 0) throw new Error(
 erep('<script src="https://accounts.google.com/gsi/client" async defer></script>\n', '');
 erep("var SERVER_URL = 'PASTE-YOUR-APPS-SCRIPT-WEB-APP-URL-HERE';", "var SERVER_URL = '/api/employee', CSRF = '';");
 erep("function configured(){return /^https:\\/\\/script\\.google\\.com\\/.+\\/exec$/.test(SERVER_URL)}", "function configured(){return true}");
-erep("  if(!configured()){err('This page is not set up yet: the Apps Script web app address is missing (SERVER_URL). Ask the tool admin.');}\n  if(!window.google||!google.accounts){return setTimeout(init,200)}\n  google.accounts.id.initialize({client_id:CLIENT_ID,callback:function(r){tok=r.credential;load()},auto_select:false});\n  google.accounts.id.renderButton($('gbtn'),{theme:'outline',size:'large'});\n",
-     "  fetch('/api/session',{credentials:'same-origin'}).then(function(r){if(r.status===401){location.href='/auth/login?to=/employee';return null}return r.json()}).then(function(j){if(!j)return;CSRF=j.csrf;tok='sso';load()}).catch(function(){err('Could not reach the server. Please try again.')});\n");
+erep("  if(!configured()){err('This page is not set up yet: the Apps Script web app address is missing (SERVER_URL). Ask the tool admin.');}\n  if(!window.google||!google.accounts){if((!navigator.onLine||(initTries=(window.initTries||0)+1,window.initTries=initTries,initTries>25))&&offlineView())return;return setTimeout(init,200)}\n  google.accounts.id.initialize({client_id:CLIENT_ID,callback:function(r){tok=r.credential;load()},auto_select:false});\n  google.accounts.id.renderButton($('gbtn'),{theme:'outline',size:'large'});\n",
+     "  fetch('/api/session',{credentials:'same-origin'}).then(function(r){if(r.status===401){location.href='/auth/login?to=/employee';return null}return r.json()}).then(function(j){if(!j)return;CSRF=j.csrf;tok='sso';load()}).catch(function(){if(!offlineView())err('Could not reach the server. Please try again.')});\n");
 erep("  body.idToken=tok;\n  return fetch(SERVER_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)}).then(function(r){return r.json()});",
      "  return fetch(SERVER_URL,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-PTF-CSRF':CSRF},body:JSON.stringify(body)}).then(function(r){if(r.status===401||r.status===403)return{error:'sign-in invalid'};return r.json()});");
 erep("function signedOut(m){tok=null;", "function signedOut(m){tok=null;if(!DEMO){location.href='/auth/login?to=/employee';return}");
-erep('<button onclick="signOut()">Sign out</button>', '<button onclick="location.href=&quot;/auth/logout&quot;">Sign out</button>');
+erep('<button onclick="signOut()">Sign out</button>', '<button onclick="clearCache();location.href=&quot;/auth/logout&quot;">Sign out</button>');   /* the offline copy goes with the sign-out */
 erep("'This Google account is not on the employee list.", "'Your Microsoft account is not on the employee list.");
+/* phone app: the manifest, the service worker and the icons are public (the browser fetches them without the sign-in cookie) and carry no personal data */
+erep('<link rel="manifest" href="manifest.webmanifest">', '<link rel="manifest" href="/employee.webmanifest">');
+e = e.split('href="icons/icon-180.png"').join('href="/pwa-icon-180.png"').split('href="icons/icon-192.png"').join('href="/pwa-icon-192.png"');
+erep("SW_URL = 'sw.js', SW_OPT = {}", "SW_URL = '/employee-sw.js', SW_OPT = { scope: '/employee' }");
+fs.copyFileSync(path.join(root, 'sw.js'), path.join(out, 'employee-sw.js'));
+{ const mf = JSON.parse(fs.readFileSync(path.join(root, 'manifest.webmanifest'), 'utf8')); mf.start_url = '/employee'; mf.scope = '/employee'; mf.id = '/employee'; mf.icons.forEach((i) => { i.src = '/pwa-' + path.basename(i.src); });
+  fs.writeFileSync(path.join(out, 'employee.webmanifest'), JSON.stringify(mf, null, 2)); for (const f of fs.readdirSync(path.join(root, 'icons'))) fs.copyFileSync(path.join(root, 'icons', f), path.join(out, 'pwa-' + f)); }
 fs.writeFileSync(path.join(out, 'employee.html'), e);
 console.log('public/tool.html ' + Math.round(s.length / 1024) + ' KB, public/employee.html ' + Math.round(e.length / 1024) + ' KB');

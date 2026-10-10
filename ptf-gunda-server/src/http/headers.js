@@ -7,7 +7,7 @@ module.exports = function headers(cfg) {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:", "media-src 'self' data: blob:", "font-src 'self' data:",
     "connect-src 'self'",                            // nothing can be sent to any other site
-    "frame-src 'self' blob: data:", "worker-src 'self' blob:",
+    "frame-src 'self' blob: data:", "worker-src 'self' blob:", "manifest-src 'self'",
     "object-src 'none'", "base-uri 'none'", "form-action 'self'", "frame-ancestors 'none'",
     cfg.prod ? 'upgrade-insecure-requests' : ''
   ].filter(Boolean).join('; ');

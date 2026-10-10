@@ -36,7 +36,7 @@ async function createApp(cfg, opts) {
     if (!fs.existsSync(pub)) return;
     for (const f of fs.readdirSync(pub)) {
       const full = path.join(pub, f); if (!fs.statSync(full).isFile()) continue;
-      const buf = fs.readFileSync(full), ext = path.extname(f), type = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json' }[ext] || 'application/octet-stream';
+      const buf = fs.readFileSync(full), ext = path.extname(f), type = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json', '.webmanifest': 'application/manifest+json' }[ext] || 'application/octet-stream';
       assets.set(f, { buf, type, gz: buf.length > 1024 ? zlib.gzipSync(buf, { level: 9 }) : null, etag: '"' + crypto.createHash('sha1').update(buf).digest('hex').slice(0, 20) + '"' });
     }
   }
@@ -126,6 +126,7 @@ async function createApp(cfg, opts) {
 
     if (p === '/healthz') { let ok = true; try { await db.q('SELECT 1 AS x'); } catch (e) { ok = false; } return U.sendJson(req, res, ok ? 200 : 503, { ok }); }
     if (p === '/static/shim.js' || p === '/static/pre.js') { if (sendAsset(req, res, p.slice(8))) return; }
+    if (/^\/(employee-sw\.js|employee\.webmanifest|pwa-icon-(180|192|512|maskable-512)\.png)$/.test(p)) { if (sendAsset(req, res, p.slice(1), p === '/employee-sw.js' ? { 'Service-Worker-Allowed': '/employee' } : { 'Cache-Control': 'public, max-age=86400' })) return; }   /* the phone app files: public, no personal data */
 
     /* ---- lobby screens: no sign-in, a long secret token in the link; they get the rotation of their scope and nothing else ---- */
     if (m === 'GET' && (p.startsWith('/tv/') || p === '/api/tv' || p === '/api/tv-events')) {

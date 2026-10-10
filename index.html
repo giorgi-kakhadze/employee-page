@@ -2,6 +2,7 @@
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>My work page</title>
+<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#2b5cd9"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="My work"><link rel="apple-touch-icon" href="icons/icon-180.png"><link rel="icon" type="image/png" href="icons/icon-192.png">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{--bg:#f6f7f9;--card:#fff;--tx:#1d2330;--mut:#6b7385;--ac:#2b5cd9;--ok:#1f9d55;--warn:#d9822b;--bad:#c0392b;--bd:#e3e6ec}
@@ -47,7 +48,15 @@ var SERVER_URL = 'PASTE-YOUR-APPS-SCRIPT-WEB-APP-URL-HERE';   /* ends in /exec *
 /* ==================== */
 /* Employee self-service. Everything shown here comes from the Apps Script action "me", which checks the Google sign-in and returns ONLY this person's own data
    (profile, shared evaluations with comments, retraining, game counts, schedule, rotation, own requests, v3.31: own pay statements, bonuses, incidents and the remarks staff chose to show). Nothing about other people is ever sent to this page. */
-var tok = null, D = null, tab = 'home', refreshT = null, DEMO = /[?&]demo\b/.test(location.search);
+var tok = null, D = null, tab = 'home', refreshT = null, DEMO = /[?&]demo\b/.test(location.search), OFFLINE = 0, DEFER = null, SW_URL = 'sw.js', SW_OPT = {};
+/* ---- phone app (v3.41): install to the home screen; optional offline copy of the schedule and rotation. Nothing is kept unless the person switches it on, and it is removed when they sign out. ---- */
+function keepOn(){try{return localStorage.getItem('ptfEmpKeep')==='1'}catch(e){return false}}
+function saveCache(){if(!keepOn()||!D||DEMO)return;try{var p=D.profile||{};localStorage.setItem('ptfEmpCache',JSON.stringify({t:Date.now(),d:{email:D.email,name:D.name,profile:{name:p.name,nickname:p.nickname,position:p.position,team:p.team,shift:p.shift},schedule:D.schedule,rotation:D.rotation,pub:D.pub,leave:D.leave,requests:[]}}))}catch(e){}}
+function clearCache(){try{localStorage.removeItem('ptfEmpCache');localStorage.removeItem('ptfEmpKeep')}catch(e){}}
+function loadCache(){try{var c=JSON.parse(localStorage.getItem('ptfEmpCache')||'null');return c&&c.d&&keepOn()?c:null}catch(e){return null}}
+function offlineView(){var c=loadCache();if(!c)return false;D=c.d;OFFLINE=c.t;tok=tok||'offline';$('login').hidden=true;show();return true}
+window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();DEFER=e;var b=$('pwaInstall');if(b)b.hidden=false});
+if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)&&!DEMO){window.addEventListener('load',function(){navigator.serviceWorker.register(SW_URL,SW_OPT).catch(function(){})})}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function $(id){return document.getElementById(id)}
 function err(m){$('err').textContent=m}
@@ -56,7 +65,7 @@ function configured(){return /^https:\/\/script\.google\.com\/.+\/exec$/.test(SE
 function init(){
   if(DEMO){D=demoData();show();return}
   if(!configured()){err('This page is not set up yet: the Apps Script web app address is missing (SERVER_URL). Ask the tool admin.');}
-  if(!window.google||!google.accounts){return setTimeout(init,200)}
+  if(!window.google||!google.accounts){if((!navigator.onLine||(initTries=(window.initTries||0)+1,window.initTries=initTries,initTries>25))&&offlineView())return;return setTimeout(init,200)}
   google.accounts.id.initialize({client_id:CLIENT_ID,callback:function(r){tok=r.credential;load()},auto_select:false});
   google.accounts.id.renderButton($('gbtn'),{theme:'outline',size:'large'});
 }
@@ -67,13 +76,13 @@ function call(body){
   body.idToken=tok;
   return fetch(SERVER_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)}).then(function(r){return r.json()});
 }
-function signOut(){tok=null;D=null;try{if(window.google&&google.accounts&&google.accounts.id)google.accounts.id.disableAutoSelect()}catch(e){}try{sessionStorage.clear()}catch(e){}location.reload()}
-function signedOut(m){tok=null;if(refreshT){clearInterval(refreshT);refreshT=null}$('app').hidden=true;$('login').hidden=false;err(m)}
+function signOut(){tok=null;D=null;clearCache();try{if(window.google&&google.accounts&&google.accounts.id)google.accounts.id.disableAutoSelect()}catch(e){}try{sessionStorage.clear()}catch(e){}location.reload()}
+function signedOut(m){tok=null;clearCache();if(refreshT){clearInterval(refreshT);refreshT=null}$('app').hidden=true;$('login').hidden=false;err(m)}
 function load(silent){
   if(!silent&&$('app').hidden)err('Loading...');
   call({action:'me'}).then(function(j){
     if(j.error){if(j.error==='sign-in invalid')return signedOut(ERRS[j.error]);if(!silent)say(ERRS[j.error]||j.error);return}
-    D=j;show()}).catch(function(){if(!silent)say('Could not reach the server. Please try again.')});
+    OFFLINE=0;D=j;saveCache();show()}).catch(function(){if(!D&&offlineView())return;if(!silent)say('Could not reach the server. Please try again.')});
 }
 
 /* ---------- helpers ---------- */
@@ -109,13 +118,13 @@ function restoreDraft(){if(!DRAFT)return;var o=DRAFT.v;['rqT','rqDay','rqW','rqF
 function show(){
   keepDraft();
   $('login').hidden=true;var a=$('app');a.hidden=false;if(!TABS.some(function(t){return t[0]===tab}))tab='home';
-  var h=(DEMO?'<div class="banner"><b>Demo data.</b> This page is not connected to the server. Nothing you do here is sent anywhere. <button type="button" onclick="D=demoData(\'presenter\');tab=\'rotation\';show();scrollTo(0,0)">Game presenter</button> <button type="button" onclick="D=demoData(\'shuffler\');tab=\'rotation\';show();scrollTo(0,0)">Shuffler</button></div>':'')+
+  var h=(OFFLINE?'<div class="banner"><b>You are offline.</b> This is the schedule and rotation saved on this phone on '+esc(new Date(OFFLINE).toLocaleString())+'. Refresh and requests need a connection. <button type="button" onclick="OFFLINE=0;load()" style="margin-left:6px">Try again</button></div>':'')+(DEMO?'<div class="banner"><b>Demo data.</b> This page is not connected to the server. Nothing you do here is sent anywhere. <button type="button" onclick="D=demoData(\'presenter\');tab=\'rotation\';show();scrollTo(0,0)">Game presenter</button> <button type="button" onclick="D=demoData(\'shuffler\');tab=\'rotation\';show();scrollTo(0,0)">Shuffler</button></div>':'')+
     '<div class="row"><div><h1>Hello, '+esc(firstName())+'</h1><div class="mut">'+esc(D.email)+'</div></div><span><button onclick="load()">&#8635; Refresh</button> <button onclick="signOut()">Sign out</button></span></div>'+
     '<nav class="main3">'+TABS.map(function(t){return '<button data-t="'+t[0]+'" class="'+(t[0]===tab?'on':'')+'">'+t[1]+'</button>'}).join('')+'</nav><div id="pg"></div>';
   a.innerHTML=h;
   a.querySelector('nav').onclick=function(e){var b=e.target.closest('button');if(b){tab=b.getAttribute('data-t');show();window.scrollTo(0,0)}};
   var P={home:pHome,schedule:pSchedule,rotation:pRotation};
-  $('pg').innerHTML=pubBanner()+(P[tab]||pHome)();wireAck();
+  $('pg').innerHTML=pubBanner()+(P[tab]||pHome)();wireAck();wirePwa();
   if(tab==='schedule'){wireRequests();restoreDraft()}
   [].forEach.call(document.querySelectorAll('[data-go]'),function(x){x.onclick=function(){var g=x.getAttribute('data-go');if(g.charAt(0)==='#'){var el=document.querySelector(g);if(el)el.scrollIntoView({behavior:'smooth'});return}tab=g;show();window.scrollTo(0,0)}});
   [].forEach.call(document.querySelectorAll('[data-ev]'),function(x){x.onclick=function(){var i=+x.getAttribute('data-ev');openEv=openEv===i?null:i;show();var el=document.getElementById('ev'+i);if(el)el.scrollIntoView({block:'nearest'})}});
@@ -124,6 +133,8 @@ function show(){
 }
 function tile(go,n,l,cls){return '<button class="tile'+(cls?' '+cls:'')+'" data-go="'+go+'"><b>'+n+'</b><span>'+l+'</span></button>'}
 function updatesHtml(){var L=(D.requests||[]).filter(function(r){return(r.status==='approved'||r.status==='rejected')&&r.decidedAt&&Date.now()-r.decidedAt<7*864e5}).sort(function(a,b){return b.decidedAt-a.decidedAt});if(!L.length)return '';return '<div class="card"><b>&#128276; Updates for you</b>'+L.map(function(r){var ok=r.status==='approved';return '<div class="day"><span>'+(ok?'&#10003; ':'&#10007; ')+esc(rtl(r.type))+' '+esc(r.from)+(r.to&&r.to!==r.from?' &rarr; '+esc(r.to):'')+' was <b>'+(ok?'approved':'rejected')+'</b>'+(r.decisionNote?'<div class="mut">'+esc(r.decisionNote)+'</div>':'')+'<div class="mut">'+esc(new Date(r.decidedAt).toLocaleString())+'</div></span><span class="'+(ok?'work':'bad')+'"></span></div>'}).join('')+'</div>'}
+function pwaCard(){if(DEMO)return '';var ios=/iphone|ipad|ipod/i.test(navigator.userAgent),st=window.matchMedia&&matchMedia('(display-mode: standalone)').matches;return '<h2>My phone</h2><div class="card">'+(st?'<div class="mut">&#10003; Installed on this phone.</div>':'<button id="pwaInstall" class="pri" '+(DEFER?'':'hidden')+'>&#128242; Install this page on my phone</button>'+(ios&&!st?'<div class="mut">On iPhone: tap Share, then <b>Add to Home Screen</b>.</div>':'<div class="mut" id="pwaHint">'+(DEFER?'':'Open this page in your phone browser menu and choose <b>Install app</b> / <b>Add to Home screen</b>.')+'</div>'))+'<label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px"><input type="checkbox" id="keepChk" style="margin-top:4px"'+(keepOn()?' checked':'')+'><span><b>Keep my schedule and rotation on this phone</b> to read them without a connection.<div class="mut">Only your schedule, rotation and vacation days are saved. It is removed when you sign out. Do not switch this on for a phone or computer that other people use.</div></span></label></div>'}
+function wirePwa(){var b=$('pwaInstall');if(b)b.onclick=function(){if(!DEFER)return;DEFER.prompt();DEFER.userChoice.then(function(){DEFER=null;b.hidden=true})};var k=$('keepChk');if(k)k.onchange=function(){try{if(k.checked){localStorage.setItem('ptfEmpKeep','1');saveCache()}else clearCache()}catch(e){}}}
 function pHome(){
   var p=D.profile||{},ev=D.evaluations||[],last=ev[0],wd=workDays(),next=wd[0],mi=mistakes(),inc=D.incidents||[],rm=D.remarks||[],pn=payNow(),pl=payLast(),y=today().slice(0,7);
   var incM=inc.filter(function(x){return x.date.slice(0,7)===y}).length,bad=rm.filter(function(x){return x.kind==='violation'||x.kind==='disciplinary'}).length,good=rm.filter(function(x){return x.kind==='positive'}).length;
@@ -168,7 +179,7 @@ function pHome(){
   /* games */
   h+='<h2 id="games">My games</h2>'+gamesHtml();
   var rt=D.retraining||[];if(rt.length)h+='<h2>My retraining</h2><div class="card">'+rt.map(function(x){return '<div class="day"><span><b>'+esc(x.date)+'</b><div class="mut">'+esc(x.reason||'')+'</div></span><span class="'+(x.status==='Completed'?'work':x.status==='Missed'?'bad':'leave')+'">'+esc(x.status)+'</span></div>'}).join('')+'</div>';
-  return h;
+  return h+pwaCard();
 }
 function gamesHtml(){
   var g=D.gameCounts;
