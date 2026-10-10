@@ -20536,6 +20536,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       if (!date) date = iso(new Date()); laySnap(); if (canEdit()) { try { importTrained(); syncKnow(); } catch (e) {} }
       if (sub === 'sch') { renderSch(); return; }
       if (sub === 'ack' && canEdit()) { renderAck(); return; }
+      if (sub === 'today' && canEdit()) { renderToday(); return; }
       if (sub === 'my') { renderMy(); return; }
       if (sub === 'clock' && canEdit()) { renderClock(); return; }
       if (sub === 'tv' && canEdit()) { renderTv(); return; }
@@ -20602,6 +20603,10 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     root.addEventListener('click', function (e) {
       var t = e.target, a = t.getAttribute && t.getAttribute('data-a'), sh = cur(), ed = canEdit(), g = function (n) { return t.getAttribute && t.getAttribute(n); };
       if (g('data-sh')) { shift = g('data-sh'); render(); return; }
+      if (g('data-tdcopy') != null) { copyTxt(tdText(tdModel()), 'Handover text copied. Paste it into a message to the next shift.'); return; }
+      if (g('data-tdprint') != null) { window.print(); return; }
+      if (g('data-tdcv') != null) { sub = 'rot'; cvOpen = true; render(); return; }
+      if (g('data-tdack') != null) { sub = 'ack'; render(); return; }
       if (g('data-ackf') != null) { ackF = g('data-ackf'); renderAck(); return; }
       if (g('data-ackmail') != null) { var nm0 = ackNames().length; if (!nm0) { alert('Everybody has confirmed.'); return; } if (!window.__srvPost) { alert('E-mail is not available here.'); return; } if (!confirm('Send an e-mail to ' + nm0 + ' people who have not confirmed?\n\n(They are written to once; you can send again after 10 minutes.)')) return; try { window.__srvPost({ action: 'ackRemind', site: window.__totSite || 'main', team: ackT }).then(function (r) { try { showShellToast(r && r.ok ? 'Reminder e-mailed to ' + r.sent + ' of ' + r.total + ' people.' : 'Not sent: ' + ((r && r.error) || 'no answer from the server'), r && r.ok ? 'success' : 'error'); } catch (e) {} }); } catch (e) { alert('Could not send: ' + e.message); } return; }
       if (g('data-ackcopy') != null) { var an = ackNames(); copyTxt(an.length ? an.join('\n') : '(everybody has confirmed)', an.length + ' name(s) copied.'); return; }
@@ -20753,6 +20758,58 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       if (t.id === 'tvBase') { localStorage.setItem('totTvBase', String(t.value || '').trim() || 'PTF-tv.html'); renderTv(); return; }
       if (f) { var q = f.split('|'), k = q[1]; tvOne(q[0], function (s) { if (k === 'on') s.on = t.checked; else if (k === 'zoom') s.zoom = Math.max(0.5, Math.min(3, +t.value || 1)); else if (k === 'ahead') s.ahead = Math.max(1, Math.min(12, Math.round(+t.value || 4))); else if (k === 'rowsPer') s.rowsPer = Math.max(0, Math.min(40, Math.round(+t.value || 0))); else s[k] = String(t.value).slice(0, 80); }); renderTv(); return; }
       if (l) { var r = l.split('|'); tvOne(r[0], function (s) { var A = s[r[1]] = (s[r[1]] || []).filter(function (x) { return x !== r[2]; }); if (t.checked) A.push(r[2]); }); renderTv(); } });
+    /* ===== v3.41 TODAY: the briefing screen for the shift lead. Who is expected, who is where right now, who is on a break, what is not covered now and next, who is absent,
+       who has not confirmed, what the employees reported. Refreshes every 30 seconds; one button copies a handover text for the next shift. ===== */
+    function tdSlot(sh, S) { if (date !== iso(new Date())) return date < iso(new Date()) ? S : -1; var n = new Date(), h = window.__totNowH != null ? +window.__totNowH : n.getHours() + n.getMinutes() / 60, rel = h - (+sh.start); if (rel < 0) rel += 24; var k = Math.floor(rel * 2); if (k >= S) { var before = ((+sh.start) - h + 24) % 24, after = (h - ((+sh.start) + S / 2) + 24) % 24; return before <= after ? -1 : S; } return k; }
+    function autoShift() { var t = iso(new Date()), n = new Date(), h = window.__totNowH != null ? +window.__totNowH : n.getHours() + n.getMinutes() / 60, best = shift, bd = 99; Object.keys(SH).forEach(function (k) { var st = startOf(k), L = hrShift(k), rel = h - st; if (rel < 0) rel += 24; var d = rel < L ? 0 : ((st - h + 24) % 24) + 1; if (d < bd) { bd = d; best = k; } }); return best; }
+    function tdModel() {
+      var sh = cur(), rows = sh.rows.filter(function (x) { return x.name && x.name.trim(); }), S = 0; rows.forEach(function (x) { S = Math.max(S, slots(x)); }); var k = tdSlot(sh, S), q = Math.max(0, Math.min(S - 1, k)), st = +sh.start;
+      var cell = function (x, c) { return String((x.cells || [])[c] || '').trim(); }, isB = function (v) { return /^(b|brk|break)$/i.test(v); }, off = function (v) { return !v || isOff(v); };
+      var M = { sh: sh, S: S, k: k, q: q, rows: rows, now: [], brk: [], offNow: [], absent: [], called: [], teams: [], nextBrk: [], backBrk: [], gapNow: 0, nextGap: null };
+      rows.forEach(function (x) { var v = cell(x, q); if (x.abs && x.abs.length) M.absent.push(x); if (x.called) M.called.push(x); if (k < 0 || k >= S) return; if (isB(v)) M.brk.push(x); else if (off(v)) M.offNow.push(x); else M.now.push(x);
+        if (q + 1 < S) { var nv = cell(x, q + 1); if (!isB(v) && isB(nv)) M.nextBrk.push(x); if (isB(v) && !isB(nv) && !off(nv)) M.backBrk.push(x); } });
+      var R = ranges(), T = Math.max(1, +data.cfg.tables || 100);
+      data.teams.forEach(function (t) {
+        var tr = rows.filter(function (x) { return x.t === t.id; }); if (!tr.length) return; var info = { t: t, rows: tr, need: 0, kind: 'tables', miss: [], missNext: [] }, zon = zoneOn(t.id);
+        var need = zon ? zoneList(shift, t.id, sh).map(function (z) { return 'Z:' + z.n; }) : (R[t.id] ? rangeList(R[t.id]).map(String) : []); info.need = need.length; info.kind = zon ? 'zones' : 'tables';
+        var covered = function (c) { var u = {}; tr.forEach(function (x) { if (c < slots(x)) u[cell(x, c)] = 1; }); return need.filter(function (n) { return !u[n]; }); };
+        if (need.length && k >= 0 && k < S) { info.miss = covered(q); for (var c = q + 1; c < S; c++) { var m = covered(c); if (m.length) { info.missNext = m; info.missAt = c; break; } } }
+        info.now = tr.filter(function (x) { var v = cell(x, q); return !off(v) && !isB(v); }).map(function (x) { return { n: x.name.trim(), v: cell(x, q), nx: q + 1 < S ? cell(x, q + 1) : '' }; });
+        info.brk = tr.filter(function (x) { return isB(cell(x, q)); }).map(function (x) { return x.name.trim(); }); M.gapNow += info.miss.length; if (info.missAt != null && (!M.nextGap || info.missAt < M.nextGap.c)) M.nextGap = { c: info.missAt, team: t.name, n: info.missNext.length };
+        M.teams.push(info); });
+      var ack = {}; ackRows().forEach(function (r) { ack[String(r.name).toLowerCase()] = r.st; }); M.unconf = rows.filter(function (x) { var a = ack[x.name.trim().toLowerCase()]; return a && a !== 'ok'; }).map(function (x) { return x.name.trim(); });
+      M.noMail = rows.filter(function (x) { return !ack[x.name.trim().toLowerCase()]; }).length;
+      M.reports = absRaw().filter(function (r) { return r.status === 'new' && r.date === date && r.shift === shift; }); return M;
+    }
+    function tdName(x) { return esc(x.n || x); }
+    function tdVal(v) { return /^Z:/.test(v) ? 'Zone ' + esc(v.slice(2)) : /^\d+$/.test(v) ? 'Table ' + v : esc(v); }
+    function tdText(M) {
+      var st = +M.sh.start, L = ['Shift handover \u2014 ' + date + ', ' + (SH[shift] || shift) + ' (' + tl(st) + '\u2013' + tl(st + M.S / 2) + ')', 'Expected: ' + M.rows.length + ' \u00B7 working now: ' + M.now.length + ' \u00B7 on a break: ' + M.brk.length + ' \u00B7 absent: ' + M.absent.length + (M.called.length ? ' \u00B7 called in: ' + M.called.length : '')];
+      if (M.absent.length) L.push('Absent: ' + M.absent.map(function (x) { return x.name.trim() + ' (' + x.abs.map(function (a) { return (CV_WHY[a.why] || a.why) + ' from ' + tl(st + a.a / 2); }).join(', ') + ')'; }).join('; '));
+      if (M.called.length) L.push('Called in: ' + M.called.map(function (x) { return x.name.trim(); }).join(', '));
+      L.push(M.gapNow ? 'NOT COVERED right now: ' + M.teams.filter(function (t) { return t.miss.length; }).map(function (t) { return t.t.name + ' ' + t.miss.map(function (m) { return /^Z:/.test(m) ? 'zone ' + m.slice(2) : 'table ' + m; }).join(', '); }).join('; ') : 'All tables and zones are covered right now.');
+      if (M.nextGap) L.push('Next gap at ' + tl(st + M.nextGap.c / 2) + ' (' + M.nextGap.team + ').'); if (M.unconf.length) L.push('Have not confirmed their schedule: ' + M.unconf.join(', ')); if (M.reports.length) L.push('Reports waiting: ' + M.reports.map(function (r) { return r.name + ' (' + r.type + ')'; }).join(', '));
+      return L.join('\n');
+    }
+    function renderToday() {
+      var M = tdModel(), st = +M.sh.start, ed = canEdit(), h = '<div class="sc">' + subBar() + '<div class="bar"><button data-a="prev">\u25C0</button><input type="date" id="scD" value="' + date + '"><button data-a="next">\u25B6</button>';
+      Object.keys(SH).forEach(function (k) { h += '<button data-sh="' + k + '" class="' + (k === shift ? 'on' : '') + '">' + SH[k] + '</button>'; });
+      h += '<b style="margin-left:10px">\uD83D\uDCCB Today</b><span class="hint">' + (M.k < 0 ? 'The shift starts at ' + tl(st) + '.' : M.k >= M.S && M.S ? 'This shift has ended.' : M.S ? 'Now ' + tl(st + M.q / 2) + '\u2013' + tl(st + (M.q + 1) / 2) + ' (half hour ' + (M.q + 1) + ' of ' + M.S + '). Updates every 30 seconds.' : '') + '</span><button data-tdcopy="1">\uD83D\uDCCB Copy handover text</button><button data-tdprint="1">\uD83D\uDDA8 Print</button></div>';
+      if (!M.rows.length) return void (root.innerHTML = h + '<div class="hint" style="font-size:14px">Nobody is in the ' + esc(SH[shift] || shift) + ' rotation on ' + esc(date) + ' yet. Open <b>Rotation</b>, press <b>Load working staff</b>, then <b>Generate</b>.</div></div>');
+      var tile = function (l, v, c, go) { return '<div style="flex:1;min-width:110px;border:1px solid var(--border);border-left:5px solid ' + c + ';border-radius:10px;padding:8px 10px"><div style="font-size:26px;font-weight:700">' + v + '</div><div class="hint">' + l + '</div></div>'; };
+      h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0">' + tile('expected', M.rows.length, '#64748b') + tile('working now', M.now.length, '#16a34a') + tile('on a break', M.brk.length, '#d97706') + tile('absent', M.absent.length, M.absent.length ? '#dc2626' : '#64748b') + tile('called in', M.called.length, '#2563eb') + tile('not covered now', M.gapNow, M.gapNow ? '#dc2626' : '#16a34a') + tile('not confirmed', M.unconf.length, M.unconf.length ? '#d97706' : '#16a34a') + '</div>';
+      h += M.gapNow ? '<div style="border:1px solid #ef4444;background:rgba(239,68,68,.12);border-radius:8px;padding:8px 12px;margin:0 0 8px"><b>\u26A0 Not covered right now:</b> ' + M.teams.filter(function (t) { return t.miss.length; }).map(function (t) { return esc(t.t.name) + ' \u2014 ' + t.miss.map(function (m) { return /^Z:/.test(m) ? 'zone ' + esc(m.slice(2)) : 'table ' + esc(m); }).join(', '); }).join(' \u00B7 ') + ' <button data-tdcv="1">\uD83D\uDE91 Absence / cover</button></div>'
+        : '<div style="border:1px solid #22c55e;background:rgba(34,197,94,.10);border-radius:8px;padding:6px 12px;margin:0 0 8px">\u2714 Every table and zone has somebody right now.' + (M.nextGap ? ' <b>Next gap at ' + tl(st + M.nextGap.c / 2) + '</b> (' + esc(M.nextGap.team) + ', ' + M.nextGap.n + ' ' + 'place' + (M.nextGap.n === 1 ? '' : 's') + ').' : ' No gap later in the shift.') + '</div>';
+      if (M.reports.length) h += '<div style="border:1px dashed #ef4444;border-radius:8px;padding:6px 12px;margin:0 0 8px"><b>\uD83D\uDEA8 Reported by employees:</b> ' + M.reports.map(function (r) { return absTxt(r); }).join(' \u00B7 ') + ' <button data-tdcv="1">Plan the cover</button></div>';
+      if (M.absent.length || M.called.length) h += '<div class="hint" style="margin:0 0 8px">' + (M.absent.length ? '\uD83D\uDE91 Absent: ' + M.absent.map(function (x) { return '<b>' + esc(x.name.trim()) + '</b> (' + x.abs.map(function (a) { return esc(CV_WHY[a.why] || a.why) + ' from ' + tl(st + a.a / 2); }).join(', ') + ')'; }).join(' \u00B7 ') : '') + (M.called.length ? ' &nbsp; \u2795 Called in: ' + M.called.map(function (x) { return '<b>' + esc(x.name.trim()) + '</b>'; }).join(', ') : '') + '</div>';
+      h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px">' + M.teams.map(function (t) {
+        return '<div style="border:1px solid var(--border);border-radius:10px;padding:8px 10px"><b>' + esc(t.t.name) + '</b> <span class="hint">' + t.rows.length + ' people' + (t.need ? ' \u00B7 ' + t.need + ' ' + t.kind : '') + (t.miss.length ? ' \u00B7 <span style="color:#ef4444">' + t.miss.length + ' not covered</span>' : '') + '</span>'
+          + t.now.map(function (p) { return '<div class="day" style="display:flex;justify-content:space-between;gap:8px;margin:2px 0"><span>' + esc(p.n) + '</span><span><b>' + tdVal(p.v) + '</b>' + (p.nx && p.nx !== p.v ? ' <span class="hint">\u2192 ' + tdVal(p.nx) + '</span>' : '') + '</span></div>'; }).join('')
+          + (t.brk.length ? '<div class="hint" style="margin-top:4px;color:#d97706">\u2615 On a break: ' + t.brk.map(esc).join(', ') + '</div>' : '') + '</div>'; }).join('') + '</div>';
+      if (M.nextBrk.length || M.backBrk.length) h += '<div class="hint" style="margin:8px 0 0">' + (M.nextBrk.length ? '\u2615 Going on a break at ' + tl(st + (M.q + 1) / 2) + ': ' + M.nextBrk.map(function (x) { return esc(x.name.trim()); }).join(', ') : '') + (M.backBrk.length ? ' &nbsp; \u21A9 Back from a break at ' + tl(st + (M.q + 1) / 2) + ': ' + M.backBrk.map(function (x) { return esc(x.name.trim()); }).join(', ') : '') + '</div>';
+      if (M.unconf.length) h += '<div class="hint" style="margin:8px 0 0">\u23F3 Have not confirmed their schedule: ' + M.unconf.map(esc).join(', ') + ' <button data-tdack="1">\u2705 Confirmations</button></div>';
+      root.innerHTML = h + '</div>';
+    }
     /* ===== v3.41 CONFIRMATIONS: employees confirm on their page that they have seen what was published to them (the version of their schedule + rotation). ===== */
     var ackF = '', ackT = '';
     function ackList() { try { var a = JSON.parse(localStorage.getItem('totScheduleAcks') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
@@ -20772,7 +20829,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       root.innerHTML = h;
     }
     function ackNames() { return ackRows().filter(function (r) { return r.st !== 'ok' && (!ackT || r.team === ackT); }).map(function (r) { return r.name; }); }
-    function subBar() { var ed0 = canEdit(), B0 = function (k, l) { return '<button data-sub="' + k + '" class="' + (sub === k ? 'on' : '') + '">' + l + '</button>'; }; return '<div class="subbar">' + (ed0 ? B0('staff', '🧑‍💼 Staff') : '') + B0('rot', '🔄 Rotation') + (ed0 ? '<button data-sub="setup" class="' + (sub === 'setup' || sub === 'teams' || sub === 'tables' ? 'on' : '') + '">⚙ Setup</button>' + ((sub === 'teams' || sub === 'tables') ? '<button data-sub="setup" title="Back to Setup">← Back to Setup</button>' : '') : '') + '<button data-sub="sch" class="' + (sub === 'sch' ? 'on' : '') + '">📅 Schedule</button><button data-sub="my" class="' + (sub === 'my' ? 'on' : '') + '">👤 My schedule</button>' + (ed0 ? B0('clock', '⏱ Attendance') : '') + (ed0 ? B0('ack', '✅ Confirmations') : '') + (ed0 ? B0('tv', '📺 Screens') : '') + (canEdit() ? '<button data-sub="req" class="' + (sub === 'req' ? 'on' : '') + '">📨 Requests' + (pendN() ? ' (' + pendN() + ')' : '') + '</button>' : '') + (canPay() ? '<button data-sub="pay" class="' + (sub === 'pay' ? 'on' : '') + '">💰 Pay</button>' : '') + '' + (canEdit() ? '<button data-pub="sch" title="Choose days, shift types, teams and people, then send">📤 Send schedule</button><button data-pub="rot" title="Choose shift types, days, teams and people; employees see their tables when you decide">📤 Send rotation</button>' : '') + '</div>'; }
+    function subBar() { var ed0 = canEdit(), B0 = function (k, l) { return '<button data-sub="' + k + '" class="' + (sub === k ? 'on' : '') + '">' + l + '</button>'; }; return '<div class="subbar">' + (ed0 ? B0('staff', '🧑‍💼 Staff') : '') + B0('rot', '🔄 Rotation') + (ed0 ? '<button data-sub="setup" class="' + (sub === 'setup' || sub === 'teams' || sub === 'tables' ? 'on' : '') + '">⚙ Setup</button>' + ((sub === 'teams' || sub === 'tables') ? '<button data-sub="setup" title="Back to Setup">← Back to Setup</button>' : '') : '') + '<button data-sub="sch" class="' + (sub === 'sch' ? 'on' : '') + '">📅 Schedule</button><button data-sub="my" class="' + (sub === 'my' ? 'on' : '') + '">👤 My schedule</button>' + (ed0 ? B0('today', '📋 Today') : '') + (ed0 ? B0('clock', '⏱ Attendance') : '') + (ed0 ? B0('ack', '✅ Confirmations') : '') + (ed0 ? B0('tv', '📺 Screens') : '') + (canEdit() ? '<button data-sub="req" class="' + (sub === 'req' ? 'on' : '') + '">📨 Requests' + (pendN() ? ' (' + pendN() + ')' : '') + '</button>' : '') + (canPay() ? '<button data-sub="pay" class="' + (sub === 'pay' ? 'on' : '') + '">💰 Pay</button>' : '') + '' + (canEdit() ? '<button data-pub="sch" title="Choose days, shift types, teams and people, then send">📤 Send schedule</button><button data-pub="rot" title="Choose shift types, days, teams and people; employees see their tables when you decide">📤 Send rotation</button>' : '') + '</div>'; }
     function scode(s2) { return s2 === 'afternoon' ? 'A' : s2 === 'night' ? 'N' : 'M'; }
     function scl(v) { v = String(v || '').trim(); if (!v) return ''; if (/^m(orning)?$/i.test(v)) return 'sM'; if (/^a(fternoon)?$/i.test(v)) return 'sA'; if (/^n(ight)?$/i.test(v)) return 'sN'; if (/^(vac|vacation|holiday)$/i.test(v)) return 'sV'; if (/^(sick|sick leave)$/i.test(v)) return 'sS'; if (/^(unpaid|study|training leave|family|parental|no-?show)$/i.test(v)) return 'sU'; if (isOff(v) || /^(off|day off)$/i.test(v)) return 'sO'; return 'sX'; }
     function srec(k, mk) { data.sched = data.sched || {}; var y = ym(), m = data.sched[y]; if (!m) { if (!mk) return null; m = data.sched[y] = {}; } var r = m[k]; if (!r) { if (!mk) return null; r = m[k] = { d: {}, c: {} }; } r.d = r.d || {}; r.c = r.c || {}; return r; }
@@ -20872,7 +20929,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     root.addEventListener('click', function (e) {
       var t = e.target, g = function (n) { return t.getAttribute && t.getAttribute(n); }, a = g('data-sa'), ed = canEdit();
       if (g('data-pub')) { openShare(g('data-pub')); return; }
-      if (g('data-sub')) { sub = g('data-sub'); if (sub === 'teams') tmView = 'ppl'; if (sub === 'staff') stQ = ''; if (sub === 'sch') sm = (date || iso(new Date())).slice(0, 7); if (sub === 'my' && !mm) mm = (date || iso(new Date())).slice(0, 7); render(); return; }
+      if (g('data-sub')) { sub = g('data-sub'); if (sub === 'today') { date = iso(new Date()); shift = autoShift(); } if (sub === 'teams') tmView = 'ppl'; if (sub === 'staff') stQ = ''; if (sub === 'sch') sm = (date || iso(new Date())).slice(0, 7); if (sub === 'my' && !mm) mm = (date || iso(new Date())).slice(0, 7); render(); return; }
       if (a === 'stxt') { var tx = sText(sVis[+g('data-i')]); if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(tx).then(function () { alert('Schedule copied. Paste it into a message to send.'); }, function () { prompt('Copy this text:', tx); }); else prompt('Copy this text:', tx); return; }
       if (a === 'slink') { var pl = sVis[+g('data-i')]; if (pl) copyTxt(shareLink(pl), 'Personal link for ' + pl.name + ' copied. Send it to them (WhatsApp, email…).' + fileWarn()); return; }
       if (a === 'steam') { sTeamText(); return; }
@@ -21720,7 +21777,8 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     });
     setInterval(function () {
       try {
-        if (root.hidden || tm || document.hidden) return; if (sub === 'ack') { var ar = (localStorage.getItem('totScheduleAcks') || '') + '|' + (localStorage.getItem(MYK) || '').length; if (ar !== window.__ackRaw) { window.__ackRaw = ar; renderAck(); } }   /* v3.41: confirmations arrive by sync while this tab is open */
+        if (root.hidden || tm || document.hidden) return; if (sub === 'today' && Date.now() - (window.__tdAt || 0) > 30000) { window.__tdAt = Date.now(); renderToday(); }
+        if (sub === 'ack') { var ar = (localStorage.getItem('totScheduleAcks') || '') + '|' + (localStorage.getItem(MYK) || '').length; if (ar !== window.__ackRaw) { window.__ackRaw = ar; renderAck(); } }   /* v3.41: confirmations arrive by sync while this tab is open */
         var raw = localStorage.getItem(K); if (raw === lastRaw) return;
         var ae = document.activeElement; if (ae && root.contains(ae) && ae.tagName === 'INPUT' && sub !== 'req') return;
         load(); render();

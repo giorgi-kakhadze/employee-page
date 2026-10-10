@@ -158,3 +158,10 @@ Give everyone the new `tool/PTF-pass-to-floor-Gunda.html`, **deploy the new `Cod
 - **Safeguards:** only for today (or yesterday's night shift), only for a shift that is really theirs, not twice, at most three reports a day; lateness 5–240 minutes.
 - New data key `totAbsenceReports`, new employee action `report` (tool Apps Script and Server Edition). Tests: `tests/report.test.js`, Server Edition `test/signout.test.js` part 5.
 - Not included: phone calls or SMS, and an automatic cover (the manager still decides; the cover panel from step 1 makes it one click).
+
+## Step 7: Today screen (shift lead briefing)
+- FMD → Schedule → **📋 Today**: opens on today's date and the shift that is running now, refreshes every 30 s.
+- Tiles: expected, working now, on a break, absent, called in, not covered now, not confirmed.
+- Gap banner with the next half hour where a table has nobody; sick/late reports; absences; per-team cards (who is where now and next position); who goes on / comes back from a break; people who have not confirmed the published schedule (one click to remind).
+- Buttons: copy handover text, print, open the cover panel, remind unconfirmed.
+- Test: `tests/today.test.js`. Single-file tool only needs the HTML; the Server Edition gets it through `npm run build`.
