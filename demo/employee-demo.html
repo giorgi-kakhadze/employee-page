@@ -113,6 +113,7 @@ function show(){
   if(!refreshT&&!DEMO)refreshT=setInterval(function(){if(!document.querySelector('#rqForm:focus-within'))load(true)},60000);
 }
 function tile(go,n,l,cls){return '<button class="tile'+(cls?' '+cls:'')+'" data-go="'+go+'"><b>'+n+'</b><span>'+l+'</span></button>'}
+function rtl(t){return Object.prototype.hasOwnProperty.call(RT,t)?RT[t]:'Request'}
 function updatesHtml(){var L=(D.requests||[]).filter(function(r){return(r.status==='approved'||r.status==='rejected')&&r.decidedAt&&Date.now()-r.decidedAt<7*864e5}).sort(function(a,b){return b.decidedAt-a.decidedAt});if(!L.length)return '';return '<div class="card"><b>&#128276; Updates for you</b>'+L.map(function(r){var ok=r.status==='approved';return '<div class="day"><span>'+(ok?'&#10003; ':'&#10007; ')+esc(rtl(r.type))+' '+esc(r.from)+(r.to&&r.to!==r.from?' &rarr; '+esc(r.to):'')+' was <b>'+(ok?'approved':'rejected')+'</b>'+(r.decisionNote?'<div class="mut">'+esc(r.decisionNote)+'</div>':'')+'<div class="mut">'+esc(new Date(r.decidedAt).toLocaleString())+'</div></span><span class="'+(ok?'work':'bad')+'"></span></div>'}).join('')+'</div>'}
 function pHome(){
   var p=D.profile||{},ev=D.evaluations||[],last=ev[0],wd=workDays(),next=wd[0],mi=mistakes(),inc=D.incidents||[],rm=D.remarks||[],pn=payNow(),pl=payLast(),y=today().slice(0,7);
