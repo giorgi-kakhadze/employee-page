@@ -24,6 +24,7 @@ function handle(b, id, cur) {
     if (act === 'reqNew') return out_(reqNew_(b));
     if (act === 'reqCancel') return out_(reqCancel_(b));
     if (act === 'ack') return out_(ackNew_(b));
+    if (act === 'report') return out_(reportNew_(b));
     if (act === 'login') { var who0 = admin ? { role: 'admin' } : whoIs_(cur, em); return { status: admin || who0.role ? 'approved' : 'pending' }; }
     if (act === 'video') {   /* resumable upload in pieces; private to the owner */
       if (!admin) { var mv = whoIs_(cur, em); if (!accCaps_(accA_(cur), em, mv.role, capsFor_(cur, mv.role)).videos_upload) return { error: 'not allowed' }; }
@@ -42,7 +43,7 @@ function handle(b, id, cur) {
     }
 /*__BODY__*/
     return { error: 'unknown' };
-  } catch (ex) { try { Logger.log('handle: ' + (ex && ex.stack || ex)); } catch (x) {} if (b && /^(push|reqNew|reqCancel|ack)$/.test(b.action)) throw ex; return { error: 'server error' }; }   /* a write that failed half way must not be kept: the state layer then reloads from the database */
+  } catch (ex) { try { Logger.log('handle: ' + (ex && ex.stack || ex)); } catch (x) {} if (b && /^(push|reqNew|reqCancel|ack|report)$/.test(b.action)) throw ex; return { error: 'server error' }; }   /* a write that failed half way must not be kept: the state layer then reloads from the database */
 }
 /* the daily project e-mail (07:00) */
 function runDigest(cur, id) { ENV.id = id || { email: '', name: '' }; ENV.state = { cur: cur }; return projDigest_(cur, false); }

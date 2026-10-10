@@ -28,5 +28,14 @@ const { ok, section, done, sample } = require('./util'); const { start } = requi
   j = await boss.rpc({ action: 'ackRemind', site: 'main' }); ok('a manager can send the reminder: one person had not confirmed', j.ok && j.sent === 1 && j.total === 1, JSON.stringify(j));
   j = await boss.rpc({ action: 'ackRemind', site: 'main' }); ok('a second one right away is refused', /10 minutes/.test(j.error || ''), JSON.stringify(j));
   const lead = await S.client('lead@x.com'); j = await lead.rpc({ action: 'ackRemind', site: 'main' }); ok('a shift lead without schedule rights cannot send it', !!j.error, JSON.stringify(j));
+  section('5. "I am sick / late / leaving" reports from the employee page');
+  const dd = new Date(), td = dd.getFullYear() + '-' + String(dd.getMonth() + 1).padStart(2, '0') + '-' + String(dd.getDate()).padStart(2, '0');
+  const K3 = Object.assign({}, S.state.cur.keys, { totMySchedules: { v: JSON.stringify({ byEmail: { [em]: { name: 'Ana', ver: 'v9', vat: now, sx: [{ d: td, s: 'morning', f: 0, t: 24 }], rx: [] } }, sent: {} }), t: now + 20 } });
+  await S.state.replaceAll({ keys: K3 }); const emp2 = await S.client(em);
+  j = await emp2.emp({ action: 'report', type: 'late', date: td, shift: 'morning', minutes: 30, note: 'Bus' }); ok('a late report is accepted and comes back in the list', j.ok && j.reports.length === 1 && j.reports[0].type === 'late' && j.reports[0].minutes === 30, JSON.stringify(j));
+  j = await emp2.emp({ action: 'report', type: 'late', date: td, shift: 'morning', minutes: 30 }); ok('the same report twice is refused', /already reported/.test(j.error || ''), JSON.stringify(j));
+  j = await emp2.emp({ action: 'report', type: 'sick', date: td, shift: 'night' }); ok('a shift that is not theirs is refused', /not a working shift/.test(j.error || ''), JSON.stringify(j));
+  j = await emp2.emp({ action: 'me' }); ok('"me" shows their own reports', j.reports && j.reports.length === 1 && j.reports[0].status === 'new', JSON.stringify(j.reports));
+  const rep = JSON.parse(S.state.cur.keys.totAbsenceReports.v); ok('the report is stored for the schedule people', rep.length === 1 && rep[0].email === em && /Bus/.test(rep[0].note), JSON.stringify(rep));
   await S.close(); done('signout');
 })().catch((e) => { console.error(e); process.exit(1); });

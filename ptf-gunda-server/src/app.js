@@ -8,9 +8,9 @@ const U = require('./http/util'), securityHeaders = require('./http/headers');
 
 /* per-person settings that are not shared data (theme, sounds, which location was open last). Kept on the server so they follow the person, not the laptop. */
 const PREF_KEYS = ['totAppTheme', 'totAppStyle', 'totSoundPrefs', 'totMusicPrefs', 'totConsentV1', 'totLastSite', 'rememberSupervisor', 'supFirstName'];
-const EMPLOYEE_ACTIONS = ['me', 'reqNew', 'reqCancel', 'ack'];
-const WRITE_ACTIONS = ['push', 'reqNew', 'reqCancel', 'ack'];
-const KNOWN_ACTIONS = ['pull', 'push', 'me', 'reqNew', 'reqCancel', 'ack', 'login', 'video', 'videoGet', 'projNotify', 'ackRemind', 'reqMail', 'pjFileUp', 'pjFileGet', 'list', 'setStatus', 'remove', 'request'];
+const EMPLOYEE_ACTIONS = ['me', 'reqNew', 'reqCancel', 'ack', 'report'];
+const WRITE_ACTIONS = ['push', 'reqNew', 'reqCancel', 'ack', 'report'];
+const KNOWN_ACTIONS = ['pull', 'push', 'me', 'reqNew', 'reqCancel', 'ack', 'report', 'login', 'video', 'videoGet', 'projNotify', 'ackRemind', 'reqMail', 'pjFileUp', 'pjFileGet', 'list', 'setStatus', 'remove', 'request'];
 
 async function createApp(cfg, opts) {
   opts = opts || {};

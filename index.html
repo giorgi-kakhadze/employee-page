@@ -124,7 +124,7 @@ function show(){
   a.innerHTML=h;
   a.querySelector('nav').onclick=function(e){var b=e.target.closest('button');if(b){tab=b.getAttribute('data-t');show();window.scrollTo(0,0)}};
   var P={home:pHome,schedule:pSchedule,rotation:pRotation};
-  $('pg').innerHTML=pubBanner()+(P[tab]||pHome)();wireAck();wirePwa();
+  $('pg').innerHTML=pubBanner()+((tab==='home'||tab==='schedule')?repCard():'')+(P[tab]||pHome)();wireAck();wirePwa();wireReport();
   if(tab==='schedule'){wireRequests();restoreDraft()}
   [].forEach.call(document.querySelectorAll('[data-go]'),function(x){x.onclick=function(){var g=x.getAttribute('data-go');if(g.charAt(0)==='#'){var el=document.querySelector(g);if(el)el.scrollIntoView({behavior:'smooth'});return}tab=g;show();window.scrollTo(0,0)}});
   [].forEach.call(document.querySelectorAll('[data-ev]'),function(x){x.onclick=function(){var i=+x.getAttribute('data-ev');openEv=openEv===i?null:i;show();var el=document.getElementById('ev'+i);if(el)el.scrollIntoView({block:'nearest'})}});
@@ -200,6 +200,15 @@ function pSchedule(){
 }
 function firstName(){var n=String((D.profile&&D.profile.name)||D.name||'').trim();if(n.indexOf(',')>0)n=n.split(',')[1].trim();return n.split(/\s+/)[0]||D.email}
 function rotKind(v){var m=/^Zone\s+(\S+)(?:\s*·\s*tables?\s+(.+))?$/i.exec(v);if(m)return{k:'zone',z:m[1],t:(m[2]||'').split(/\s*,\s*/).filter(Boolean)};if(/^Table\b/i.test(v))return{k:'table',t:[v.replace(/^Table\s*/i,'')]};if(v==='Break')return{k:'break'};if(v==='Off'||v==='-')return{k:'off'};return{k:'other'}}
+function repToday(){var s=D.schedule&&D.schedule.days||[],t=today(),n=new Date(),hr=n.getHours()+n.getMinutes()/60,y=null;s.forEach(function(x){if(!SH[x.s])return;if(x.d===t&&!ended(x))y=y||x;else if(x.d===iso(new Date(Date.now()-864e5))&&x.s==='night'&&x.t!=null&&hr<+x.t)y=y||x});return y}
+function repCard(){var y=repToday();if(!y||OFFLINE)return '';var L=(D.reports||[]).filter(function(r){return r.date===y.d}),h='<div class="card" id="repCard"><b>&#128657; Something wrong today?</b><div class="mut" style="margin:2px 0 8px">'+esc(SH[y.s])+' shift'+(y.f!=null?' &middot; '+hh(y.f)+'-'+hh(y.t):'')+'. Tell your manager here, so the rotation can be changed in time.</div>';
+ if(L.length)h+=L.map(function(r){var w={sick:'sick',late:'late (about '+r.minutes+' min)',early:'leaving at '+esc(r.at)}[r.type]||r.type;return '<div class="day"><span>'+new Date(r.ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' &middot; You reported: <b>'+w+'</b></span><span class="'+(r.status==='handled'?'work':'leave')+'">'+(r.status==='handled'?'&#10003; Your manager has planned for it':r.status==='dismissed'?'Seen':'&#8987; Sent')+'</span></div>'}).join('');
+ return h+'<div id="repBtns" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px"><button data-rep="sick">&#129298; I am sick</button><button data-rep="late">&#9200; I will be late</button><button data-rep="early">&#128682; I have to leave early</button></div><div id="repForm" hidden></div><div id="repE" class="err"></div></div>'}
+function wireReport(){var c=$('repCard');if(!c)return;var y=repToday();if(!y)return;[].forEach.call(c.querySelectorAll('[data-rep]'),function(b){b.onclick=function(){var t=b.getAttribute('data-rep'),f=$('repForm'),o='';
+  if(t==='late')o='<label>About how late?</label><select id="repM"><option value="15">15 minutes</option><option value="30" selected>30 minutes</option><option value="45">45 minutes</option><option value="60">1 hour</option><option value="90">1.5 hours</option><option value="120">2 hours</option></select>';
+  if(t==='early'){var E='',e0=Math.ceil((new Date().getHours()+new Date().getMinutes()/60)*2)/2,st=+y.f,en=+y.t;for(var q=st+.5;q<en;q+=.5)E+='<option value="'+hh(q)+'">'+hh(q)+'</option>';o='<label>I have to leave at</label><select id="repA">'+E+'</select>'}
+  f.innerHTML=o+'<label>Note for your manager (optional)</label><input id="repN" maxlength="300"><button class="pri" id="repGo" style="margin-top:8px">Send to my manager</button>';f.hidden=false;
+  $('repGo').onclick=function(){var g=this;g.disabled=true;$('repE').textContent='Sending...';call({action:'report',type:t,date:y.d,shift:y.s,minutes:$('repM')?+$('repM').value:0,at:$('repA')?$('repA').value:'',note:$('repN').value.trim()}).then(function(j){g.disabled=false;if(j.error){if(j.error==='sign-in invalid')return signedOut(ERRS[j.error]);$('repE').textContent=j.error;return}D.reports=j.reports;show()}).catch(function(){g.disabled=false;$('repE').textContent='Could not reach the server. Nothing was sent. Please call your manager.'})}}})}
 function pubBanner(){var p=D.pub;if(!p||!p.ver)return '';if(p.ack===p.ver)return '<div class="mut" style="margin:8px 0">&#10003; You confirmed your schedule and rotation'+(p.ackAt?' on '+esc(new Date(p.ackAt).toLocaleString()):'')+'.</div>';return '<div class="card" style="border-color:var(--ac);border-width:2px"><b>&#128227; Your schedule or rotation was updated'+(p.at?' on '+esc(new Date(p.at).toLocaleString()):'')+'.</b><div class="mut" style="margin:4px 0 8px">Please read it and confirm that you have seen it.</div><button class="pri" id="ackBtn">&#10003; I have seen it</button><div id="ackE" class="err"></div></div>'}
 function wireAck(){var b=$('ackBtn');if(!b)return;b.onclick=function(){b.disabled=true;call({action:'ack',ver:D.pub.ver}).then(function(j){if(j.error){b.disabled=false;if(j.error==='sign-in invalid')return signedOut(ERRS[j.error]);if(j.pub)D.pub=j.pub;$('ackE').textContent=j.error;if(j.pub)setTimeout(show,1200);return}D.pub=j.pub;show()}).catch(function(){b.disabled=false;$('ackE').textContent='Could not reach the server. Nothing was sent.'})}}
 function pRotation(){
@@ -285,6 +294,7 @@ function demoData(kind){
 }
 function demoCall(b){
   if(b.action==='me')return D;
+  if(b.action==='report'){D.reports=(D.reports||[]).concat([{id:'dr'+Date.now(),type:b.type,date:b.date,shift:b.shift,minutes:b.minutes||0,at:b.at||'',status:'new',ts:Date.now()}]);return{ok:true,reports:D.reports}}
   if(b.action==='ack'){D.pub.ack=D.pub.ver;D.pub.ackAt=Date.now();return{ok:true,pub:D.pub}}
   if(b.action==='reqNew'){D.requests.unshift({id:'demo'+Date.now(),type:b.type,from:b.from,to:b.to,withName:b.withName||'',shift:b.shift||'',note:b.note||'',status:'pending',created:Date.now()});return{ok:true,requests:D.requests}}
   if(b.action==='reqCancel'){D.requests.forEach(function(r){if(r.id===b.id)r.status='cancelled'});return{ok:true,requests:D.requests}}

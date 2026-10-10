@@ -58,7 +58,7 @@ const FOLDER = 'Tool Data', DATA = 'tool-data.json', ACCESS = 'access.json';
 /* Who may see the pay settings stored inside the schedule (admin always may). */
 const PAY_ROLES = ['manager'];   /* v2.1: matches the tool, where only the Manager sees the Pay tab (was also senior and scheduling_coordinator) */
 /* Data only these roles may read or write (admin always may). Key name without the site prefix. */
-const RESTRICT = { totBonusCfg: ['manager', 'senior'], totBonusReviews: ['manager', 'senior'], totMyPay: ['manager'], totRemarks: ['manager', 'senior', 'hr_recruiter', 'shift_lead', 'performance_coach', 'service_manager', 'scheduling_coordinator'], totIncidents: ['manager', 'senior', 'service_manager', 'performance_coach'], totIncImports: ['manager', 'senior', 'service_manager', 'performance_coach'], totIncCfg: ['manager', 'senior', 'service_manager', 'performance_coach'], totRecruitment: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totWorkbooks: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totEmpRequests: ['manager', 'senior', 'scheduling_coordinator', 'hr_recruiter'], totScheduleAcks: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'], totGameCounts: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'], totImportHistory: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'], totLifecycle: ['manager', 'senior', 'hr_recruiter'], totMySchedules: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'], totTvScreens: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'] };   /* v3.40: the lobby-screen links (secret tokens) are seen only by people who edit the schedule */   /* v2.3: per-person 28-day schedules, written only by schedule editors */
+const RESTRICT = { totBonusCfg: ['manager', 'senior'], totBonusReviews: ['manager', 'senior'], totMyPay: ['manager'], totRemarks: ['manager', 'senior', 'hr_recruiter', 'shift_lead', 'performance_coach', 'service_manager', 'scheduling_coordinator'], totIncidents: ['manager', 'senior', 'service_manager', 'performance_coach'], totIncImports: ['manager', 'senior', 'service_manager', 'performance_coach'], totIncCfg: ['manager', 'senior', 'service_manager', 'performance_coach'], totRecruitment: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totWorkbooks: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totEmpRequests: ['manager', 'senior', 'scheduling_coordinator', 'hr_recruiter'], totScheduleAcks: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'], totAbsenceReports: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'], totGameCounts: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'], totImportHistory: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'], totLifecycle: ['manager', 'senior', 'hr_recruiter'], totMySchedules: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'], totTvScreens: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'] };   /* v3.40: the lobby-screen links (secret tokens) are seen only by people who edit the schedule */   /* v2.3: per-person 28-day schedules, written only by schedule editors */
 /* v2.2 employee self-service: paste your Web client ID from Google Cloud (APIs & Services > Credentials > OAuth client ID > Web application). Leave as is to keep the feature off. */
 const GOOGLE_CLIENT_ID = 'sso';
 const ADMIN_ONLY_WRITE = ['totUniqRules', 'totAccessPolicy', 'totSites', 'wsCustomConfig', 'totEvalKinds', 'totEvalCfgBackups', 'totProcessTpl', 'totIntegrations', 'totDeptCfg', 'totAccessGrants'];   /* v3.19: evaluation setup, kinds, backups, process templates and integration settings can only be written with the admin key */
@@ -117,6 +117,8 @@ function me_(tok) {
     if (m.bal && isFinite(+m.bal.allow)) out.leave = { y: String(m.bal.y || '').slice(0, 4), allow: Math.max(0, +m.bal.allow || 0), used: Math.max(0, +m.bal.used || 0) };   /* v3.41: vacation days used / allowed, worked out by the tool from the schedule */
     if (m.ver) { var akey = k.slice(0, k.length - 14) + 'totScheduleAcks', aa = jpc_(K[akey] && K[akey].v, []), mineA = (Array.isArray(aa) ? aa : []).filter(function (x) { return x && String(x.id || '').toLowerCase() === g.email; })[0];   /* v3.41: has this person confirmed the version that was published to them? */
       out.pub = { ver: String(m.ver).slice(0, 20), at: +m.vat || 0, ack: mineA ? String(mineA.ver || '').slice(0, 20) : '', ackAt: mineA ? +mineA.ts || 0 : 0 }; }
+    var rkey = k.slice(0, k.length - 14) + 'totAbsenceReports', ra = jpc_(K[rkey] && K[rkey].v, []);   /* v3.41: this person's own "I am sick / late / leaving" reports of the last two days and what became of them */
+    out.reports = (Array.isArray(ra) ? ra : []).filter(function (x) { return x && String(x.email || '').toLowerCase() === g.email && (+x.ts || 0) > Date.now() - 2 * 86400000; }).slice(-6).map(function (x) { return { id: String(x.id), type: String(x.type), date: String(x.date || ''), shift: String(x.shift || ''), minutes: +x.minutes || 0, at: String(x.at || ''), status: String(x.status || 'new'), ts: +x.ts || 0 }; });
     if (rx) out.rotation = { group: String(m.group || ''), shift: String(m.shift || ''), days: rx.filter(rel).slice(0, 28).map(function (d) { return { d: d.d, s: String(d.s || ''), f: d.f == null ? null : +d.f, c: (Array.isArray(d.c) ? d.c : []).slice(0, 48).map(function (c) { return String(c || '').slice(0, 160); }) }; }) };
   });
   if (!found) return { error: 'no employee found for this email' };
@@ -261,6 +263,33 @@ function ackNew_(b) {
   cur.keys[key] = { v: JSON.stringify(arr), t: Math.max(now, (+(old && old.t) || 0) + 1) }; cur.updatedAt = now; df.setContent(JSON.stringify(cur));
   return { ok: true, pub: { ver: mver, at: vat, ack: ver, ackAt: now } };
 }
+/* v3.41 "I am sick / running late / have to leave early": the employee reports it on their page; the schedule people see it on the bell and in the cover panel; the scheduling coordinators and shift leads are also e-mailed. */
+function reportNew_(b) {
+  var g = verifyGoogle_(String(b.idToken || '')); if (!g) return { error: 'sign-in invalid' };
+  var df = file_(DATA, '{"keys":{}}'), cur = readJ_(df, { keys: {} }); cur.keys = cur.keys || {};
+  var ep = empOf_(cur.keys, g.email); if (!ep) return { error: 'no employee found for this email' };
+  if (/^(terminated|retired)$/i.test(String(ep.e.status || '').trim())) return { error: 'This account is no longer active. Ask your manager.' };
+  var type = String(b.type || ''); if (type !== 'sick' && type !== 'late' && type !== 'early') return { error: 'bad type' };
+  var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd'), date = String(b.date || ''), shift = String(b.shift || '');
+  if (!isoOk_(date) || dayDiff_(date, today) < 0 || dayDiff_(date, today) > 1) return { error: 'You can report only for today (or yesterday\'s night shift).' };
+  var mine = false; Object.keys(cur.keys).forEach(function (k) {
+    if (k.slice(-14) !== 'totMySchedules' || !parseKey_(k) || parseKey_(k).name !== 'totMySchedules') return; var m = (jp_(cur.keys[k] && cur.keys[k].v, {}).byEmail || {})[g.email]; if (!m) return;
+    (Array.isArray(m.sx) ? m.sx : []).forEach(function (d) { if (d && d.d === date && String(d.s) === shift) mine = true; }); });
+  if (!mine) return { error: 'That is not a working shift in the schedule that was sent to you.' };
+  var minutes = type === 'late' ? Math.round(+b.minutes) : 0, at = type === 'early' ? String(b.at || '') : '';
+  if (type === 'late' && !(minutes >= 5 && minutes <= 240)) return { error: 'Choose how late you will be (5 to 240 minutes).' };
+  if (type === 'early' && !/^\d{2}:\d{2}$/.test(at)) return { error: 'Choose the time you have to leave.' };
+  var note = Array.from(String(b.note || '').trim()).slice(0, 300).join(''), key = ep.pre + 'totAbsenceReports', old = cur.keys[key], arr = jp_(old && old.v, []); if (!Array.isArray(arr)) arr = [];
+  var own = arr.filter(function (x) { return x && String(x.email || '').toLowerCase() === g.email && x.date === date; });
+  if (own.some(function (x) { return x.type === type && x.status === 'new'; })) return { error: 'You already reported this. Your manager has it.' };
+  if (own.length >= 3) return { error: 'You already sent three reports for this day. Please call your manager.' };
+  var now = Date.now(), nm = String(ep.e.fullName || ep.e.nickname || '').slice(0, 80), rec = { id: 'ab' + now.toString(36) + Math.random().toString(36).slice(2, 5), email: g.email, name: nm, workId: String(ep.e.workId || '').slice(0, 30), date: date, shift: shift, type: type, minutes: minutes, at: at, note: note, ts: now, u: now, status: 'new' };
+  arr.push(rec); if (arr.length > 600) arr = arr.slice(-400);
+  cur.keys[key] = { v: JSON.stringify(arr), t: Math.max(now, (+(old && old.t) || 0) + 1) }; cur.updatedAt = now; df.setContent(JSON.stringify(cur));
+  try { var pol = policy_(cur), what = { sick: 'is sick', late: 'will be about ' + minutes + ' minutes late', early: 'has to leave at ' + at }[type], site = ep.pre ? ep.pre.replace(/^s~/, '').replace(/~$/, '') : 'main', to = Object.keys(pol.users || {}).filter(function (e) { var u = pol.users[e]; return u && (u.role === 'scheduling_coordinator' || u.role === 'shift_lead') && /^[^@\s]+@[^@\s]+$/.test(e) && (!Array.isArray(u.sites) || u.sites.indexOf(site) >= 0); }).slice(0, 10);
+    to.forEach(function (e) { try { MailApp.sendEmail(e, 'Absence report: ' + nm, nm + ' ' + what + ' (' + shift + ' shift, ' + date + ').' + (note ? '\n\nNote: ' + note : '') + '\n\nOpen the tool > FMD > Schedule > Rotation > Absence / cover to plan the cover.'); } catch (x) {} }); } catch (x2) {}
+  return { ok: true, reports: arr.filter(function (x) { return x && String(x.email || '').toLowerCase() === g.email && now - (+x.ts || 0) < 2 * 86400000; }).slice(-6).map(function (x) { return { id: x.id, type: x.type, date: x.date, shift: x.shift, minutes: +x.minutes || 0, at: x.at || '', status: x.status || 'new', ts: +x.ts || 0 }; }) };
+}
 function reqCancel_(b) {
   var g = verifyGoogle_(String(b.idToken || '')); if (!g) return { error: 'sign-in invalid' };
   var df = file_(DATA, '{"keys":{}}'), cur = readJ_(df, { keys: {} }); cur.keys = cur.keys || {};
@@ -293,7 +322,7 @@ function whoIs_(cur, em) { var p = policy_(cur), u = (p.users || {})[em]; if (!u
 /* v3.21 ADMIN-ONLY MODE: every screen except Home is locked for non-admins until the admin grants it (tool: Permissions page, key totAccessGrants).
    Switch: totAccessGrants.on === false turns it off; otherwise it is on. Keys not listed here (audit log, employee list, policy, ...) are not gated. */
 const GATE_VIEW = { totBonusCfg: 'dept', totBonusReviews: 'dept', totRemarks: 'dept', totIncidents: 'dept', totIncImports: 'dept', totIncCfg: 'dept', evalResults: 'exam', traineeNotes: 'exam', coachingActions: 'exam', evalShare: 'exam', evalVideos: 'exam', evalPhotos: 'exam', totWorkshopFiles: 'exam', totRetrain: 'exam', wsCustomConfig: 'exam', totEvalKinds: 'exam',
-  totOnboardingHier: 'onboarding', totOnboardingV2: 'onboarding', totOnboardingFiles: 'onboarding', totSchedule: 'schedule', totMySchedules: 'schedule', totScheduleAcks: 'schedule', totAppearance: 'appearance', totAppearanceDept: 'appearance',
+  totOnboardingHier: 'onboarding', totOnboardingV2: 'onboarding', totOnboardingFiles: 'onboarding', totSchedule: 'schedule', totMySchedules: 'schedule', totScheduleAcks: 'schedule', totAbsenceReports: 'schedule', totAppearance: 'appearance', totAppearanceDept: 'appearance',
   totTasks: 'tasks', totCases: 'tasks', totComments: 'tasks', totAnnouncements: 'tasks', totRecruitment: 'recruiting', totWorkbooks: 'recruiting', totEmpRequests: 'requests',
   totGameCounts: 'dept', totImportHistory: 'dept', totLifecycle: 'dept', totDeptDocs: 'dept', totDeptCfg: 'dept', idPrintHistory: 'id', logbookDescriptions: 'logbooks', logbookCustomGames: 'logbooks', logbookSettings: 'logbooks' };
 var GRN_ = { v: null, g: null };
@@ -305,7 +334,7 @@ function mergeAsks_(newV, oldV, em) { var n = [], o = []; try { n = JSON.parse(n
 /* v3.29 Service Management: incidents are also open to any position the admin maps to the Service Management department; performance coaches
    read them (to coach), but only service managers, managers and seniors (and the department) write them */
 const RESTRICT_DEPT = { totIncidents: ['service'], totIncImports: ['service'], totIncCfg: ['service'] };
-const WRITE_ROLES = { totScheduleAcks: ['manager', 'senior', 'scheduling_coordinator'], totTvScreens: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'], totTeams: ['manager', 'senior'], totBonusCfg: ['manager'],  totIncidents: ['manager', 'senior', 'service_manager'], totIncImports: ['manager', 'senior', 'service_manager'], totIncCfg: ['manager', 'senior', 'service_manager'] };
+const WRITE_ROLES = { totScheduleAcks: ['manager', 'senior', 'scheduling_coordinator'], totAbsenceReports: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'], totTvScreens: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'], totTeams: ['manager', 'senior'], totBonusCfg: ['manager'],  totIncidents: ['manager', 'senior', 'service_manager'], totIncImports: ['manager', 'senior', 'service_manager'], totIncCfg: ['manager', 'senior', 'service_manager'] };
 function roleOk_(name, role, dept) { var r = RESTRICT[name]; if (!r || r.indexOf(role) >= 0) return true; var d = RESTRICT_DEPT[name]; return !!(d && dept && d.indexOf(dept) >= 0); }
 function writeOk_(name, role, dept) { var r = WRITE_ROLES[name]; if (!r || r.indexOf(role) >= 0) return true; var d = RESTRICT_DEPT[name]; return !!(d && dept && d.indexOf(dept) >= 0); }
 /* v2.4: detailed access. The admin ticks parts per position in the tool (Admin > Detailed access); the policy keeps policy.roles[role].caps.
@@ -342,7 +371,7 @@ function accCaps_(A, em, role, caps) { if (!A) return caps; var o = {}; Object.k
 const PJ_PAGES = ['projects.my_work', 'projects.all_projects', 'projects.progress', 'projects.teams_departments', 'projects.data_explorer', 'projects.updates'], INC_PAGES = ['dw.service.inc', 'dw.service.jira', 'dw.service.rep'];
 const KEY_PAGES = { totIncidents: INC_PAGES, totIncImports: INC_PAGES, totIncCfg: INC_PAGES, totRecruitment: ['hr.recruiting', 'dw.hr.cand'], totWorkbooks: ['hr.recruiting', 'dw.hr.cand'], totLifecycle: ['dw.hr.life'],
   totEmpRequests: ['fmd.employee_requests'], totBonusCfg: ['dw.fmd.bonus'], totBonusReviews: ['dw.fmd.bonus'], totGameCounts: ['dw.fmd.games'], totImportHistory: ['dw.fmd.games'],
-  totSchedule: ['fmd.schedule'], totMySchedules: ['fmd.schedule'], totScheduleAcks: ['fmd.schedule'], totProjects: PJ_PAGES, totProjItems: PJ_PAGES, totProjBoard: PJ_PAGES,
+  totSchedule: ['fmd.schedule'], totMySchedules: ['fmd.schedule'], totScheduleAcks: ['fmd.schedule'], totAbsenceReports: ['fmd.schedule'], totProjects: PJ_PAGES, totProjItems: PJ_PAGES, totProjBoard: PJ_PAGES,
   totOnboardingHier: ['academy.onboarding', 'academy.trainee_progress'], totOnboardingV2: ['academy.onboarding', 'academy.trainee_progress'], totRetrain: ['academy.retraining', 'performance.retraining', 'fmd.retraining'],
   totChannels: ['community.channels', 'community.chats'], totMessages: ['community.channels', 'community.chats'],
   idPrintHistory: ['academy.id_creation'], logbookDescriptions: ['academy.logbooks'], logbookCustomGames: ['academy.logbooks'], logbookSettings: ['academy.logbooks'] };
@@ -702,7 +731,7 @@ function auditPush_(newV, oldV, c, max) {
   return JSON.stringify(o);
 }
 
-var KNOWN_NAMES = ["totTombstones","evalResults","traineeNotes","coachingActions","auditLog","customSpaces","idPrintHistory","employeeHistory","totJournal","totTeams","totProjects","totProjItems","totProjBoard","totChannels","totMessages","totBonusCfg","totBonusReviews","totRemarks","totMyPay","totUniqRules","totIncidents","totIncImports","totIncCfg","totAccessPolicy","totEmpRemovals","totTasks","totAnnouncements","totComments","totSites","totOnboardingHier","employeeDataSource","logbookDescriptions","logbookCustomGames","logbookSettings","totAppearance","totAppearanceDept","wsCustomConfig","idCardSizeSettings","idCompanyLogoSettings","idCardBarcodeSettings","idCardFreeLayout","idCompanyLogo","idCardFreeLayoutEnabled","totWorkshopFiles","totOnboardingFiles","totSchedule","totRetrain","totRecruitment","evalShare","evalVideos","evalPhotos","totMySchedules","totCases","totWorkbooks","totIntegrations","totEmpRequests","totScheduleAcks","totProcessTpl","totEvalKinds","totEvalCfgBackups","totDeptCfg","totDeptDocs","totLifecycle","totGameCounts","totImportHistory","totAccessGrants","totAccessAsks","totTvScreens"];
+var KNOWN_NAMES = ["totTombstones","evalResults","traineeNotes","coachingActions","auditLog","customSpaces","idPrintHistory","employeeHistory","totJournal","totTeams","totProjects","totProjItems","totProjBoard","totChannels","totMessages","totBonusCfg","totBonusReviews","totRemarks","totMyPay","totUniqRules","totIncidents","totIncImports","totIncCfg","totAccessPolicy","totEmpRemovals","totTasks","totAnnouncements","totComments","totSites","totOnboardingHier","employeeDataSource","logbookDescriptions","logbookCustomGames","logbookSettings","totAppearance","totAppearanceDept","wsCustomConfig","idCardSizeSettings","idCompanyLogoSettings","idCardBarcodeSettings","idCardFreeLayout","idCompanyLogo","idCardFreeLayoutEnabled","totWorkshopFiles","totOnboardingFiles","totSchedule","totRetrain","totRecruitment","evalShare","evalVideos","evalPhotos","totMySchedules","totCases","totWorkbooks","totIntegrations","totEmpRequests","totScheduleAcks","totAbsenceReports","totProcessTpl","totEvalKinds","totEvalCfgBackups","totDeptCfg","totDeptDocs","totLifecycle","totGameCounts","totImportHistory","totAccessGrants","totAccessAsks","totTvScreens"];
 /* ===== server handler (hand-written; the permission rules above and the pull / push body below are from Code.gs) ===== */
 var FULL_KEYS = ['totAccessPolicy', 'totAccessGrants', 'totSites'];   /* when one of these changed, what each person may see changed too: send everything */
 var GLOBAL_NAMES = ['totAccessPolicy', 'totAccessGrants', 'totAccessAsks', 'totSites'];   /* shared by all locations (stored under their plain names) */
@@ -729,6 +758,7 @@ function handle(b, id, cur) {
     if (act === 'reqNew') return out_(reqNew_(b));
     if (act === 'reqCancel') return out_(reqCancel_(b));
     if (act === 'ack') return out_(ackNew_(b));
+    if (act === 'report') return out_(reportNew_(b));
     if (act === 'login') { var who0 = admin ? { role: 'admin' } : whoIs_(cur, em); return { status: admin || who0.role ? 'approved' : 'pending' }; }
     if (act === 'video') {   /* resumable upload in pieces; private to the owner */
       if (!admin) { var mv = whoIs_(cur, em); if (!accCaps_(accA_(cur), em, mv.role, capsFor_(cur, mv.role)).videos_upload) return { error: 'not allowed' }; }
@@ -801,7 +831,7 @@ function handle(b, id, cur) {
     }
 
     return { error: 'unknown' };
-  } catch (ex) { try { Logger.log('handle: ' + (ex && ex.stack || ex)); } catch (x) {} if (b && /^(push|reqNew|reqCancel|ack)$/.test(b.action)) throw ex; return { error: 'server error' }; }   /* a write that failed half way must not be kept: the state layer then reloads from the database */
+  } catch (ex) { try { Logger.log('handle: ' + (ex && ex.stack || ex)); } catch (x) {} if (b && /^(push|reqNew|reqCancel|ack|report)$/.test(b.action)) throw ex; return { error: 'server error' }; }   /* a write that failed half way must not be kept: the state layer then reloads from the database */
 }
 /* the daily project e-mail (07:00) */
 function runDigest(cur, id) { ENV.id = id || { email: '', name: '' }; ENV.state = { cur: cur }; return projDigest_(cur, false); }
