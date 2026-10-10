@@ -129,3 +129,9 @@ Give everyone the new `tool/PTF-pass-to-floor-Gunda.html`, **deploy the new `Cod
 - The vacation balance counts the working days really marked VAC in the schedule plus requests still waiting. Days without an entry in the month grid follow the 3-on / 3-off pattern for the rule checks.
 - The employee page shows **Vacation days left** (worked out by the tool, sent with the schedule). Server Edition rules updated.
 - Test: `tests/request_rules.test.js`.
+
+## Step 3: publishing and confirmations ("I have seen my schedule")
+- Everything the tool sends to a person (Send schedule / Send rotation) now carries a **version** and the time it last changed. On the employee page a banner says **"Your schedule or rotation was updated … Please confirm"** with an **I have seen it** button; afterwards it shows "You confirmed on …". Any later change to what was sent to that person (a new day, a changed table, a cover rebuild) asks them again. Confirming an old version is refused.
+- FMD → Schedule → **✅ Confirmations** (new tab): how many were sent, confirmed, not yet, or changed since they confirmed; filter by status and team; **Copy names that still need to confirm** (paste into a message) and **CSV**. The tab updates by itself while it is open.
+- New data key `totScheduleAcks` (one record per person), new employee action `ack` (tool Apps Script and Server Edition), employee page demo updated. Tests: `tests/ack.test.js`, Server Edition `test/signout.test.js` part 3.
+- Not included yet: automatic reminders (that is the next step, notifications).

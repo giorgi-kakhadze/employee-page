@@ -110,7 +110,7 @@ function show(){
   a.innerHTML=h;
   a.querySelector('nav').onclick=function(e){var b=e.target.closest('button');if(b){tab=b.getAttribute('data-t');show();window.scrollTo(0,0)}};
   var P={home:pHome,schedule:pSchedule,rotation:pRotation};
-  $('pg').innerHTML=(P[tab]||pHome)();
+  $('pg').innerHTML=pubBanner()+(P[tab]||pHome)();wireAck();
   if(tab==='schedule'){wireRequests();restoreDraft()}
   [].forEach.call(document.querySelectorAll('[data-go]'),function(x){x.onclick=function(){var g=x.getAttribute('data-go');if(g.charAt(0)==='#'){var el=document.querySelector(g);if(el)el.scrollIntoView({behavior:'smooth'});return}tab=g;show();window.scrollTo(0,0)}});
   [].forEach.call(document.querySelectorAll('[data-ev]'),function(x){x.onclick=function(){var i=+x.getAttribute('data-ev');openEv=openEv===i?null:i;show();var el=document.getElementById('ev'+i);if(el)el.scrollIntoView({block:'nearest'})}});
@@ -183,6 +183,8 @@ function pSchedule(){
 }
 function firstName(){var n=String((D.profile&&D.profile.name)||D.name||'').trim();if(n.indexOf(',')>0)n=n.split(',')[1].trim();return n.split(/\s+/)[0]||D.email}
 function rotKind(v){var m=/^Zone\s+(\S+)(?:\s*·\s*tables?\s+(.+))?$/i.exec(v);if(m)return{k:'zone',z:m[1],t:(m[2]||'').split(/\s*,\s*/).filter(Boolean)};if(/^Table\b/i.test(v))return{k:'table',t:[v.replace(/^Table\s*/i,'')]};if(v==='Break')return{k:'break'};if(v==='Off'||v==='-')return{k:'off'};return{k:'other'}}
+function pubBanner(){var p=D.pub;if(!p||!p.ver)return '';if(p.ack===p.ver)return '<div class="mut" style="margin:8px 0">&#10003; You confirmed your schedule and rotation'+(p.ackAt?' on '+esc(new Date(p.ackAt).toLocaleString()):'')+'.</div>';return '<div class="card" style="border-color:var(--ac);border-width:2px"><b>&#128227; Your schedule or rotation was updated'+(p.at?' on '+esc(new Date(p.at).toLocaleString()):'')+'.</b><div class="mut" style="margin:4px 0 8px">Please read it and confirm that you have seen it.</div><button class="pri" id="ackBtn">&#10003; I have seen it</button><div id="ackE" class="err"></div></div>'}
+function wireAck(){var b=$('ackBtn');if(!b)return;b.onclick=function(){b.disabled=true;call({action:'ack',ver:D.pub.ver}).then(function(j){if(j.error){b.disabled=false;if(j.error==='sign-in invalid')return signedOut(ERRS[j.error]);if(j.pub)D.pub=j.pub;$('ackE').textContent=j.error;if(j.pub)setTimeout(show,1200);return}D.pub=j.pub;show()}).catch(function(){b.disabled=false;$('ackE').textContent='Could not reach the server. Nothing was sent.'})}}
 function pRotation(){
   var r=D.rotation,h='<h2>My rotation</h2><div class="mut" style="margin-bottom:8px">Your tables or zones for the coming days. View only: if something must change, send a request from Schedule.</div>';
   if(!r||!(r.days||[]).length)return h+'<div class="card mut">No rotation has been shared with you yet.</div>';
@@ -262,10 +264,11 @@ function demoData(kind){
     gameCounts:gc,incidents:inc,remarks:rem,
     pay:[{ym:y,unit:'hour',cur:'GEL',final:false,upTo:today(),days:pd,bonus:[],extra:[],totals:{shifts:tot2.shifts,hours:tot2.hours,earned:tot2.earned,leave:0,bonus:0,total:tot2.earned,plannedShifts:6+R(6),plannedHours:72,planned:600+R(400)}},
       {ym:ly,unit:'hour',cur:'GEL',final:true,upTo:ly+'-28',days:[],bonus:[{name:pos.indexOf('VIP')>=0?'VIP quality bonus':'Quality bonus',type:'Performance',level:lv,of:5,amount:lb}],extra:[],totals:{shifts:lsh,hours:lsh*8-R(10),earned:le,leave:ll,bonus:lb,total:le+ll+lb,plannedShifts:0,plannedHours:0,planned:0}}],
-    schedule:{days:days},rotation:{days:rot},leave:{y:y,allow:28,used:4+R(18)},requests:(rf=10+R(10),Math.random()<.6)?[{id:'d1',type:P(['annual','swap','dayoff']),from:d(rf),to:d(rf+R(3)),status:P(['pending','approved']),created:Date.now()-864e5,note:'Family event',decisionNote:''}]:[]};
+    schedule:{days:days},rotation:{days:rot},leave:{y:y,allow:28,used:4+R(18)},pub:{ver:'v1',at:Date.now()-36e5*3,ack:Math.random()<.5?'v1':'',ackAt:Date.now()-36e5},requests:(rf=10+R(10),Math.random()<.6)?[{id:'d1',type:P(['annual','swap','dayoff']),from:d(rf),to:d(rf+R(3)),status:P(['pending','approved']),created:Date.now()-864e5,note:'Family event',decisionNote:''}]:[]};
 }
 function demoCall(b){
   if(b.action==='me')return D;
+  if(b.action==='ack'){D.pub.ack=D.pub.ver;D.pub.ackAt=Date.now();return{ok:true,pub:D.pub}}
   if(b.action==='reqNew'){D.requests.unshift({id:'demo'+Date.now(),type:b.type,from:b.from,to:b.to,withName:b.withName||'',shift:b.shift||'',note:b.note||'',status:'pending',created:Date.now()});return{ok:true,requests:D.requests}}
   if(b.action==='reqCancel'){D.requests.forEach(function(r){if(r.id===b.id)r.status='cancelled'});return{ok:true,requests:D.requests}}
   return{error:'unknown'};

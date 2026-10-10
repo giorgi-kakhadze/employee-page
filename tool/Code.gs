@@ -54,7 +54,7 @@ const FOLDER = 'Tool Data', DATA = 'tool-data.json', ACCESS = 'access.json';
 /* Who may see the pay settings stored inside the schedule (admin always may). */
 const PAY_ROLES = ['manager'];   /* v2.1: matches the tool, where only the Manager sees the Pay tab (was also senior and scheduling_coordinator) */
 /* Data only these roles may read or write (admin always may). Key name without the site prefix. */
-const RESTRICT = { totBonusCfg: ['manager', 'senior'], totBonusReviews: ['manager', 'senior'], totMyPay: ['manager'], totRemarks: ['manager', 'senior', 'hr_recruiter', 'shift_lead', 'performance_coach', 'service_manager', 'scheduling_coordinator'], totIncidents: ['manager', 'senior', 'service_manager', 'performance_coach'], totIncImports: ['manager', 'senior', 'service_manager', 'performance_coach'], totIncCfg: ['manager', 'senior', 'service_manager', 'performance_coach'], totRecruitment: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totWorkbooks: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totEmpRequests: ['manager', 'senior', 'scheduling_coordinator', 'hr_recruiter'], totGameCounts: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'], totImportHistory: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'], totLifecycle: ['manager', 'senior', 'hr_recruiter'], totMySchedules: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'], totTvScreens: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'] };   /* v3.40: the lobby-screen links (secret tokens) are seen only by people who edit the schedule */   /* v2.3: per-person 28-day schedules, written only by schedule editors */
+const RESTRICT = { totBonusCfg: ['manager', 'senior'], totBonusReviews: ['manager', 'senior'], totMyPay: ['manager'], totRemarks: ['manager', 'senior', 'hr_recruiter', 'shift_lead', 'performance_coach', 'service_manager', 'scheduling_coordinator'], totIncidents: ['manager', 'senior', 'service_manager', 'performance_coach'], totIncImports: ['manager', 'senior', 'service_manager', 'performance_coach'], totIncCfg: ['manager', 'senior', 'service_manager', 'performance_coach'], totRecruitment: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totWorkbooks: ['manager', 'senior', 'training_coordinator', 'hr_recruiter'], totEmpRequests: ['manager', 'senior', 'scheduling_coordinator', 'hr_recruiter'], totScheduleAcks: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'], totGameCounts: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'], totImportHistory: ['manager', 'senior', 'performance_coach', 'training_coordinator', 'hr_recruiter', 'scheduling_coordinator'], totLifecycle: ['manager', 'senior', 'hr_recruiter'], totMySchedules: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'], totTvScreens: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'] };   /* v3.40: the lobby-screen links (secret tokens) are seen only by people who edit the schedule */   /* v2.3: per-person 28-day schedules, written only by schedule editors */
 /* v2.2 employee self-service: paste your Web client ID from Google Cloud (APIs & Services > Credentials > OAuth client ID > Web application). Leave as is to keep the feature off. */
 const GOOGLE_CLIENT_ID = '121975980339-fu9nd124kov2g6j94qiofOrkjkhbkee6.apps.googleusercontent.com';
 const ADMIN_ONLY_WRITE = ['totUniqRules', 'totAccessPolicy', 'totSites', 'wsCustomConfig', 'totEvalKinds', 'totEvalCfgBackups', 'totProcessTpl', 'totIntegrations', 'totDeptCfg', 'totAccessGrants'];   /* v3.19: evaluation setup, kinds, backups, process templates and integration settings can only be written with the admin key */
@@ -124,6 +124,8 @@ function me_(tok) {
     var sx = Array.isArray(m.sx) ? m.sx : (sent.sch ? m.days : null), rx = Array.isArray(m.rx) ? m.rx : (sent.rot ? m.rot : null);
     if (sx) out.schedule = { group: String(m.group || ''), team: String(m.team || ''), shift: String(m.shift || ''), days: sx.filter(rel).slice(0, 28).map(function (d) { return { d: d.d, s: String(d.s || ''), f: d.f == null ? null : +d.f, t: d.t == null ? null : +d.t }; }) };
     if (m.bal && isFinite(+m.bal.allow)) out.leave = { y: String(m.bal.y || '').slice(0, 4), allow: Math.max(0, +m.bal.allow || 0), used: Math.max(0, +m.bal.used || 0) };   /* v3.41: vacation days used / allowed, worked out by the tool from the schedule */
+    if (m.ver) { var akey = k.slice(0, k.length - 14) + 'totScheduleAcks', aa = jp_(K[akey] && K[akey].v, []), mineA = (Array.isArray(aa) ? aa : []).filter(function (x) { return x && String(x.id || '').toLowerCase() === g.email; })[0];   /* v3.41: has this person confirmed the version that was published to them? */
+      out.pub = { ver: String(m.ver).slice(0, 20), at: +m.vat || 0, ack: mineA ? String(mineA.ver || '').slice(0, 20) : '', ackAt: mineA ? +mineA.ts || 0 : 0 }; }
     if (rx) out.rotation = { group: String(m.group || ''), shift: String(m.shift || ''), days: rx.filter(rel).slice(0, 28).map(function (d) { return { d: d.d, s: String(d.s || ''), f: d.f == null ? null : +d.f, c: (Array.isArray(d.c) ? d.c : []).slice(0, 48).map(function (c) { return String(c || '').slice(0, 160); }) }; }) };
   });
   if (!found) return { error: 'no employee found for this email' };
@@ -248,6 +250,25 @@ function reqNew_(b) {
   cur.keys[key] = { v: JSON.stringify(arr), t: Math.max(now, (+(old && old.t) || 0) + 1) }; cur.updatedAt = now; df.setContent(JSON.stringify(cur));
   return { ok: true, requests: reqList_(cur.keys[key], g.email).slice(0, 40) };
 }
+/* v3.41 "I have seen my schedule / rotation": the employee confirms the version the tool published to them (m.ver). One record per person in totScheduleAcks. */
+function ackNew_(b) {
+  var g = verifyGoogle_(String(b.idToken || '')); if (!g) return { error: 'sign-in invalid' };
+  var df = file_(DATA, '{"keys":{}}'), cur = readJ_(df, { keys: {} }); cur.keys = cur.keys || {};
+  var ep = empOf_(cur.keys, g.email); if (!ep) return { error: 'no employee found for this email' };
+  if (/^(terminated|retired)$/i.test(String(ep.e.status || '').trim())) return { error: 'This account is no longer active. Ask your manager.' };
+  var ver = String(b.ver || '').slice(0, 20), mver = '', vat = 0;
+  Object.keys(cur.keys).forEach(function (k) {
+    if (k.slice(-14) !== 'totMySchedules' || !parseKey_(k) || parseKey_(k).name !== 'totMySchedules') return;
+    var m = (jp_(cur.keys[k] && cur.keys[k].v, {}).byEmail || {})[g.email]; if (m && m.ver) { mver = String(m.ver).slice(0, 20); vat = +m.vat || 0; }
+  });
+  if (!mver) return { error: 'There is nothing to confirm.' };
+  if (ver !== mver) return { error: 'Your schedule changed again. Please read the new version and confirm it.', pub: { ver: mver, at: vat, ack: '', ackAt: 0 } };
+  var key = ep.pre + 'totScheduleAcks', old = cur.keys[key], arr = jp_(old && old.v, []); if (!Array.isArray(arr)) arr = [];
+  var now = Date.now(), nm = String(ep.e.fullName || ep.e.nickname || '').slice(0, 80); arr = arr.filter(function (x) { return x && String(x.id || '').toLowerCase() !== g.email; });
+  arr.push({ id: g.email, email: g.email, name: nm, ver: ver, ts: now, u: now });
+  cur.keys[key] = { v: JSON.stringify(arr), t: Math.max(now, (+(old && old.t) || 0) + 1) }; cur.updatedAt = now; df.setContent(JSON.stringify(cur));
+  return { ok: true, pub: { ver: mver, at: vat, ack: ver, ackAt: now } };
+}
 function reqCancel_(b) {
   var g = verifyGoogle_(String(b.idToken || '')); if (!g) return { error: 'sign-in invalid' };
   var df = file_(DATA, '{"keys":{}}'), cur = readJ_(df, { keys: {} }); cur.keys = cur.keys || {};
@@ -279,7 +300,7 @@ function whoIs_(cur, em) { var p = policy_(cur), u = (p.users || {})[em]; if (!u
 /* v3.21 ADMIN-ONLY MODE: every screen except Home is locked for non-admins until the admin grants it (tool: Permissions page, key totAccessGrants).
    Switch: totAccessGrants.on === false turns it off; otherwise it is on. Keys not listed here (audit log, employee list, policy, ...) are not gated. */
 const GATE_VIEW = { totBonusCfg: 'dept', totBonusReviews: 'dept', totRemarks: 'dept', totIncidents: 'dept', totIncImports: 'dept', totIncCfg: 'dept', evalResults: 'exam', traineeNotes: 'exam', coachingActions: 'exam', evalShare: 'exam', evalVideos: 'exam', evalPhotos: 'exam', totWorkshopFiles: 'exam', totRetrain: 'exam', wsCustomConfig: 'exam', totEvalKinds: 'exam',
-  totOnboardingHier: 'onboarding', totOnboardingV2: 'onboarding', totOnboardingFiles: 'onboarding', totSchedule: 'schedule', totMySchedules: 'schedule', totAppearance: 'appearance', totAppearanceDept: 'appearance',
+  totOnboardingHier: 'onboarding', totOnboardingV2: 'onboarding', totOnboardingFiles: 'onboarding', totSchedule: 'schedule', totMySchedules: 'schedule', totScheduleAcks: 'schedule', totAppearance: 'appearance', totAppearanceDept: 'appearance',
   totTasks: 'tasks', totCases: 'tasks', totComments: 'tasks', totAnnouncements: 'tasks', totRecruitment: 'recruiting', totWorkbooks: 'recruiting', totEmpRequests: 'requests',
   totGameCounts: 'dept', totImportHistory: 'dept', totLifecycle: 'dept', totDeptDocs: 'dept', totDeptCfg: 'dept', idPrintHistory: 'id', logbookDescriptions: 'logbooks', logbookCustomGames: 'logbooks', logbookSettings: 'logbooks' };
 function grants_(cur) { try { var e = cur.keys.totAccessGrants, g = e && JSON.parse(e.v); return g && typeof g === 'object' ? g : {}; } catch (x) { return {}; } }
@@ -290,7 +311,7 @@ function mergeAsks_(newV, oldV, em) { var n = [], o = []; try { n = JSON.parse(n
 /* v3.29 Service Management: incidents are also open to any position the admin maps to the Service Management department; performance coaches
    read them (to coach), but only service managers, managers and seniors (and the department) write them */
 const RESTRICT_DEPT = { totIncidents: ['service'], totIncImports: ['service'], totIncCfg: ['service'] };
-const WRITE_ROLES = { totTvScreens: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'], totTeams: ['manager', 'senior'], totBonusCfg: ['manager'],  totIncidents: ['manager', 'senior', 'service_manager'], totIncImports: ['manager', 'senior', 'service_manager'], totIncCfg: ['manager', 'senior', 'service_manager'] };
+const WRITE_ROLES = { totScheduleAcks: ['manager', 'senior', 'scheduling_coordinator'], totTvScreens: ['manager', 'senior', 'scheduling_coordinator', 'shift_lead'], totTeams: ['manager', 'senior'], totBonusCfg: ['manager'],  totIncidents: ['manager', 'senior', 'service_manager'], totIncImports: ['manager', 'senior', 'service_manager'], totIncCfg: ['manager', 'senior', 'service_manager'] };
 function roleOk_(name, role, dept) { var r = RESTRICT[name]; if (!r || r.indexOf(role) >= 0) return true; var d = RESTRICT_DEPT[name]; return !!(d && dept && d.indexOf(dept) >= 0); }
 function writeOk_(name, role, dept) { var r = WRITE_ROLES[name]; if (!r || r.indexOf(role) >= 0) return true; var d = RESTRICT_DEPT[name]; return !!(d && dept && d.indexOf(dept) >= 0); }
 /* v2.4: detailed access. The admin ticks parts per position in the tool (Admin > Detailed access); the policy keeps policy.roles[role].caps.
@@ -327,7 +348,7 @@ function accCaps_(A, em, role, caps) { if (!A) return caps; var o = {}; Object.k
 const PJ_PAGES = ['projects.my_work', 'projects.all_projects', 'projects.progress', 'projects.teams_departments', 'projects.data_explorer', 'projects.updates'], INC_PAGES = ['dw.service.inc', 'dw.service.jira', 'dw.service.rep'];
 const KEY_PAGES = { totIncidents: INC_PAGES, totIncImports: INC_PAGES, totIncCfg: INC_PAGES, totRecruitment: ['hr.recruiting', 'dw.hr.cand'], totWorkbooks: ['hr.recruiting', 'dw.hr.cand'], totLifecycle: ['dw.hr.life'],
   totEmpRequests: ['fmd.employee_requests'], totBonusCfg: ['dw.fmd.bonus'], totBonusReviews: ['dw.fmd.bonus'], totGameCounts: ['dw.fmd.games'], totImportHistory: ['dw.fmd.games'],
-  totSchedule: ['fmd.schedule'], totMySchedules: ['fmd.schedule'], totProjects: PJ_PAGES, totProjItems: PJ_PAGES, totProjBoard: PJ_PAGES,
+  totSchedule: ['fmd.schedule'], totMySchedules: ['fmd.schedule'], totScheduleAcks: ['fmd.schedule'], totProjects: PJ_PAGES, totProjItems: PJ_PAGES, totProjBoard: PJ_PAGES,
   totOnboardingHier: ['academy.onboarding', 'academy.trainee_progress'], totOnboardingV2: ['academy.onboarding', 'academy.trainee_progress'], totRetrain: ['academy.retraining', 'performance.retraining', 'fmd.retraining'],
   totChannels: ['community.channels', 'community.chats'], totMessages: ['community.channels', 'community.chats'],
   idPrintHistory: ['academy.id_creation'], logbookDescriptions: ['academy.logbooks'], logbookCustomGames: ['academy.logbooks'], logbookSettings: ['academy.logbooks'] };
@@ -708,6 +729,7 @@ function doPost(e) {
     if (act === 'tv') return out_(tv_(b));   /* v3.40: lobby screen: no sign-in, a secret token */
     if (act === 'me') return out_(me_(String(b.idToken || '')));
     if (act === 'reqNew') return out_(reqNew_(b));
+    if (act === 'ack') return out_(ackNew_(b));
     if (act === 'reqCancel') return out_(reqCancel_(b));
     if (act === 'login') {
       if (tries_(em) >= MAX_TRIES) return out_({ status: 'locked' });
