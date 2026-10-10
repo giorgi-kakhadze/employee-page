@@ -165,3 +165,12 @@ Give everyone the new `tool/PTF-pass-to-floor-Gunda.html`, **deploy the new `Cod
 - Gap banner with the next half hour where a table has nobody; sick/late reports; absences; per-team cards (who is where now and next position); who goes on / comes back from a break; people who have not confirmed the published schedule (one click to remind).
 - Buttons: copy handover text, print, open the cover panel, remind unconfirmed.
 - Test: `tests/today.test.js`. Single-file tool only needs the HTML; the Server Edition gets it through `npm run build`.
+
+## Step 8: Payroll export
+- FMD → Schedule → **Pay** now starts with a **📤 Payroll export** panel (managers/admin only, as the rest of Pay).
+- Formats: **Pay lines** (one row per person and pay code: ID, name, position, team, code, description, quantity, unit, rate, multiplier, amount; bonuses and month-review bonus levels are their own lines), **Summary** (one row per person), **Day timesheet** (one row per day), or an **Excel workbook with all three**. File: CSV or .xlsx; separator comma / semicolon / tab; decimal dot or comma (for European Excel).
+- Pay codes are editable (DAY, NIGHT, VAC, SICK, STUDY, FAM, UNPAID, BONUS); extra-pay shifts get a suffix such as `DAY_X2`.
+- Employee ID comes from Employee Data (Workday ID, else Employee ID) by name.
+- Checks before export: nothing to export / worked shifts with no rate (blocks); gaps in the Schedule grid, missing employee IDs or positions, month not finished, changed after closing (ask to confirm).
+- Every export is logged (who, when, file, people, total) and written to the audit log. **Mark month as paid** records the total; if the schedule changes afterwards the panel warns with the difference.
+- Test: `tests/payroll_export.test.js`. Client-side only, so the Server Edition gets it from `npm run build`.
