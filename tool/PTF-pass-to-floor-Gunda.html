@@ -21730,7 +21730,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
     window.totSchedOpen = function (k, o) { sub = k; if (o) { if (o.date) date = o.date; if (o.shift) shift = o.shift; if (o.cv) cvOpen = true; } try { render(); } catch (e) {} };
     /* v3.41 the bell for people who run the schedule: confirmations still missing and employee requests waiting */
     (window.__notifExtra = window.__notifExtra || []).push(function () {
-      var out = []; try { if (!canEdit()) return out; load();
+      var out = []; try { if (!canEdit()) return out;   /* (no load() here: the bell asks every few seconds and a reload would throw away edits that are not saved yet) */
         var rows = ackRows(), miss = rows.filter(function (r) { return r.st !== 'ok'; });
         if (miss.length) out.push({ ts: Math.max.apply(null, miss.map(function (r) { return r.vat; })), text: '\u23F3 ' + miss.length + ' of ' + rows.length + ' people have not confirmed their schedule or rotation', go: ['sched', 'ack'], cat: 'other', act: true, open: function () { switchView('schedule'); setTimeout(function () { window.totSchedOpen('ack'); }, 150); } });
         var ab = absRaw().filter(function (r) { return r.status === 'new' && (+r.ts || 0) > Date.now() - 36 * 3600e3; });
