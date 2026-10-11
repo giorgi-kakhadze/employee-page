@@ -175,3 +175,9 @@ Give everyone the new `tool/PTF-pass-to-floor-Gunda.html`, **deploy the new `Cod
 - Every export is logged (who, when, file, people, total) and written to the audit log. **Mark month as paid** records the total; if the schedule changes afterwards the panel warns with the difference.
 - Test: `tests/payroll_export.test.js`. Client-side only, so the Server Edition gets it from `npm run build`.
 - Update: the default is now the single **Excel workbook** (sheets Info, Pay lines, Summary, Days). Info lists month, who exported, totals, currency, rate type and the pay code legend. It opens in Excel and imports into Google Sheets or any payroll system that takes Excel.
+
+## Schedule grid: two modes (admin choice)
+- **Settings → 📅 Schedule grid** (admin): **Show everyone** (default, the old behaviour: every row is built, up to 400 people) or **Load as you scroll** (only the rows on screen plus a buffer are built; no 400 limit). The choice is saved in the schedule data (`gridMode`), so it applies to every admin device that syncs.
+- Scroll mode keeps the look, sticky header, search, selection (drag, Shift/Ctrl+click, click a name), arrow keys, "Only selected people", copy and move. Selection and copy use the data, not the page, so they work on rows that are not built yet.
+- Measured on the 1,004-person demo: grid on screen after about 0.7 s (all 1,004 people) against about 2–2.5 s (400 people); page elements 9.8k against 35k.
+- Test: `tests/grid_scroll.test.js`.
