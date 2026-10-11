@@ -181,3 +181,10 @@ Give everyone the new `tool/PTF-pass-to-floor-Gunda.html`, **deploy the new `Cod
 - Scroll mode keeps the look, sticky header, search, selection (drag, Shift/Ctrl+click, click a name), arrow keys, "Only selected people", copy and move. Selection and copy use the data, not the page, so they work on rows that are not built yet.
 - Measured on the 1,004-person demo: grid on screen after about 0.7 s (all 1,004 people) against about 2–2.5 s (400 people); page elements 9.8k against 35k.
 - Test: `tests/grid_scroll.test.js`.
+
+## Fix: absence and cover wrecked the rotation (auto from staff / shared tables)
+- Cause 1: marking someone absent re-planned the rest of the shift without the **"auto from staff"** limit, so people were spread over all tables (up to the "Tables" number, e.g. 100) instead of the few tables the staff can cover; the rotation looked deleted/garbage until it was generated again.
+- Cause 2: the re-plan handled one team alone. Teams without their own table range share one pool of tables (Generate plans them together), so replanning one team gave its people tables the other team was already using (table clashes).
+- Cause 3: the gap check counted all tables when "auto from staff" was on ("1504 table-slots have nobody" for a correct rotation).
+- Cause 4: **Generate whole shift** ignored absences, so the absent person worked again while the 🚑 mark still showed.
+- Fix: the re-plan uses the same grouping and table count as Generate; the gap check uses the same table count; Generate keeps absences. Test: `tests/cover_auto.test.js` (fails on the old code, passes now).

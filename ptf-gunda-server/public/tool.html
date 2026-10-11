@@ -19913,7 +19913,9 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
         if (r && +r[0] >= 1 && +r[1] >= +r[0]) o[t.id] = [Math.floor(+r[0]), Math.min(500, Math.floor(+r[1]))]; }); return o; }
     function rangeList(r) { if (r[2]) return r[2].slice(); var o = []; for (var t = r[0]; t <= r[1]; t++) o.push(t); return o; }
     function poolTables(T) { var R = ranges(), taken = {}, o = [], t; Object.keys(R).forEach(function (k) { rangeList(R[k]).forEach(function (n) { taken[n] = 1; }); }); for (t = 1; t <= T; t++) if (!taken[t]) o.push(t); if (!o.length) for (t = 1; t <= T; t++) o.push(t); return o; }
-    function tableSet(rows, T) { var R = ranges(), keys = Object.keys(R), o = [], t; if (!keys.length) { for (t = 1; t <= T; t++) o.push(t); return o; } var present = {}; rows.forEach(function (x) { if (x.name && x.name.trim() && !zoneOn(x.t)) present[R[x.t] ? x.t : '_'] = 1; }); var seen = {}; keys.forEach(function (k) { if (present[k]) rangeList(R[k]).forEach(function (n) { seen[n] = 1; }); }); if (present._) poolTables(T).forEach(function (n) { seen[n] = 1; }); Object.keys(seen).forEach(function (n) { o.push(+n); }); return o.sort(function (a, b) { return a - b; }); }
+    function tableSet(rows, T) { var R = ranges(), keys = Object.keys(R), o = [], t, au = !!data.cfg.auto, K = maxRun(), cnt = {}, cut = function (L, g) { return au && cnt[g] ? L.slice(0, Math.min(L.length, autoT(cnt[g], K))) : L; };   /* "auto from staff": only as many tables as the people can cover, like Generate */
+      rows.forEach(function (x) { if (x.name && x.name.trim() && !zoneOn(x.t)) { var g = R[x.t] ? x.t : '_'; cnt[g] = (cnt[g] || 0) + 1; } });
+      if (!keys.length) { for (t = 1; t <= T; t++) o.push(t); return cut(o, '_'); } var present = {}; rows.forEach(function (x) { if (x.name && x.name.trim() && !zoneOn(x.t)) present[R[x.t] ? x.t : '_'] = 1; }); var seen = {}; keys.forEach(function (k) { if (present[k]) cut(rangeList(R[k]), k).forEach(function (n) { seen[n] = 1; }); }); if (present._) cut(poolTables(T), '_').forEach(function (n) { seen[n] = 1; }); Object.keys(seen).forEach(function (n) { o.push(+n); }); return o.sort(function (a, b) { return a - b; }); }
     function rangeWarn() { var R = ranges(), keys = Object.keys(R), msg = [], T = +data.cfg.tables || 100, owner = {}; keys.forEach(function (k) { rangeList(R[k]).forEach(function (t) { if (owner[t] && owner[t] !== k && msg.length < 3) msg.push('Table ' + t + ' is given to both ' + teamName(owner[t]) + ' and ' + teamName(k) + '.'); owner[t] = k; }); if (R[k][1] > T) msg.push(teamName(k) + ' goes up to table ' + R[k][1] + ' but Tables is ' + T + '.'); }); var bad = data.teams.filter(function (t) { var r = (data.cfg.tt || {})[t.id]; return r && (r[0] || r[1]) && !R[t.id]; }).map(function (t) { return t.name; }); if (bad.length) msg.push('Fill both "from" and "to" (to must not be smaller than from) for: ' + bad.join(', ') + '.'); return msg.length ? '<div class="hint" style="color:#f59e0b;margin-top:4px">⚠ ' + msg.map(esc).join(' ') + '</div>' : ''; }
     /* v2.98: part-time window, popup helper, automatic table count */
     function st0(x) { return Math.max(0, Math.min(slots(x) - 1, Math.round((+x.from || 0) * 2))); }
@@ -20126,6 +20128,8 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       rs.forEach(function (x) { if (!onlyTeam || !x.cells) { x.cells = []; for (var q0 = 0; q0 < slots(x); q0++) x.cells[q0] = 'OFF'; } });
       segs.forEach(function (sg) { for (var q = Math.round(sg.from * 2); q < slots(sg); q++) sg._r.cells[q] = sg.cells[q] == null ? '' : sg.cells[q]; });
       rs.forEach(function (x) { x.pod = worked(x) / 2 + 'h · ' + brks(x) + ' brk'; });
+      /* people already marked absent stay absent: plan the rest again from their first absent half hour */
+      var abT = {}; rs.forEach(function (x) { if (x.abs && x.abs.length) abT[x.t] = Math.min(abT[x.t] == null ? 999 : abT[x.t], Math.min.apply(null, x.abs.map(function (a) { return a.a; }))); }); Object.keys(abT).forEach(function (t) { replan(t, abT[t]); });
       save(); render();
       var g2 = gapInfo(), cf2 = confl(cur());
       /* v2.121: report how many assigned slots still lack qualification */
@@ -20153,11 +20157,13 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
       var rel = h - st; if (rel < 0) rel += 24; var k = Math.ceil(rel * 2); if (k >= tot) { var before = (st - h + 24) % 24, after = (h - (st + tot / 2) + 24) % 24; return before <= after ? 0 : tot; } return Math.max(0, k); }
     function cvAbsent(x, c) { return (x.abs || []).some(function (a) { return c >= a.a && c < a.b; }); }
     function replan(tid, k) {
-      var sh = cur(), rows = sh.rows.filter(function (x) { return x.name && x.name.trim() && x.t === tid; }), segs = [];
+      /* the same grouping as Generate: a team with its own table range, or all teams without one together on the shared tables; zone teams on their own */
+      var sh = cur(), R = ranges(), zon = zoneOn(tid), gk = zon || R[tid] ? tid : '_', segs = [], rows = sh.rows.filter(function (x) { if (!x.name || !x.name.trim()) return false; if (zon) return x.t === tid; return !zoneOn(x.t) && (R[x.t] ? x.t : '_') === gk; });
       rows.forEach(function (x) { var S = slots(x), run = null, c, from0 = Math.max(k, st0(x)); x.cells = x.cells || []; for (c = k; c < S; c++) { if (c < from0 || cvAbsent(x, c)) { x.cells[c] = 'OFF'; if (run) { segs.push({ from: run[0] / 2, len: run[1] / 2, t: tid, cells: [], _r: x }); run = null; } } else if (run) run[1] = c + 1; else run = [c, c + 1]; } if (run) segs.push({ from: run[0] / 2, len: run[1] / 2, t: tid, cells: [], _r: x }); });
       if (!segs.length) return 0;
-      var T = Math.max(1, Math.min(500, +data.cfg.tables || 100)), R = ranges();
-      if (zoneOn(tid)) { var ZL = zoneList(shift, tid, sh); if (ZL.length) rotateZones(segs, ZL, zoneSlots(tid)); } else rotateGroup(segs, R[tid] ? rangeList(R[tid]) : poolTables(T), maxRun());
+      var T = Math.max(1, Math.min(500, +data.cfg.tables || 100)), K = maxRun();
+      if (zon) { var ZL = zoneList(shift, tid, sh); if (ZL.length) rotateZones(segs, ZL, zoneSlots(tid)); else return 0; }
+      else { var base = gk === '_' ? poolTables(T) : rangeList(R[gk]); if (data.cfg.auto) base = base.slice(0, Math.min(base.length, autoT(rows.length, K))); rotateGroup(segs, base, K); }
       segs.forEach(function (sg) { for (var q = Math.round(sg.from * 2); q < slots(sg); q++) sg._r.cells[q] = sg.cells[q] == null ? '' : sg.cells[q]; });
       rows.forEach(function (x) { x.pod = worked(x) / 2 + 'h · ' + brks(x) + ' brk'; });
       return segs.length;
