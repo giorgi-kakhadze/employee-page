@@ -19,10 +19,11 @@ const p2 = (n) => ('0' + n).slice(-2), now = new Date(), prev = new Date(now.get
   await P.evaluate((ym) => { const m = document.querySelector('#payM'); m.value = ym; m.dispatchEvent(new Event('change', { bubbles: true })); }, ym); await w(400);
   const txt = () => P.evaluate(() => document.querySelector('#scheduleView').innerText);
   let t = await txt();
+  ok('workbook is the default format', await P.evaluate(() => document.querySelector('#pxFmt').value === 'book' && document.querySelector('#pxFile').value === 'xlsx'));
   ok('payroll export panel exists with checks', /Payroll export/.test(t) && /no employee ID/.test(t), t.slice(0, 200));
   const get = async (setup) => { await P.evaluate(setup); await w(300); const [d] = await Promise.all([P.waitForEvent('download'), P.evaluate(() => document.querySelector('[data-pa="pxgo"]').click())]); const f = '/tmp/px-' + Date.now(); await d.saveAs(f); return { name: d.suggestedFilename(), body: fs.readFileSync(f) }; };
   const setv = (id, v) => `(()=>{const e=document.querySelector('#${id}');e.value='${v}';e.dispatchEvent(new Event('change',{bubbles:true}));})()`;
-  let r = await get(`${setv('pxFmt', 'lines')}`);
+  let r = await get(`${setv('pxFile', 'csv')};${setv('pxFmt', 'lines')}`);
   let csv = r.body.toString('utf8');
   ok('lines file name and BOM', r.name === 'payroll-' + ym + '-lines.csv' && csv.charCodeAt(0) === 0xFEFF, r.name);
   ok('Ana: 2 day shifts x10 = 20, night 14, vacation 10, bonus 25.5, with ID W1000', /W1000,Ana Beridze,VIP Game Presenter,,DAY,Day shift,2,day,10,1,20\r?\n/.test(csv) && /NIGHT,Night shift,1,day,14,1,14\r?\n/.test(csv) && /VAC,Vacation,1,day,10,1,10\r?\n/.test(csv) && /BONUS,Spot bonus,1,item,25.5,1,25.5\r?\n/.test(csv), csv);
@@ -38,6 +39,7 @@ const p2 = (n) => ('0' + n).slice(-2), now = new Date(), prev = new Date(now.get
   ok('days timesheet has one row per day', csv.split('\r\n').length === 1 + 5, csv);
   r = await get(`${setv('pxFmt', 'book')}`);
   ok('workbook is a real .xlsx (zip) named .xlsx', r.name === 'payroll-' + ym + '-book.xlsx' && r.body.slice(0, 2).toString() === 'PK', r.name);
+  { const zl = require('zlib'), b = r.body; let i = 0, found = ''; while ((i = b.indexOf(Buffer.from('PK\x03\x04'), i)) >= 0) { const m = b.readUInt16LE(i + 8), cs = b.readUInt32LE(i + 18), nl = b.readUInt16LE(i + 26), xl = b.readUInt16LE(i + 28), nm = b.slice(i + 30, i + 30 + nl).toString(), d = b.slice(i + 30 + nl + xl, i + 30 + nl + xl + cs); if (nm === 'xl/workbook.xml') found = (m ? zl.inflateRawSync(d) : d).toString(); i += 4; } ok('workbook has Info, Pay lines, Summary and Days sheets', /Info/.test(found) && /Pay lines/.test(found) && /Summary/.test(found) && /Days/.test(found), found.slice(0, 300)); }
   await w(700); const S = await P.evaluate(() => JSON.parse(localStorage.getItem('totSchedule')));
   const aud = await P.evaluate(() => JSON.parse(localStorage.getItem('auditLog') || '[]').some(a => /Exported payroll/.test(a.act)));
   ok('export log has 5 entries and the audit log recorded it', (S.pay.exports || []).length === 5 && S.pay.exports[0].people === 2 && S.pay.exports[0].total === 69.5 + 7 && aud, JSON.stringify(S.pay.exports && S.pay.exports[0]));

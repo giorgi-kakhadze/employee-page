@@ -174,3 +174,4 @@ Give everyone the new `tool/PTF-pass-to-floor-Gunda.html`, **deploy the new `Cod
 - Checks before export: nothing to export / worked shifts with no rate (blocks); gaps in the Schedule grid, missing employee IDs or positions, month not finished, changed after closing (ask to confirm).
 - Every export is logged (who, when, file, people, total) and written to the audit log. **Mark month as paid** records the total; if the schedule changes afterwards the panel warns with the difference.
 - Test: `tests/payroll_export.test.js`. Client-side only, so the Server Edition gets it from `npm run build`.
+- Update: the default is now the single **Excel workbook** (sheets Info, Pay lines, Summary, Days). Info lists month, who exported, totals, currency, rate type and the pay code legend. It opens in Excel and imports into Google Sheets or any payroll system that takes Excel.
