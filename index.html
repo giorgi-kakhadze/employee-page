@@ -90,7 +90,7 @@ var SH={morning:'Morning',afternoon:'Afternoon',night:'Night'},OFF={rest:'Day of
 var RT={swap:'Swap a shift',giveaway:'Give away a shift',annual:'Vacation / annual leave',sick:'Sick leave',dayoff:'Day off',payq:'Question about my pay'},RS={pending:'Waiting for a decision',approved:'Approved',rejected:'Declined',cancelled:'Cancelled'};
 function rtl(t){return Object.prototype.hasOwnProperty.call(RT,t)?RT[t]:'Request'}function rsl(t){return Object.prototype.hasOwnProperty.call(RS,t)?RS[t]:String(t||'')}
 function hh(n){n=((n%24)+24)%24;return String(Math.floor(n)).padStart(2,'0')+':'+(n%1?'30':'00')}
-function cellTxt(v){v=String(v||'').trim();if(!v)return '-';if(/^\d+$/.test(v))return 'Table '+v;if(/^(b|brk|break)$/i.test(v))return 'Break';if(/^(off|x|-)$/i.test(v))return 'Off';return v}
+function cellTxt(v){v=String(v||'').trim();if(!v)return '-';if(/^\d+$/.test(v))return 'Table '+v;if(/^(b|brk|break)$/i.test(v))return 'Break';if(/^(off|x|-)$/i.test(v))return 'Off';if(/^(r|res|reserve)$/i.test(v))return 'Standby';return v}
 function dLabel(d,long){var dt=new Date(d+'T12:00:00');return isNaN(dt)?esc(d):dt.toLocaleDateString(undefined,{weekday:long?'long':'short',day:'numeric',month:'short'})}
 function iso(dt){return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0')}
 function today(){return iso(new Date())}
@@ -199,7 +199,7 @@ function pSchedule(){
   return h+pRequests();
 }
 function firstName(){var n=String((D.profile&&D.profile.name)||D.name||'').trim();if(n.indexOf(',')>0)n=n.split(',')[1].trim();return n.split(/\s+/)[0]||D.email}
-function rotKind(v){var m=/^Zone\s+(\S+)(?:\s*·\s*tables?\s+(.+))?$/i.exec(v);if(m)return{k:'zone',z:m[1],t:(m[2]||'').split(/\s*,\s*/).filter(Boolean)};if(/^Table\b/i.test(v))return{k:'table',t:[v.replace(/^Table\s*/i,'')]};if(v==='Break')return{k:'break'};if(v==='Off'||v==='-')return{k:'off'};return{k:'other'}}
+function rotKind(v){var m=/^Zone\s+(\S+)(?:\s*·\s*tables?\s+(.+))?$/i.exec(v);if(m)return{k:'zone',z:m[1],t:(m[2]||'').split(/\s*,\s*/).filter(Boolean)};if(/^Table\b/i.test(v))return{k:'table',t:[v.replace(/^Table\s*/i,'')]};if(v==='Break')return{k:'break'};if(v==='Off'||v==='-')return{k:'off'};if(v==='Standby')return{k:'standby'};return{k:'other'}}
 function repToday(){var s=D.schedule&&D.schedule.days||[],t=today(),n=new Date(),hr=n.getHours()+n.getMinutes()/60,y=null;s.forEach(function(x){if(!SH[x.s])return;if(x.d===t&&!ended(x))y=y||x;else if(x.d===iso(new Date(Date.now()-864e5))&&x.s==='night'&&x.t!=null&&hr<+x.t)y=y||x});return y}
 function repCard(){var y=repToday();if(!y||OFFLINE)return '';var L=(D.reports||[]).filter(function(r){return r.date===y.d}),h='<div class="card" id="repCard"><b>&#128657; Something wrong today?</b><div class="mut" style="margin:2px 0 8px">'+esc(SH[y.s])+' shift'+(y.f!=null?' &middot; '+hh(y.f)+'-'+hh(y.t):'')+'. Tell your manager here, so the rotation can be changed in time.</div>';
  if(L.length)h+=L.map(function(r){var w={sick:'sick',late:'late (about '+r.minutes+' min)',early:'leaving at '+esc(r.at)}[r.type]||r.type;return '<div class="day"><span>'+new Date(r.ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' &middot; You reported: <b>'+w+'</b></span><span class="'+(r.status==='handled'?'work':'leave')+'">'+(r.status==='handled'?'&#10003; Your manager has planned for it':r.status==='dismissed'?'Seen':'&#8987; Sent')+'</span></div>'}).join('');
@@ -225,7 +225,7 @@ function pRotation(){
       if(k.k==='zone'||k.k==='table'){
         h+='<div class="rt'+(cur?' now':'')+'"><div class="rtT">'+tm+(cur?'<span class="nowTag">NOW</span>':'')+'<span class="mut"> &middot; '+((g.to-g.from)/2)+' h</span></div><div class="rtMain">'+(k.k==='zone'?'<span class="zb">Zone '+esc(k.z)+'</span>':'<span class="zb tb">Table '+esc(k.t[0])+'</span>')+'</div>'+
           (k.k==='zone'&&k.t.length?'<div class="rtTb">'+k.t.map(function(x){return '<span class="tn">'+esc(x)+'</span>'}).join('')+'</div><div class="mut" style="font-size:12px">Tables in this zone</div>':'')+'</div>'}
-      else h+='<div class="rt '+(k.k==='break'?'brk':'offr')+(cur?' now':'')+'"><div class="rtT">'+tm+(cur?'<span class="nowTag">NOW</span>':'')+'</div><div class="rtMain"><span class="'+(k.k==='break'?'leave':'off')+'">'+(k.k==='break'?'&#9749; Break':esc(g.v))+'</span></div></div>'});
+      else h+='<div class="rt '+(k.k==='break'?'brk':'offr')+(cur?' now':'')+'"><div class="rtT">'+tm+(cur?'<span class="nowTag">NOW</span>':'')+'</div><div class="rtMain"><span class="'+(k.k==='break'?'leave':'off')+'">'+(k.k==='break'?'&#9749; Break':k.k==='standby'?'On standby: ready to cover a table':esc(g.v))+'</span></div></div>'});
     h+='</div>'});
   return h;
 }

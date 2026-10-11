@@ -22,6 +22,7 @@ td.c{background:var(--card);text-align:center;font-size:calc(3.4vh*var(--z));fon
 td.c small{display:block;font-size:.5em;font-weight:500;color:var(--mut);margin-top:.2em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #zm{margin-top:1.4vh;padding:1vh 1.2vw;border-top:2px solid #1d2a47;font-size:calc(2.4vh*var(--z))}#zm b{color:var(--ac)}#zm .zc{display:inline-block;background:#12301f;color:#c7f9cc;border-radius:1vh;padding:.3vh 1vw;margin:.4vh .6vw .4vh 0;font-weight:600}#zm .zc span{color:#e6fff0;font-weight:500}
 td.c.tb{color:#bfdbfe}td.c.zn{color:#c7f9cc;background:#12301f}td.c.br{color:var(--warn);font-weight:500;background:#2a2312}td.c.of{color:#4b5878;font-weight:400}
+td.c.rs{color:#86c99a;background:#102418;font-weight:500}.bc.rs{background:#12301f;color:#86c99a}
 td.c.cur{box-shadow:inset 0 0 0 .5vh var(--ok)}
 tr.th td{background:transparent;color:var(--ac);font-size:calc(2.4vh*var(--z));font-weight:700;padding:1vh 1vw 0;border:0}
 #bb{display:grid;gap:1vh .8vw;align-content:start}#bb.one .pl{grid-template-columns:1fr}
@@ -64,7 +65,7 @@ tr.th td{background:transparent;color:var(--ac);font-size:calc(2.4vh*var(--z));f
   function cellOf(v,row){
     v=String(v||'').trim();if(!v)return{k:'of',a:'',b:''};
     var m=/^Z:(.+)$/.exec(v);if(m){var z=((D.zones||{})[row.t]||[]).filter(function(q){return String(q.n)===m[1]})[0];return{k:'zn',a:'Zone '+m[1],b:z&&z.t&&z.t.length&&(D.screen.zinfo==='cell'||D.screen.zinfo==='both')?'tables '+rng(z.t):'',key:v}}
-    if(/^\d+$/.test(v))return{k:'tb',a:v,b:'',key:v};if(/^(b|brk|break)$/i.test(v))return{k:'br',a:'Break',b:'',key:'B'};if(/^(off|x|-|—|\?)$/i.test(v))return{k:'of',a:'',b:''};return{k:'tb',a:v,b:'',key:v};
+    if(/^(r|res|reserve)$/i.test(v))return{k:'rs',a:'Reserve',b:'',key:'R'};if(/^\d+$/.test(v))return{k:'tb',a:v,b:'',key:v};if(/^(b|brk|break)$/i.test(v))return{k:'br',a:'Break',b:'',key:'B'};if(/^(off|x|-|—|\?)$/i.test(v))return{k:'of',a:'',b:''};return{k:'tb',a:v,b:'',key:v};
   }
   function rng(L){return L.slice().sort(function(a,b){return a-b}).join(', ')}   /* every table number is written out */
   /* "Everything at once": one block per team, every person with the table they are on right now (and the next one small); zone teams list who is in which zone. Text shrinks until all teams fit one screen. */
