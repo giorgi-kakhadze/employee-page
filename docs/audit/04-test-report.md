@@ -9,7 +9,7 @@ Environment: Linux container, Node 22, Chromium (Playwright), Google Apps Script
 | `tests/*.test.js` (tool, employee page, Code.gs rules) | 45 (39 existing + 6 new) | **All passed, 0 failed checks** |
 | Server Edition `node test/run-all.js` | server, auth, browser, tv, tv-browser, signout, pwa, dynamics | **All passed** |
 | Server Edition `postgres` | 1 | **Blocked** — no PostgreSQL server in this environment (skipped by the suite itself) |
-| Server Edition parity (`npm run test:parity`, the original tests run against the server rules) | — | see section 4 |
+| Server Edition parity (`npm run test:parity`: all 45 tool test files run against the server rules) | 45 files, 967 checks | **Passed** after recording 6 intended differences (section 4) |
 
 New tests written in this audit (all passed):
 
@@ -43,3 +43,11 @@ The click crawl ran **before** the two new features were added. The new screens 
 | Screen readers, full keyboard-only use, colour contrast | Not tested; labels were checked by script only |
 | Load above the volumes in `large_data.test.js` | Not tested |
 | Restore of a real company backup | Restore was tested with test data only |
+
+## 4. Server Edition parity — intended differences
+
+The first parity run reported 6 failures, all in two new audit tests:
+- `audit_account_switch` (5 checks) uses the password sign-in screen. The Server Edition has no such screen: people sign in with Microsoft, and data lives only in the tab's memory, so nothing of a previous person can remain in the browser (covered by the Server Edition's own `signout` and `browser` tests). Whether a no-position account sees only Home in the Server Edition was **not tested**; the server sends such an account no data either way.
+- `audit_default_keys` (1 check) checks the `Code.gs` admin key. The Server Edition has no admin key; admin is an Entra app role (`test/auth`).
+
+These are now listed as known differences in `ptf-gunda-server/test/run-parity.js`. Re-run of those two files: no unexpected failures. Every other file and check passed with no new differences.

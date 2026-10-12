@@ -5,7 +5,10 @@
 const { spawnSync } = require('child_process'), fs = require('fs'), path = require('path');
 const dir = path.join(__dirname, '..', '..', 'tests');
 const KNOWN = {
-  hardening: ['access requests are throttled (30 per 10 minutes)']   // there is no "request access" action any more: Microsoft decides who may sign in
+  hardening: ['access requests are throttled (30 per 10 minutes)'],   // there is no "request access" action any more: Microsoft decides who may sign in
+  /* the password sign-in screen does not exist (Entra sign-in; data is kept in memory, never in the browser's storage: test/signout, browser) */
+  audit_account_switch: ['the new person is signed in', 'nothing of the manager\'s restricted data is left in the browser', 'a person with no position sees Home only (no department spaces)', 'Home explains that the account has no position yet', 'a direct switch to another screen is refused'],
+  audit_default_keys: ['Code.gs: the default admin key is refused with a clear message']   // there is no admin key: admin is an Entra app role (test/auth)
 };
 const only = process.argv[2] ? process.argv[2].split(',') : null;
 const files = fs.readdirSync(dir).filter((f) => /\.test\.js$/.test(f)).map((f) => f.replace('.test.js', '')).filter((f) => !only || only.includes(f));
