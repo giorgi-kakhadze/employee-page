@@ -101,8 +101,51 @@ tr.th td{background:transparent;color:var(--ac);font-size:calc(2.4vh*var(--z));f
     var bb=$('bb'),avail=bd.clientHeight-16;for(;bs>.35;bs-=.05){document.documentElement.style.setProperty('--bs',(bs*(S.zoom||1)).toFixed(2));if(bb.offsetHeight<=avail)break}
     $('pg').textContent=pages>1?('page '+(page+1)+' / '+pages):'';clearTimeout(pageT);if(pages>1)pageT=setTimeout(function(){page=(page+1)%pages;draw()},15000);
   }
+  /* ===== information board renderer (shared by the editor preview and the TV page) ===== */
+  var IB = {
+    FM: { '16:9': [16, 9], '9:16': [9, 16], '32:9': [32, 9], '9:32': [9, 32], '21:9': [21, 9], '4:3': [4, 3], '3:4': [3, 4], '1:1': [1, 1] },
+    TYPES: { desk: ['Department desk', '\uD83C\uDFE2'], ask: ['Ask-here spot', '\u2753'], note: ['Note / reminder', '\uD83D\uDCDD'], ann: ['Announcement', '\uD83D\uDCE3'], text: ['Text', ''], clock: ['Clock', ''], today: ["Today's shift", '\uD83D\uDCC5'], img: ['Image', ''] },
+    esc: function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); },
+    col: function (c, d) { return /^#[0-9a-fA-F]{6}$/.test(String(c || '')) ? c : d; },
+    ratio: function (B) { if (B.fmt === 'custom') { var w = +B.w || 16, h = +B.h || 9; return Math.max(0.15, Math.min(8, w / h)); } var f = IB.FM[B.fmt] || IB.FM['16:9']; return f[0] / f[1]; },
+    lines: function (t) { return String(t || '').split(/\n/).filter(function (x) { return x.trim(); }); },
+    pad: function (n) { return ('0' + n).slice(-2); },
+    css: '.ibS{position:relative;overflow:hidden;background:#0b1220;color:#f2f5fb;font-family:system-ui,"Segoe UI",Arial,sans-serif;line-height:1.25}.ibS *{box-sizing:border-box}' +
+      '.ibHd{position:absolute;left:0;right:0;top:0;height:7%;display:flex;align-items:center;justify-content:space-between;padding:0 2%;background:rgba(255,255,255,.06);font-weight:700;font-size:1.7em}' +
+      '.ibB{position:absolute;border-radius:.8em;padding:.7em .9em;background:#131c30;overflow:hidden;border:0 solid transparent}.ibB.ibSel{outline:3px solid #3b82f6;outline-offset:1px;z-index:9999!important}' +
+      '.ibH{font-weight:700;font-size:1.45em;color:var(--ac,#7fb2ff);margin:0 0 .3em;display:flex;gap:.4em;align-items:center}.ibB p{margin:.25em 0;font-size:1em;color:inherit;opacity:.92}.ibB ul{margin:.25em 0;padding-left:1.1em}.ibB li{margin:.15em 0}' +
+      '.ibPill{display:inline-block;background:rgba(34,197,94,.18);color:#c7f9cc;border-radius:1em;padding:.1em .7em;margin:.2em .3em 0 0;font-size:.95em}' +
+      '.ibT-note{color:#3b2f00}.ibT-note .ibH{color:#7a5b00}.ibT-ann{border-left-width:.45em;border-left-color:var(--ac,#f59e0b)}' +
+      '.ibClk{font-size:3.2em;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}.ibDt{font-size:1.2em;opacity:.8;margin-top:.2em}.ibB img{width:100%;height:100%;object-fit:contain;display:block}',
+    block: function (b, ctx) {
+      var E = IB.esc, t = IB.TYPES[b.t] ? b.t : 'text', bg = IB.col(b.bg, t === 'note' ? '#fde68a' : t === 'img' || t === 'text' ? 'transparent' : '#131c30'), ac = IB.col(b.c, t === 'note' ? '#7a5b00' : t === 'ann' ? '#f59e0b' : '#7fb2ff'), fs = Math.max(0.4, Math.min(4, +b.fs || 1));
+      var st = 'left:' + (+b.x || 0) + '%;top:' + (+b.y || 0) + '%;width:' + (+b.w || 10) + '%;height:' + (+b.h || 10) + '%;background:' + bg + ';--ac:' + ac + ';font-size:' + fs + 'em;text-align:' + (b.al === 'c' ? 'center' : b.al === 'r' ? 'right' : 'left') + ';z-index:' + (+b.z || 1) + (t === 'img' || t === 'text' ? ';padding:0' : '');
+      var h = '', L = IB.lines(b.tx), head = (b.ic || IB.TYPES[t][1] ? '<span>' + E(b.ic || IB.TYPES[t][1]) + '</span>' : '') + (b.ti ? '<span>' + E(b.ti) + '</span>' : '');
+      if (t === 'desk' || t === 'ask' || t === 'ann') h = (head ? '<div class="ibH">' + head + '</div>' : '') + L.map(function (x) { return '<p>' + E(x) + '</p>'; }).join('') + (b.lo ? '<span class="ibPill">' + E(b.lo) + '</span>' : '');
+      else if (t === 'note') h = (head ? '<div class="ibH">' + head + '</div>' : '') + '<ul>' + L.map(function (x) { return '<li>' + E(x) + '</li>'; }).join('') + '</ul>';
+      else if (t === 'text') h = L.map(function (x) { return '<p>' + E(x) + '</p>'; }).join('');
+      else if (t === 'clock') h = '<div class="ibClk" data-ibc="t"></div><div class="ibDt" data-ibc="d"></div>';
+      else if (t === 'img') h = /^data:image\/(png|jpe?g|webp|gif);base64,/.test(String(b.img || '')) ? '<img alt="" src="' + E(b.img) + '">' : '';
+      else if (t === 'today') { var T = (ctx && ctx.today) || null; h = '<div class="ibH"><span>\uD83D\uDCC5</span><span>' + E(b.ti || 'Today') + '</span></div>' + (T ? '<p><b>' + E(T.shift) + '</b> \u00B7 ' + E(T.range) + '</p><p>On the floor now: <b>' + (+T.on || 0) + '</b></p>' + (T.res && T.res.length ? '<p>Mentors on standby: ' + T.res.map(E).join(', ') + '</p>' : '') : '<p style="opacity:.6">No rotation for this time yet.</p>'); }
+      return '<div class="ibB ibT-' + t + '" data-ib="' + E(b.id) + '" style="' + st + '">' + h + '</div>';
+    },
+    stage: function (B, ctx) { var h = ''; if (B.head !== false) h += '<div class="ibHd"><span>' + IB.esc(B.title || '') + '</span><span data-ibc="hd"></span></div>'; (B.blocks || []).forEach(function (b) { h += IB.block(b, ctx); }); return h; },
+    /* draws the board into host (an element with a size) fitted by ratio; rot = 0/90/180/270 turns the whole picture (a TV standing on its side) */
+    mount: function (host, B, ctx, rot, opt) {
+      var W = host.clientWidth, H = host.clientHeight, r = IB.ratio(B), q = (rot === 90 || rot === 270), aw = q ? H : W, ah = q ? W : H, w = aw, h = w / r; if (h > ah) { h = ah; w = h * r; }
+      var u = Math.sqrt(w * h) / 55; host.innerHTML = '<div class="ibW" style="position:absolute;left:50%;top:50%;width:' + w + 'px;height:' + h + 'px;margin:' + (-h / 2) + 'px 0 0 ' + (-w / 2) + 'px;transform:rotate(' + (rot || 0) + 'deg)"><div class="ibS" style="width:100%;height:100%;font-size:' + u.toFixed(2) + 'px;background:' + IB.col(B.bg, '#0b1220') + '">' + IB.stage(B, ctx) + '</div></div>';
+      IB.tick(host); return host.querySelector('.ibS'); },
+    tick: function (root) { var n = new Date(), D = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], t = IB.pad(n.getHours()) + ':' + IB.pad(n.getMinutes()), d = D[n.getDay()] + ' ' + n.getDate() + ' ' + M[n.getMonth()];
+      Array.prototype.forEach.call(root.querySelectorAll('[data-ibc]'), function (e) { var k = e.getAttribute('data-ibc'); e.textContent = k === 't' ? t : k === 'd' ? d : d + ' \u00B7 ' + t; }); }
+  };
+  
+  /* information board: the picture is drawn into the whole window, the clock ticks every second */
+  function infoToday(){var N=nowParts(),el=N.h-D.start;if(D.date!==N.d&&el<0)el+=24;if(el<0||el>=D.len||!D.rows||!D.rows.length)return null;var q=Math.floor(el*2),on=0,res=[];D.rows.forEach(function(r){var v=String(q<r.c.length?r.c[q]:'').trim();if(!v||/^(off|x|-|—|\?)$/i.test(v))return;if(/^(r|res|reserve)$/i.test(v))res.push(String(r.n).split(' ')[0]);else on++});var SHN={morning:'Morning shift',afternoon:'Afternoon shift',night:'Night shift'};return{shift:SHN[D.shift]||D.shift,range:hh(D.start)+'–'+hh(D.start+D.len),on:on,res:res}}
+  function drawInfo(){var B=D.board;if(!B){msg('This information board is empty. Open the board in the tool and add blocks.');return}document.documentElement.style.cursor='none';document.body.style.background=IB.col(B.bg,'#0b1220');var st=document.getElementById('ibCssT');if(!st){st=document.createElement('style');st.id='ibCssT';st.textContent=IB.css+'#hd,#pg,#off{display:none!important}#bd{position:fixed;left:0;top:0;right:0;bottom:0;height:auto;padding:0}';document.head.appendChild(st)}
+    var bd=$('bd');bd.style.cssText='position:fixed;left:0;top:0;right:0;bottom:0;padding:0;overflow:hidden';var sig=JSON.stringify(B)+'|'+window.innerWidth+'x'+window.innerHeight+'|'+(D.date||'')+(D.shift||'');var t=infoToday();var sg2=sig+JSON.stringify(t);if(bd.getAttribute('data-sig')!==sg2){bd.setAttribute('data-sig',sg2);IB.mount(bd,B,{today:t},+B.rot||0)}else IB.tick(bd)}
   function draw(){
     if(!D)return;var S=D.screen||{},z=zl||S.zoom||1;
+    if(S.view==='info'){drawInfo();return}
     document.documentElement.style.setProperty('--z',z);document.documentElement.style.setProperty('--hz',Math.min(z,1.4));document.documentElement.style.setProperty('--nz',Math.max(1,Math.min(1.6,z)));
     document.title=(S.title||S.name||'Rotation');$('ti').textContent=S.title||S.name||'Rotation';
     if(D.empty||!D.rows||!D.rows.length){$('su').textContent='';msg(D.empty?'No rotation has been made for this time yet.':'Nobody in this rotation right now.');return}
@@ -128,7 +171,7 @@ tr.th td{background:transparent;color:var(--ac);font-size:calc(2.4vh*var(--z));f
   }
   function cellKey(r,i){var v=String(i<r.c.length?r.c[i]:'').trim();return /^(off|x|-|—|\?|)$/i.test(v)?'':v}
   function tick(){var n=new Date();$('clock').textContent=('0'+n.getHours()).slice(-2)+':'+('0'+n.getMinutes()).slice(-2);$('up').textContent=lastUp?'updated '+hh(new Date(lastUp).getHours()+new Date(lastUp).getMinutes()/60):'';if(D&&Math.floor(n.getTime()/30000)!==last){last=Math.floor(n.getTime()/30000);draw()}}
-  setInterval(tick,1000);tick();load();
+  setInterval(function(){var S=D&&D.screen;if(S&&S.view==='info'){var b=$('bd');if(b)IB.tick(b)}},1000);window.addEventListener('resize',function(){if(D&&D.screen&&D.screen.view==='info')drawInfo()});setInterval(tick,1000);tick();load();
   if(SERVER){setInterval(load,60000);try{var es=new EventSource('/api/tv-events?t='+encodeURIComponent(TOKEN));es.onmessage=function(){load()};es.onerror=function(){$('dot').className='off'};es.onopen=function(){$('dot').className=''}}catch(e){}}
   else setInterval(load,30000);
   document.addEventListener('keydown',function(e){if(e.key==='+'||e.key==='='){zl=Math.min(3,(zl||(D&&D.screen.zoom)||1)+.1);draw()}else if(e.key==='-'){zl=Math.max(.5,(zl||(D&&D.screen.zoom)||1)-.1);draw()}else if(e.key==='0'){zl=0;draw()}else if(e.key==='f'||e.key==='F'){if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()}});

@@ -4,7 +4,7 @@ const { State } = require('./store/state');
 const makeEnv = require('./rules/env'), createRules = require('./rules/rules');
 const sessionsFactory = require('./auth/session'), oidcFactory = require('./auth/oidc');
 const filesFactory = require('./services/files'), auditFactory = require('./services/audit'), mailFactory = require('./services/mail');
-const U = require('./http/util'), securityHeaders = require('./http/headers');
+const U = require('./http/util'), securityHeaders = require('./http/headers'), dynamics = require('./services/dynamics');
 
 /* per-person settings that are not shared data (theme, sounds, which location was open last). Kept on the server so they follow the person, not the laptop. */
 const PREF_KEYS = ['totAppTheme', 'totAppStyle', 'totSoundPrefs', 'totMusicPrefs', 'totConsentV1', 'totLastSite', 'rememberSupervisor', 'supFirstName'];
@@ -220,6 +220,17 @@ async function createApp(cfg, opts) {
       if (n > 16000) return U.sendJson(req, res, 413, { error: 'too large' });
       await db.q('INSERT INTO prefs(email,v,t) VALUES(?,?,?) ON CONFLICT(email) DO UPDATE SET v=excluded.v,t=excluded.t', [id.email, JSON.stringify(o), Date.now()]);
       return U.sendJson(req, res, 200, { ok: true }, { 'Cache-Control': 'no-store' });
+    }
+    /* HR: employees from Microsoft Dynamics 365. The connection secret lives only in the server settings (PTF_DYN_*); the browser gets the list of people, never the secret. Admin, managers and HR only. */
+    if (m === 'POST' && p === '/api/hr/dynamics') {
+      if (req.headers['x-ptf-csrf'] !== id.csrf) { audit.log(id.email, 'csrf.refused', p, ip); return U.sendJson(req, res, 403, { error: 'forbidden' }); }
+      const org2 = req.headers.origin; if (org2 && cfg.publicUrl && org2 !== cfg.publicUrl) { audit.log(id.email, 'origin.refused', String(org2).slice(0, 100), ip); return U.sendJson(req, res, 403, { error: 'forbidden' }); }
+      const w2 = id.admin ? { role: 'admin' } : rules.whoIs_(state.cur, id.email), r2 = String(w2.role || '');
+      if (!(id.admin || r2 === 'manager' || /^hr/i.test(r2))) return U.sendJson(req, res, 403, { error: 'not allowed' });
+      if (!limit('dyn:' + id.email, 10, 60e3)) return U.sendJson(req, res, 429, { error: 'busy' }, { 'Retry-After': '20' });
+      let b2; try { b2 = JSON.parse(await U.readBody(req, 4096)); } catch (e) { return U.sendJson(req, res, 400, { error: 'bad request' }); }
+      const prev = !!b2 && b2.mode === 'preview', out2 = await dynamics.pull(prev); audit.log(id.email, prev ? 'hr.dynamics.preview' : 'hr.dynamics.pull', out2.ok ? String(out2.count) + ' records' : 'failed: ' + String(out2.error || '').slice(0, 80), ip);
+      return U.sendJson(req, res, 200, out2, { 'Cache-Control': 'no-store' });
     }
     if (m === 'POST' && (p === '/api/rpc' || p === '/api/employee')) {
       // CSRF: a custom header that a cross-site form or image cannot send, plus the Origin check

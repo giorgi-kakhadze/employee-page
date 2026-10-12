@@ -160,6 +160,17 @@ function tvFind_(K, token) {
   }); return hit;
 }
 function tvDay_(ds, off) { var d = new Date(ds + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + off); return d.toISOString().slice(0, 10); }
+/* v3.42 information board: only known block types, numbers within the screen, short texts, hex colours and small pictures (data: images only) */
+function board_(b) {
+  if (!b || typeof b !== 'object') return null;
+  var FM = { '16:9': 1, '9:16': 1, '32:9': 1, '9:32': 1, '21:9': 1, '4:3': 1, '3:4': 1, '1:1': 1, custom: 1 }, TY = { desk: 1, ask: 1, note: 1, ann: 1, text: 1, clock: 1, today: 1, img: 1 }, num = function (v, lo, hi, d) { v = +v; return isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d; }, hex = function (c) { c = String(c || ''); return /^#[0-9a-fA-F]{6}$/.test(c) ? c : ''; }, str = function (t, n) { return String(t == null ? '' : t).slice(0, n); };
+  var out = { fmt: FM[b.fmt] ? b.fmt : '16:9', w: num(b.w, 1, 64, 16), h: num(b.h, 1, 64, 9), rot: [0, 90, 180, 270].indexOf(+b.rot) >= 0 ? +b.rot : 0, bg: hex(b.bg) || '#0b1220', head: b.head !== false, title: str(b.title, 120), blocks: [] };
+  (Array.isArray(b.blocks) ? b.blocks : []).slice(0, 80).forEach(function (x) {
+    if (!x || !TY[x.t]) return; var o = { id: str(x.id, 24).replace(/[^A-Za-z0-9_-]/g, ''), t: x.t, x: num(x.x, -5, 100, 0), y: num(x.y, -5, 100, 0), w: num(x.w, 2, 100, 10), h: num(x.h, 2, 100, 10), z: num(x.z, -50, 500, 1), fs: num(x.fs, 0.4, 4, 1), al: x.al === 'c' || x.al === 'r' ? x.al : 'l', ti: str(x.ti, 120), tx: str(x.tx, 1500), lo: str(x.lo, 80), ic: str(x.ic, 8), c: hex(x.c), bg: hex(x.bg) };
+    if (x.t === 'img') { var im = String(x.img || ''); if (/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+\/=]+$/.test(im) && im.length <= 250000) o.img = im; }
+    out.blocks.push(o); });
+  return out;
+}
 function tv_(b) {
   var K = (readJ_(file_(DATA, '{"keys":{}}'), { keys: {} }).keys) || {}, hit = tvFind_(K, b && b.token); if (!hit) return { error: 'not found' };
   var s = hit.s, ds = /^\d{4}-\d{2}-\d{2}$/.test(String(b.d || '')) ? String(b.d) : Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd'), hr = isFinite(+b.h) && +b.h >= 0 && +b.h < 24 ? +b.h : (+Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH') + +Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'mm') / 60);
@@ -175,7 +186,8 @@ function tv_(b) {
   }
   var teams = (S.teams || []).map(function (t) { return { id: String(t.id), name: String(t.name || '').slice(0, 40) }; }), tf = Array.isArray(s.teams) ? s.teams.map(String) : [], pf = Array.isArray(s.pos) ? s.pos.map(String) : [];
   var posOf = {}; ((S.roster && S.roster.people) || []).forEach(function (p) { if (p && p.name) posOf[String(p.name).trim().toLowerCase()] = String(p.pos || ''); });
-  var out = { ok: true, screen: { name: String(s.name || '').slice(0, 60), title: String(s.title || '').slice(0, 80), view: s.view === 'full' ? 'full' : s.view === 'board' || s.view === 'boardfull' ? s.view : 'now', zoom: Math.max(0.5, Math.min(3, +s.zoom || 1)), names: s.names === 'full' || s.names === 'first' ? s.names : 'short', zinfo: s.zinfo === 'cell' || s.zinfo === 'both' ? s.zinfo : 'legend', ahead: Math.max(1, Math.min(12, +s.ahead || 4)), rowsPer: Math.max(0, Math.min(40, +s.rowsPer || 0)), u: +s.u || 0 }, now: { d: ds, h: hr }, teams: [], rows: [], zones: {}, updated: +(K[hit.pre + 'totSchedule'] && K[hit.pre + 'totSchedule'].t) || 0 };
+  var out = { ok: true, screen: { name: String(s.name || '').slice(0, 60), title: String(s.title || '').slice(0, 80), view: s.view === 'full' ? 'full' : s.view === 'board' || s.view === 'boardfull' || s.view === 'info' ? s.view : 'now', zoom: Math.max(0.5, Math.min(3, +s.zoom || 1)), names: s.names === 'full' || s.names === 'first' ? s.names : 'short', zinfo: s.zinfo === 'cell' || s.zinfo === 'both' ? s.zinfo : 'legend', ahead: Math.max(1, Math.min(12, +s.ahead || 4)), rowsPer: Math.max(0, Math.min(40, +s.rowsPer || 0)), u: +s.u || 0 }, now: { d: ds, h: hr }, teams: [], rows: [], zones: {}, updated: +(K[hit.pre + 'totSchedule'] && K[hit.pre + 'totSchedule'].t) || 0 };
+  if (out.screen.view === 'info') out.board = board_(s.board);   /* v3.42 information board: a free layout of blocks; the rotation data below is only used by the "today" block */
   if (!pick) { out.empty = true; return out; }
   var w2 = win(pick.sh, pick.k); out.date = pick.d; out.shift = pick.k; out.start = w2.s; out.len = w2.L;
   var zc = (cfg.zoneTeams || {}), seenT = {};
