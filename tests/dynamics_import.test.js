@@ -27,7 +27,7 @@ const MURL = 'https://script.google.com/macros/s/MAILER/exec';
   const call = (b) => JSON.parse(sandbox.doPost({ postData: { contents: JSON.stringify(b) } }).s);
   console.log('1. The Google script (the text the tool offers)');
   let j = call({ key: 'ADM', action: 'dynamics', mode: 'pull' });
-  ok('only the admin key may ask; the team key and a wrong key are refused', call({ key: 'ADM2', action: 'dynamics' }).error === 'wrong key');
+  ok('only the admin key may ask; the team key and a wrong key are refused', /^wrong key/.test(call({ key: 'ADM2', action: 'dynamics' }).error));
   ok('the pull returns the people in the import columns (3 people from 2 pages)', j.ok && j.count === 3 && JSON.stringify(j.data[0]) === JSON.stringify(['Full Name', 'HR ID', 'Email Address', 'Start Date', 'End Date', 'Position', 'Status']) && j.data[1][1] === 'H1' && j.data[3][1] === 'H3', JSON.stringify(j).slice(0, 300));
   ok('the person with a past end date is Terminated, the others Employed', j.data[2][6] === 'Terminated' && j.data[1][6] === 'Employed');
   ok('the second page was read from the same Dynamics address', fetched.some(u => /page=2/.test(u)));

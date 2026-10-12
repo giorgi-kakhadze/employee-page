@@ -9,7 +9,7 @@ module.exports = async function (toolPath, gas) {
     p.on('dialog', d => d.accept());
     await p.route(URL + '**', async r => { const body = r.request().postData(); let out; try { out = gas.post(body); } catch (e) { out = { error: 'server crash: ' + e.message }; errs.push('SERVER ' + e.stack); } await r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(out) }); });
     await p.addInitScript(w => {
-      if (sessionStorage.getItem('__init')) return; sessionStorage.setItem('__init', '1');
+      if (sessionStorage.getItem('__init') || window.name === '__noinit') return; sessionStorage.setItem('__init', '1');   /* window.name '__noinit': a test that signs in through the real sign-in screen */
       localStorage.setItem('totSyncCfg', JSON.stringify(w.admin ? { url: w.url, key: 'ADMKEY' } : { url: w.url }));
       if (w.admin) sessionStorage.setItem('totAdmin', '1');
       else localStorage.setItem('totAuth', JSON.stringify({ email: w.email, pwHash: w.pw, t: Date.now() }));
