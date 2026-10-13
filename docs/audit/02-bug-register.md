@@ -56,6 +56,13 @@ Line numbers refer to the files delivered with this audit. "Test" names a file i
 - **Fix:** Status column "Built · needs settings" and a plain explanation of what HR/IT must provide.
 - **Status:** Fixed.
 
+## F-08 · High · Onboarding paste filled every column with M / F
+
+- **Evidence:** reported with a screenshot: after pasting trainee rows into Onboarding → "Paste here", Employee ID, Last Name, First Name, Phone, E-mail, EmpStage, Trainer e-mail and Team all showed M or F. Reproduced by `onboarding_paste.test.js` on the previous file (10 failed checks).
+- **Root cause:** the header search matched loosely in both directions. A data cell "m" is contained in "email" and "last name", so a data row became the header row; every field whose name contains an "m" was then read from the Gender column.
+- **Fix:** `hdrLike()` — a cell matches a header name only if it is the name, or at least 3 characters and contains it, or at least 4 characters and is part of it. Rows with an e-mail or a 6+ digit number are never headers. Used by the Information-sheet import, the "Paste here" import and the trainee header lookup.
+- **Status:** Fixed. **Test:** `onboarding_paste.test.js` ✅ (rows without a header, with the header, after empty lines).
+
 ---
 
 ## Earlier in this work period (already delivered, listed for completeness)

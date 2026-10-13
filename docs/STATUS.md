@@ -34,6 +34,8 @@ Checked against `docs/platform-requirements.txt` (35 sections), using the code i
 
 "v3.28" marks department overviews, the FMD staff directory, the change journal (history per department and per person), Settings, and evaluation media and types (see `docs/v3_28_notes.md`).
 
+"October 2026" marks the full audit (shared-browser safety, Home only for accounts without a position, admin keys, safe CSV, local dates), documents with versions and read-and-confirm, the shift handover log, admin-only backup and clear, and the earlier steps of v3.40 (absence and cover, request rules, confirmations, notifications, Today, payroll export, mentors, information board, Microsoft Dynamics 365) — see `docs/audit/` and `docs/v3_40_notes.md`.
+
 Legend: **Done** = works in the tool today · **Partial** = some of it works, the rest is listed · **Missing** = not built · **Not connected** = the screens and rules exist, but no live connection, on purpose (no fake integrations).
 
 "v3.22" marks what this round added.

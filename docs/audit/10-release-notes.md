@@ -24,6 +24,11 @@ The app version label stays **3.40**; this update is applied on top of it.
 - Department documents: version, "staff must read and confirm", who has confirmed, "Who has not?", re-confirm on a new version.
 - Today screen: shift handover log with "I have read it", writer-only editing, locked once read.
 
+**Follow-up fixes after the audit**
+- F-08 Onboarding → "Paste here": a pasted Gender cell (M / F) was taken as a header row, so every column whose name contains an "m" (Employee ID, names, phone, e-mail, team …) was filled with M or F. Header detection now needs real header text and never treats a row with an e-mail or phone number as a header. Test: `onboarding_paste.test.js`.
+- Backup and Clear history in every space (and Backup / Clear employee data) are for the **admin only**; staff don't see them and the actions are refused for them, also from the browser console and while the admin uses View as. Test: `space_backup_admin.test.js`.
+- Home is shared by every department: the Logbook descriptions card is removed (Logbooks shows it), and the Last backup card is shown to the admin only. Test: `home_cards.test.js`.
+
 ## Known issues and limits
 - A confirmation proves the button was pressed, not understanding.
 - "Who has not?" counts people with a position in Access management. People only in the employee list (without an account) are not counted.

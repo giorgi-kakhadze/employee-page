@@ -13,3 +13,5 @@ Two editions of the same tool. **Say which one when you ask for a change.**
 
 * Start here for the Server Edition: [`ptf-gunda-server/README.md`](ptf-gunda-server/README.md) and `ptf-gunda-server/docs/`.
 * The single-file edition: [`tool/`](tool/), tests in [`tests/`](tests/), notes per version in [`docs/`](docs/), a demo company in [`demo/`](demo/).
+* October 2026 audit and updates: [`docs/audit/`](docs/audit/) (audit report, bug register, tests, security, release notes, user guide) and [`docs/v3_40_notes.md`](docs/v3_40_notes.md). What the tool can do, in two pages: [`PTF-Gunda-Capabilities.pdf`](PTF-Gunda-Capabilities.pdf).
+* **Before deploying `tool/Code.gs`:** change `ADMIN_SECRET` (the example key is refused) and deploy a new version.

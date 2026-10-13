@@ -188,3 +188,12 @@ Give everyone the new `tool/PTF-pass-to-floor-Gunda.html`, **deploy the new `Cod
 - Cause 3: the gap check counted all tables when "auto from staff" was on ("1504 table-slots have nobody" for a correct rotation).
 - Cause 4: **Generate whole shift** ignored absences, so the absent person worked again while the 🚑 mark still showed.
 - Fix: the re-plan uses the same grouping and table count as Generate; the gap check uses the same table count; Generate keeps absences. Test: `tests/cover_auto.test.js` (fails on the old code, passes now).
+
+## October 2026 audit and follow-ups
+The full audit (findings, fixes, tests, security, department plan, integrations, user guide, release notes) is in `docs/audit/`. New since the steps above:
+- Documents in every department: version, "staff must read and confirm", "Who has not?" (server-checked: `totDocAcks`).
+- Today screen: shift handover log with "I have read it" (server-checked: `totHandover`).
+- Shared computers: the browser is cleared when a different person signs in; accounts without a position see Home only.
+- Example admin keys in Code.gs and the mailer script are refused; CSV exports are protected against formulas; "overdue" / "this month" use local time.
+- Onboarding "Paste here" no longer fills every column with M / F (F-08).
+- Backup and Clear history (every space, Employee Data) are for the admin only; Home no longer shows Logbook descriptions, and Last backup only to the admin.
