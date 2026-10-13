@@ -6724,20 +6724,9 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
     html += '<div class="hs-item"><span>Evaluations saved</span><b>' + recs.length + '</b><span>' + todayN + ' today</span></div>';
     html += '<div class="hs-item' + (empN ? ' hs-accent' : '') + '"><span>Employees in data source</span><b>' + empN + '</b><span>' + (empN ? 'Searchable in Exam &amp; ID' : 'Import on this page') + '</span></div>';
     if (sessionText) html += '<div class="hs-item hs-accent"><span>Unfinished session</span><b style="font-size:14px">' + sessionText + '</b><button type="button" onclick="switchView(\'exam\')">Resume in Exam</button></div>';
-    html += '<div class="hs-item' + (stale ? ' warn' : '') + '"><span>Last backup</span><b>' + backupText + '</b>' +
+    html += '<div class="hs-item adminOnlyData' + (stale ? ' warn' : '') + '"><span>Last backup</span><b>' + backupText + '</b>' +
             (stale ? '<button type="button" onclick="exportBackup()">Back up now</button>' : '<span>&nbsp;</span>') + '</div>';
-    try {
-      const games = (typeof lbGetGamesFromExam === 'function') ? lbGetGamesFromExam() : [];
-      const descs = (typeof lbLoadDescriptions === 'function') ? lbLoadDescriptions() : {};
-      const totalG = games.length;
-      let configured = 0;
-      games.forEach(function (g) { if (descs[g.id] && String(descs[g.id]).trim()) configured++; });
-      if (totalG) {
-        const allOk = configured === totalG;
-        html += '<div class="hs-item' + (allOk ? '' : ' warn') + '"><span>Logbook descriptions</span><b>' + configured + ' / ' + totalG + '</b><span>' +
-          (allOk ? 'All configured' : (totalG - configured) + ' need a description') + '</span></div>';
-      }
-    } catch (eLb) {}
+    /* Logbook descriptions are not shown on Home: Home is shared by every department (Logbooks shows them itself) */
     if (false) html += '<div class="hs-item warn"><span>Browser storage</span><b>~' + pct + '% used</b><span>Back up and clear old data soon</span></div>';
     if (corrupt) html += '<div class="hs-item warn"><span>Unreadable data</span><b>' + corrupt + ' item(s) set aside</b><span>Kept in storage; included in backups</span></div>';
     el.innerHTML = html;
