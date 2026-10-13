@@ -1,0 +1,8 @@
+node_modules
+data
+test
+loadtest
+docs
+infra
+.git
+*.md

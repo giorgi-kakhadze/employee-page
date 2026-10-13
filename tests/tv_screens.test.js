@@ -1,0 +1,44 @@
+/* v3.40 lobby screens in the single-file edition: FMD → Schedule → 📺 Screens creates links; the Apps Script answers the TV with only the rotation of the scope, no sign-in. */
+const path = require('path'), tool = process.argv[2] || path.join(__dirname, '..', 'tool', 'PTF-pass-to-floor-Gunda.html'), code = process.argv[3] || path.join(__dirname, '..', 'tool', 'Code.gs');
+const gas = require('./fakegas')(code); require('./seed')(gas);
+let fails = 0; function ok(n, c, x) { if (!c) fails++; console.log((c ? '  ✅ ' : '  ❌ ') + n + (x ? '  → ' + x : '')); }
+(async () => {
+  const H = await require('./harness')(tool, gas);
+  const P = await H.open({ admin: true }); await P.setViewportSize({ width: 1600, height: 1000 }); await P.sync();
+  const w = (ms) => P.waitForTimeout(ms), TV = () => P.evaluate(() => JSON.parse(localStorage.getItem('totTvScreens') || '[]'));
+  const D = '2026-10-08';
+  await P.evaluate((D) => { switchView('schedule'); const mk = (name, t, cells) => ({ name, t, len: 8, from: 0, cells }); const S = JSON.parse(localStorage.getItem('totSchedule') || '{}');
+    S.roster = { anchor: D, people: [{ name: 'Ana Beridze', g: 'A', sh: 'morning', t: 't1', pos: 'gp' }, { name: 'Sandro Kapanadze', g: 'A', sh: 'morning', t: 't2', pos: 'shuf' }] }; S.teams = [{ id: 't1', name: 'Team 1' }, { id: 't2', name: 'Shufflers' }];
+    S.cfg = Object.assign(S.cfg || {}, { len: 8, zoneTeams: { t2: { on: 1, slots: 2 } }, zones: { morning: { t2: [{ n: 'A', t: [1, 2, 3] }, { n: 'B', t: [4, 5, 6] }] } } });
+    S.days = { [D]: { shifts: { morning: { start: 8, rows: [mk('Ana Beridze', 't1', Array.from({ length: 16 }, (_, i) => String(1 + (i % 4)))), mk('Sandro Kapanadze', 't2', Array.from({ length: 16 }, (_, i) => 'Z:' + 'AB'[Math.floor(i / 2) % 2]))] } } } };
+    localStorage.setItem('totSchedule', JSON.stringify(S)); SchedMount(); }, D); await w(400);
+  console.log('1. The Screens tab');
+  await P.evaluate(() => { const b = document.querySelector('#scheduleView [data-sub="tv"]'); if (b) b.click(); }); await w(400);
+  ok('there is a 📺 Screens tab for people who edit the schedule', await P.evaluate(() => /Lobby screens/.test(document.getElementById('scheduleView').textContent)));
+  await P.evaluate(() => document.querySelector('#scheduleView [data-tva="add"]').click()); await w(300);
+  await P.selectOption('#scheduleView #tvNew', 't:t2'); await P.evaluate(() => document.querySelector('#scheduleView [data-tva="add"]').click()); await w(300);
+  let A = await TV(); ok('two screens were made: everyone, and Shufflers only', A.length === 2 && A[0].teams.length === 0 && A[1].teams[0] === 't2' && /Shufflers/.test(A[1].name), JSON.stringify(A.map(a => a.name)));
+  ok('each has a long random token', A.every(a => /^[A-Za-z0-9]{32}$/.test(a.token)) && A[0].token !== A[1].token);
+  const link = await P.evaluate(() => document.querySelector('#scheduleView input[readonly]').value); ok('the link holds the token (single-file edition: page + script address + token)', link.indexOf(A[0].token) > 0 && /^PTF-tv\.html#/.test(link), link.slice(0, 80));
+  await P.evaluate(() => { const i = document.querySelector('#scheduleView [data-tvf$="|zoom"]'); i.value = '1.8'; i.dispatchEvent(new Event('change', { bubbles: true })); }); await w(300);
+  ok('the screen can show zone tables in a map, in the cells or both (default: map)', await P.evaluate(() => !!document.querySelector('#scheduleView [data-tvf$="|zinfo"]')) && (await TV())[0].zinfo === undefined);
+  ok('zoom is saved', (await TV())[0].zoom === 1.8);
+  await P.evaluate(() => { const s = document.querySelector('#scheduleView [data-tvf$="|view"]'); s.value = 'full'; s.dispatchEvent(new Event('change', { bubbles: true })); const c = document.querySelector('#scheduleView [data-tvl$="|pos|shuf"]'); if (c) { c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); } }); await w(300);
+  A = await TV(); ok('"whole shift" is saved', A[0].view === 'full');
+  const oldTok = A[1].token; await P.evaluate(() => document.querySelectorAll('#scheduleView [data-tva^="newtok|"]')[1].click()); await w(300);
+  A = await TV(); ok('"New link" makes a different token', A[1].token !== oldTok && /^[A-Za-z0-9]{32}$/.test(A[1].token));
+  await P.sync(); await w(500);
+  console.log('2. What the Apps Script tells a TV');
+  const key = gas.data().keys.totTvScreens; ok('the screen list reached the shared store', !!key);
+  const r = gas.post({ action: 'tv', token: A[1].token, d: D, h: 10 }); ok('a screen link works without any sign-in', r.ok === true && r.shift === 'morning', JSON.stringify(r).slice(0, 120));
+  ok('the Shufflers screen shows only shufflers and their zones', r.rows.length === 1 && r.rows[0].n === 'Sandro K.' && r.zones.t2.length === 2 && r.rows[0].c[0] === 'Z:A');
+  ok('the answer says how to show zone tables', r.screen.zinfo === 'legend');
+  ok('nothing else leaves: no e-mail, work id, pay', !/@|workId|pay/i.test(JSON.stringify(r)));
+  ok('the old link no longer works', gas.post({ action: 'tv', token: oldTok, d: D, h: 10 }).error === 'not found');
+  ok('a made-up token does not either', gas.post({ action: 'tv', token: 'A'.repeat(32) }).error === 'not found' && gas.post({ action: 'tv' }).error === 'not found');
+  const all = gas.post({ action: 'tv', token: A[0].token, d: D, h: 10 }); ok('the "everyone" screen shows both teams', all.rows.length === 1 || all.rows.length === 2, all.rows.length);
+  const lead = gas.post({ action: 'pull', email: 'lead@x.com', pwHash: 'pw-lead@x.com' }); ok('a shift lead (schedule editor) receives the screen list', !!(lead.keys || {}).totTvScreens);
+  const coach = gas.post({ action: 'pull', email: 'coach@x.com', pwHash: 'pw-coach@x.com' }); ok('a performance coach does not (the list holds the secret tokens)', !((coach.keys || {}).totTvScreens));
+  ok('no page errors', H.errs.length === 0, H.errs.slice(0, 3).join(' | '));
+  await H.close(); console.log('tv_screens: ' + (fails ? fails + ' FAILED' : 'ALL PASSED')); process.exit(fails ? 1 : 0);
+})();

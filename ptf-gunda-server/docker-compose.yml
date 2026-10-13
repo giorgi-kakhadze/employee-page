@@ -1,0 +1,21 @@
+# Local trial with a real PostgreSQL:  docker compose up --build   then open http://localhost:8080
+# Development login (no Microsoft account needed) is ON here and must never be used on a shared server.
+services:
+  db:
+    image: postgres:16
+    environment: { POSTGRES_USER: ptf, POSTGRES_PASSWORD: ptf, POSTGRES_DB: ptf }
+    volumes: [ "pgdata:/var/lib/postgresql/data" ]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U ptf"], interval: 5s, retries: 10 }
+  app:
+    build: .
+    depends_on: { db: { condition: service_healthy } }
+    ports: [ "8080:8080" ]
+    environment:
+      PTF_ENV: dev
+      PTF_DEV_LOGIN: "1"
+      PTF_PUBLIC_URL: http://localhost:8080
+      DATABASE_URL: postgres://ptf:ptf@db:5432/ptf
+      DATABASE_SSL: ""
+      PTF_DATA_DIR: /app/data
+    volumes: [ "files:/app/data" ]
+volumes: { pgdata: {}, files: {} }

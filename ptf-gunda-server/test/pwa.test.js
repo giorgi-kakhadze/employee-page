@@ -1,0 +1,32 @@
+'use strict';
+/* The employee page as a phone app on the Server Edition: public manifest, service worker and icons; offline copy only when the person agrees; gone at sign-out. */
+const { ok, section, done, sample } = require('./util'); const { start } = require('./lib');
+const { chromium } = (function () { try { return require('playwright'); } catch (e) { return require(require('child_process').execSync('npm root -g').toString().trim() + '/playwright'); } })();
+(async () => {
+  const S = await start({}), now = Date.now(), K = sample(), em = 'ana@x.com';
+  const d = new Date(Date.now() + 864e5), iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  K.totMySchedules = { v: JSON.stringify({ byEmail: { [em]: { name: 'Ana', team: 't1', shift: 'morning', ver: 'v1', vat: now, sx: [{ d: iso, s: 'morning', f: 8, t: 16 }], rx: [{ d: iso, s: 'morning', f: 8, c: ['3', '3', '4', '4', 'b', 'b', '5', '5'] }], bal: { y: String(d.getFullYear()), allow: 28, used: 4 } } }, sent: {} }), t: now };
+  await S.state.replaceAll({ keys: K });
+  section('1. The phone-app files are public and carry no personal data');
+  let r = await fetch(S.base + '/employee.webmanifest'); const mf = await r.json();
+  ok('the manifest opens without signing in, as a standalone app of the employee page', r.status === 200 && /manifest\+json/.test(r.headers.get('content-type')) && mf.display === 'standalone' && mf.start_url === '/employee' && mf.scope === '/employee', r.status + ' ' + JSON.stringify(mf).slice(0, 160));
+  r = await fetch(S.base + '/employee-sw.js'); const sw = await r.text(); ok('the service worker opens without signing in and never caches the API', r.status === 200 && /javascript/.test(r.headers.get('content-type')) && /\/api\\\//.test(sw), r.status);
+  let icons = true; for (const i of mf.icons) { const x = await fetch(S.base + i.src); if (x.status !== 200 || !/image\/png/.test(x.headers.get('content-type'))) icons = false; } ok('every icon opens', icons);
+  r = await fetch(S.base + '/employee', { redirect: 'manual' }); ok('the employee page itself still needs the sign-in', r.status === 302, r.status);
+  ok('the security policy allows the manifest and the worker, nothing else new', /manifest-src 'self'/.test(r.headers.get('content-security-policy') || '') && /worker-src 'self'/.test(r.headers.get('content-security-policy') || ''));
+  section('2. In a browser: installable, offline copy only by choice, removed at sign-out');
+  const br = await chromium.launch(), ctx = await br.newContext({ viewport: { width: 390, height: 844 } }), pg = await ctx.newPage(), errs = []; pg.on('pageerror', (e) => errs.push(e.message)); pg.on('dialog', (x) => x.accept());
+  await pg.goto(S.base + '/dev/login?email=' + encodeURIComponent(em) + '&name=Ana'); await pg.goto(S.base + '/employee'); await pg.waitForTimeout(2000);
+  await pg.evaluate(() => navigator.serviceWorker.ready); await pg.reload(); await pg.waitForTimeout(1500);
+  ok('the service worker controls the employee page', await pg.evaluate(() => !!navigator.serviceWorker.controller));
+  let t = await pg.evaluate(() => document.body.innerText); ok('Home shows the phone card with the offline choice', /My phone/.test(t) && /Keep my schedule and rotation on this phone/.test(t), t.slice(0, 160));
+  ok('nothing is kept on the phone by default', await pg.evaluate(() => localStorage.length === 0));
+  await pg.evaluate(() => { const k = document.getElementById('keepChk'); k.checked = true; k.dispatchEvent(new Event('change')); }); await pg.waitForTimeout(300);
+  const c = await pg.evaluate(() => JSON.parse(localStorage.getItem('ptfEmpCache') || 'null')); ok('after the choice: schedule, rotation and vacation days are saved, no pay or results', c && c.d.rotation && c.d.leave && !c.d.pay && !c.d.evaluations, c && Object.keys(c.d).join());
+  await ctx.setOffline(true); await pg.reload(); await pg.waitForTimeout(2000); t = await pg.evaluate(() => document.body.innerText);
+  ok('offline: the page opens from the worker and shows the saved rotation', /You are offline/.test(t) || /saved on this phone/.test(t), t.slice(0, 200));
+  await pg.evaluate(() => { tab = 'rotation'; show(); }); t = await pg.evaluate(() => document.body.innerText); ok('offline: tables are shown', /Table 3/.test(t));
+  await ctx.setOffline(false); await pg.goto(S.base + '/employee'); await pg.waitForTimeout(1500); await pg.evaluate(() => { const b = document.querySelector('#app button[onclick*="/auth/logout"]'); b && b.click(); }); await pg.waitForTimeout(1500);
+  ok('after signing out the copy and the choice are gone', await pg.evaluate(() => localStorage.getItem('ptfEmpCache') === null && localStorage.getItem('ptfEmpKeep') === null));
+  ok('no page errors', errs.length === 0, errs.slice(0, 3).join(' | ')); await br.close(); await S.close(); done('pwa');
+})().catch((e) => { console.error(e); process.exit(1); });

@@ -1,0 +1,39 @@
+# GitHub Actions: test, audit, deploy. Copy to .github/workflows/ in the repository that holds the server.
+# NOT RUN: written without a GitHub runner or Azure subscription. Needs repository secrets AZURE_CREDENTIALS (or OIDC login) and the variable APP_NAME / RESOURCE_GROUP.
+name: ptf-server
+on:
+  push: { branches: [ main ], paths: [ 'ptf-gunda-server/**' ] }
+  workflow_dispatch: {}
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: [ '5432:5432' ]
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 10
+    defaults: { run: { working-directory: ptf-gunda-server } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run build && git diff --exit-code public src/rules   # the committed build must match the sources
+      - run: npm test
+        env: { TEST_PG_URL: 'postgres://postgres:postgres@localhost:5432/postgres' }
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    defaults: { run: { working-directory: ptf-gunda-server } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci --omit=dev
+      - run: zip -qr ../app.zip package.json src public node_modules scripts
+      - uses: azure/login@v2
+        with: { creds: '${{ secrets.AZURE_CREDENTIALS }}' }
+      - run: az webapp deploy -g ${{ vars.RESOURCE_GROUP }} -n ${{ vars.APP_NAME }} --src-path ../app.zip --type zip

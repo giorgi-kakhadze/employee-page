@@ -1,0 +1,216 @@
+{
+ "when": "2026-10-08T07:11:19.497Z",
+ "machine": "4 cores, 16 GB (load generator, server and PostgreSQL on the same machine)",
+ "staff": 500,
+ "employees": 300,
+ "instances": 1,
+ "people": 5365,
+ "rampSeconds": 240,
+ "steadySeconds": 120,
+ "peakStaffOnline": 500,
+ "serverCpuSecondsPerInstance": [
+  263.2
+ ],
+ "avgServerCpuPercentOfOneCore": [
+  73
+ ],
+ "serverRssMBmax": 1421,
+ "eventLoopLagP99msMax": 238.55,
+ "eventLoopLagMaxMs": 793.25,
+ "errors": {
+  "(info) save conflict, merged and retried": 864
+ },
+ "serverRuleMs": {
+  "me": {
+   "n": 1345,
+   "p50": 3.1,
+   "p95": 8.1,
+   "p99": 9.1,
+   "max": 101.5
+  },
+  "push": {
+   "n": 1484,
+   "p50": 0.4,
+   "p95": 17.5,
+   "p99": 27.8,
+   "max": 92.5
+  },
+  "pull": {
+   "n": 29972,
+   "p50": 0.8,
+   "p95": 2.2,
+   "p99": 4.9,
+   "max": 78.6
+  }
+ },
+ "serverHttpMs": {
+  "other": {
+   "n": 801,
+   "p50": 1,
+   "p95": 14.2,
+   "p99": 15.5,
+   "max": 150.9
+  },
+  "sign-in": {
+   "n": 800,
+   "p50": 4.1,
+   "p95": 36.3,
+   "p99": 36.9,
+   "max": 267.4
+  },
+  "boot": {
+   "n": 500,
+   "p50": 91.5,
+   "p95": 279,
+   "p99": 279,
+   "max": 2669.8
+  },
+  "page": {
+   "n": 300,
+   "p50": 2.9,
+   "p95": 8.7,
+   "p99": 8.7,
+   "max": 50.7
+  },
+  "employee:me": {
+   "n": 1345,
+   "p50": 87.9,
+   "p95": 254.7,
+   "p99": 267,
+   "max": 1511.5
+  },
+  "rpc:push": {
+   "n": 1484,
+   "p50": 44.6,
+   "p95": 227.8,
+   "p99": 283.5,
+   "max": 1394.6
+  },
+  "rpc:pull": {
+   "n": 29820,
+   "p50": 158,
+   "p95": 472.4,
+   "p99": 561.2,
+   "max": 2880.9
+  }
+ },
+ "latencyMs": [
+  {
+   "action": "boot (full data for this person)",
+   "n": 500,
+   "p50": 56.7,
+   "p95": 1634.5,
+   "p99": 3908.9,
+   "max": 5422.5,
+   "MBsent": 225.8
+  },
+  {
+   "action": "boot size KB (uncompressed)",
+   "n": 500,
+   "p50": 4388.2,
+   "p95": 9249.6,
+   "p99": 9268.3,
+   "max": 9271.8,
+   "MBsent": ""
+  },
+  {
+   "action": "delta size KB",
+   "n": 30008,
+   "p50": 80.4,
+   "p95": 2176.4,
+   "p99": 3774.2,
+   "max": 4926.1,
+   "MBsent": ""
+  },
+  {
+   "action": "employee page (html)",
+   "n": 300,
+   "p50": 2,
+   "p95": 412.7,
+   "p99": 1972.8,
+   "max": 2080.4,
+   "MBsent": 3.4
+  },
+  {
+   "action": "employee page data (me)",
+   "n": 1347,
+   "p50": 32.1,
+   "p95": 2116.2,
+   "p99": 3970.6,
+   "max": 5762.5,
+   "MBsent": 0.6
+  },
+  {
+   "action": "login",
+   "n": 800,
+   "p50": 3.6,
+   "p95": 846.1,
+   "p99": 2296,
+   "max": 3188.9,
+   "MBsent": ""
+  },
+  {
+   "action": "pull (2-minute safety poll)",
+   "n": 854,
+   "p50": 80.2,
+   "p95": 2828.2,
+   "p99": 4879.7,
+   "max": 6421.8,
+   "MBsent": 44.3
+  },
+  {
+   "action": "pull (after conflict)",
+   "n": 864,
+   "p50": 142.6,
+   "p95": 3117.3,
+   "p99": 4915.3,
+   "max": 6787.1,
+   "MBsent": 61.5
+  },
+  {
+   "action": "pull (before write)",
+   "n": 894,
+   "p50": 96.3,
+   "p95": 2660.8,
+   "p99": 4874.1,
+   "max": 7162.1,
+   "MBsent": 45.5
+  },
+  {
+   "action": "pull after a live notice",
+   "n": 27396,
+   "p50": 235.8,
+   "p95": 2578.8,
+   "p99": 4602.2,
+   "max": 7958,
+   "MBsent": 1694.5
+  },
+  {
+   "action": "save (totRemarks)",
+   "n": 545,
+   "p50": 66.9,
+   "p95": 2203.4,
+   "p99": 3493.5,
+   "max": 5764.6,
+   "MBsent": 0
+  },
+  {
+   "action": "save (totSchedule)",
+   "n": 83,
+   "p50": 204.4,
+   "p95": 2614.2,
+   "p99": 5781.6,
+   "max": 5781.6,
+   "MBsent": 0
+  },
+  {
+   "action": "save (totTasks)",
+   "n": 856,
+   "p50": 85,
+   "p95": 2065.6,
+   "p99": 4703.4,
+   "max": 5903.8,
+   "MBsent": 0
+  }
+ ]
+}
