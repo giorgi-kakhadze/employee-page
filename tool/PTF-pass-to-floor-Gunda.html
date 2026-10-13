@@ -1771,7 +1771,7 @@ const giorgiKnowledge = {
     { id: 'bk.backup', q: 'Where is my backup?',
       phrases: ['backup', 'where is my backup', 'where is backup', 'save my data', 'download data', 'last backup', 'export data', 'export', 'export backup', 'back up'],
       keywords: ['backup', 'export'],
-      resp: 'The ⬇️ **Backup** button (or the “Last backup” pill) in the top bar downloads all saved data as a JSON file. Each space (Employee Data, Onboarding, Workshop, ID Creation, Logbooks) also has its own **Backup** and **Clear history** buttons at the bottom left. It lands wherever your browser saves downloads. Data is also kept in this browser, but a file backup is your safety net.',
+      resp: 'The ⬇️ **Backup** button (or the “Last backup” pill) in the top bar downloads all saved data as a JSON file. For the **admin only**, each space (Employee Data, Onboarding, Workshop, ID Creation, Logbooks) also has its own **Backup** and **Clear history** buttons at the bottom left; staff do not see them. It lands wherever your browser saves downloads. Data is also kept in this browser, but a file backup is your safety net.',
       actions: [DO_BK], sug: ['bk.restore', 'bk.storage', 'bk.clear'] },
     { id: 'bk.restore', q: 'How do I restore a backup?',
       phrases: ['restore', 'import backup', 'load backup', 'recover', 'recover data', 'restore backup'],
@@ -2592,9 +2592,9 @@ window.GiorgiEngine = { reply: reply, replyForIntent: replyForIntent, normalize:
           <div class="eds-actions">
             <button type="button" class="icon-btn" onclick="document.getElementById('edsFileInput').click()">⬆️ Import Excel / CSV</button>
             <button type="button" class="icon-btn" onclick="downloadEmployeeHistory()" title="Download every recorded change to employee details (CSV)">📜 Change history</button>
-            <button type="button" class="icon-btn" onclick="downloadSpaceBackup('employees')" title="Download a backup of the employee list only">⬇️ Backup employee data</button>
+            <button type="button" class="icon-btn adminOnlyData" onclick="downloadSpaceBackup('employees')" title="Download a backup of the employee list only (admin)">⬇️ Backup employee data</button>
             <button type="button" class="icon-btn" onclick="restorePreviousEmployeeImport()" title="Undo the last import (one step back)">↩️ Restore previous import</button>
-            <button type="button" class="icon-btn danger" id="edsClearBtn" style="display:none" onclick="clearEmployeeDataSource()" title="Erase only the employee list (nothing else is touched)">🧹 Clear employee data</button>
+            <button type="button" class="icon-btn danger adminOnlyData" id="edsClearBtn" style="display:none" onclick="clearEmployeeDataSource()" title="Erase only the employee list (nothing else is touched)">🧹 Clear employee data</button>
           </div>
         </div>
         <div class="eds-dropzone" id="edsDropzone" tabindex="0" role="button" aria-label="Drop Excel or CSV file here">
@@ -18651,6 +18651,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 <style id="spaceDataCss">
 #spaceBar{position:fixed;left:14px;bottom:64px;z-index:900;display:none;align-items:center;gap:6px;padding:6px 8px;border-radius:12px;background:var(--navy2);border:1px solid var(--border2);box-shadow:0 6px 22px rgba(0,0,0,.35);font:600 12px 'Inter',system-ui,sans-serif;color:var(--text2)}
 #spaceBar.show{display:flex}
+body:not(.totAdmData) .adminOnlyData,body:not(.totAdmData) #spaceBar{display:none!important}   /* backup and clear-history are for the admin only */
 #spaceBar .sb-label{padding:0 6px 0 4px;color:var(--muted);white-space:nowrap}
 #spaceBar button{font:600 12px 'Inter',system-ui,sans-serif;padding:6px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--navy3);color:var(--text2);cursor:pointer;white-space:nowrap}
 #spaceBar button:hover{border-color:var(--accent);color:var(--accent2)}
@@ -18680,13 +18681,20 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   window._spaceClearId = null;
 
   function allKeys(sp) { return sp.data.concat(sp.settings); }
+  /* Backup and Clear history of a space: the admin only (not staff, not the admin while viewing as somebody else) */
+  function admD() { try { return sessionStorage.getItem('totAdmin') === '1' && !sessionStorage.getItem('totViewAs'); } catch (e) { return false; } }
+  function admNo() { try { showShellToast('Only the admin can back up or clear a space.', 'warning'); } catch (e) {} }
+  function admMark() { try { document.body.classList.toggle('totAdmData', admD()); } catch (e) {} }
+  admMark(); setInterval(admMark, 1500);
 
   window.downloadSpaceBackup = function (id) {
+    if (!admD()) { admNo(); return; }
     var sp = SPACES[id]; if (!sp) return;
     exportBackup(id + '-backup', allKeys(sp), sp.label);
   };
 
   window.openSpaceClear = function (id) {
+    if (!admD()) { admNo(); return; }
     var sp = SPACES[id]; if (!sp) return;
     window._spaceClearId = id;
     document.getElementById('spaceClearTitle').innerHTML = '&#129529; Clear ' + sp.label + ' history?';
@@ -18701,6 +18709,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   window.closeSpaceClear = function () { document.getElementById('spaceClearModal').classList.remove('open'); };
 
   window.confirmSpaceClear = function () {
+    if (!admD()) { admNo(); closeSpaceClear(); return; }
     var id = window._spaceClearId, sp = SPACES[id]; if (!sp) return;
     closeSpaceClear();
     var keys = sp.data.concat(TRANSIENT[id] || []);
@@ -18750,7 +18759,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
   var _sv = window.switchView;
   window.switchView = function (name, mode) {
     var r = _sv.call(this, name, mode);
-    try { showBarFor(typeof currentView !== 'undefined' ? currentView : name); } catch (e) {}
+    try { admMark(); showBarFor(typeof currentView !== 'undefined' ? currentView : name); } catch (e) {}
     return r;
   };
   try { showBarFor(currentView); } catch (e) {}
