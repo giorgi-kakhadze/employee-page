@@ -17959,7 +17959,7 @@ table.ob td.hit{background-image:linear-gradient(rgba(250,204,21,.22),rgba(250,2
   function importTrainees(rows) {
     if (!rows || !rows.length) return 0;
     var head = (rows[0] || []).map(function (x) { return String(x == null ? '' : x).trim().toLowerCase().replace(/\s+/g, ' '); });
-    var hasH = head.indexOf('trainees') >= 0 || head.indexOf('trainee') >= 0 || head.indexOf('name') >= 0;
+    var hasH = (head.indexOf('trainees') >= 0 || head.indexOf('trainee') >= 0 || head.indexOf('name') >= 0) && !dataRow(head);
     /* Fuzzy header lookup: exact first, then partial match — prevents wrong column indices that cause name/email misalignment */
     function ix(names, def) {
       if (!hasH) return def;
@@ -17971,7 +17971,7 @@ table.ob td.hit{background-image:linear-gradient(rgba(250,204,21,.22),rgba(250,2
       }
       for (i = 0; i < names.length; i++) {
         n = names[i];
-        for (j = 0; j < head.length; j++) if (head[j].indexOf(n) >= 0 || n.indexOf(head[j]) >= 0) return j;
+        for (j = 0; j < head.length; j++) if (head[j] && hdrLike(head[j], n)) return j;
       }
       return def;
     }
@@ -18068,10 +18068,15 @@ table.ob td.hit{background-image:linear-gradient(rgba(250,204,21,.22),rgba(250,2
   /* rebuild any deleted Excel columns (in workbook order) so imported trainees always have somewhere to show; renamed/custom columns are kept */
   function restoreInfo() { var def = defCfg(D.track).info, cur = W.cfg.info, out = [], added = 0; def.forEach(function (d) { var e = cur.filter(function (f) { return f.id === d.id && !f.custom; })[0]; if (e) out.push(e); else { out.push(d); added++; } });
     cur.forEach(function (f) { if (out.indexOf(f) < 0 && f.custom) out.push(f); }); W.cfg.info = out; return added; }
+  /* fuzzy header match. A cell only counts as part of a longer name when it is long enough: a data cell such as "M" (gender) or "1" must never
+     match "email" or "last name" (that turned a data row into the header and filled every column with M / F). */
+  function hdrLike(x, n) { return x === n || (x.length >= 3 && x.indexOf(n) >= 0) || (x.length >= 4 && n.indexOf(x) >= 0); }
+  function dataRow(h) { return h.some(function (x) { return /@/.test(x) || x.replace(/\D/g, '').length >= 6; }); }   /* e-mails and phone numbers are data, never headers */
   function findHdr(rows, need) {
     for (var i = 0; i < rows.length; i++) {
       var h = (rows[i] || []).map(hkey);
-      if (need.every(function (n) { return h.indexOf(n) >= 0 || h.some(function (x) { return x.indexOf(n) >= 0 || n.indexOf(x) >= 0; }); })) return i;
+      if (dataRow(h)) continue;
+      if (need.every(function (n) { return h.some(function (x) { return hdrLike(x, n); }); })) return i;
     }
     return -1;
   }
@@ -18086,7 +18091,7 @@ table.ob td.hit{background-image:linear-gradient(rgba(250,204,21,.22),rgba(250,2
       else {
         /* fuzzy: try every XL key as substring */
         Object.keys(XL).forEach(function (k) {
-          if (map[XL[k]] === undefined && (h.indexOf(k) >= 0 || k.indexOf(h) >= 0)) map[XL[k]] = i;
+          if (map[XL[k]] === undefined && h && hdrLike(h, k)) map[XL[k]] = i;
         });
       }
     });
